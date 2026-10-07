@@ -1,0 +1,1 @@
+ALTER TABLE "schedule" ALTER COLUMN "interval_ms" SET DATA TYPE bigint;

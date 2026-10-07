@@ -3,7 +3,7 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { ValidationError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { SCHEDULE_CONFLICT_POLICIES, type Schedule, type ScheduleStatus } from "@aikirun/types/schedule";
@@ -87,6 +87,51 @@ describe("ScheduleService activateSchedule", () => {
 
 			await expect(activating).rejects.toThrow(ValidationError);
 			await expect(activating).rejects.toThrow('Invalid cron timezone "Europe/Atlantis"');
+		}));
+
+	test("accepts an interval that puts the first run in the last millisecond of the year 9999", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const now = Date.now();
+
+			const { schedule } = await withFakeClock(now, async () =>
+				scheduleService.activateSchedule(context.namespaceId, {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: { type: "interval", everyMs: MAX_TIMESTAMP_MS - now },
+				})
+			);
+
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(
+				expect.objectContaining({ id: schedule.id, intervalMs: MAX_TIMESTAMP_MS - now, nextRunAt: MAX_TIMESTAMP_MS })
+			);
+		}));
+
+	test("refuses an activation whose interval puts the first run after the year 9999", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+			const now = Date.now();
+
+			const activating = withFakeClock(now, async () =>
+				scheduleService.activateSchedule(context.namespaceId, {
+					workflowName: "send-invoices",
+					workflowVersionId: "v1",
+					workflowRunInput: asOpaquePayload(workflowRunInput),
+					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					spec: { type: "interval", everyMs: MAX_TIMESTAMP_MS - now + 1 },
+				})
+			);
+
+			await expect(activating).rejects.toThrow(ValidationError);
+			await expect(activating).rejects.toThrow("The interval is too long");
 		}));
 
 	test("matches an existing schedule by a deprecated input hash", () =>

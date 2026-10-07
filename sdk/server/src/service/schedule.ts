@@ -1,7 +1,7 @@
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError, ValidationError } from "@aikirun/lib/error";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type { ScheduleActivateRequestV1, ScheduleListRequestV1 } from "@aikirun/types/api/schedule";
 import type { Hash } from "@aikirun/types/infra/hasher";
 import type { NamespaceId } from "@aikirun/types/namespace";
@@ -156,6 +156,8 @@ export const createScheduleService = ({ repos, imminentTimerQueue }: ScheduleSer
 	): Promise<{ schedule: Schedule }> {
 		if (request.spec.type === "cron") {
 			assertIsValidCronSpec(request.spec);
+		} else if (Date.now() + request.spec.everyMs > MAX_TIMESTAMP_MS) {
+			throw new ValidationError("The interval is too long: the first run would be after the year 9999");
 		}
 		const definitionHashes = await hashScheduleDefinitions(request);
 		return repos.transaction(async (txRepos) =>

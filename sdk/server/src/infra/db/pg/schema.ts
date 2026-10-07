@@ -11,6 +11,7 @@ import {
 import { TASK_STATUSES, type TaskStartOptions } from "@aikirun/types/workflow/task";
 import { relations, type SQL, sql } from "drizzle-orm";
 import {
+	bigint,
 	boolean,
 	check,
 	doublePrecision,
@@ -94,7 +95,7 @@ export const schedule = pgTable(
 		type: scheduleTypeEnum("type").notNull(),
 		cronExpression: text("cron_expression"),
 		cronTimezone: text("cron_timezone"),
-		intervalMs: integer("interval_ms"),
+		intervalMs: bigint("interval_ms", { mode: "number" }),
 		overlapPolicy: scheduleOverlapPolicyEnum("overlap_policy"),
 
 		workflowRunInput: jsonb("workflow_run_input").$type<OpaquePayload>(),
