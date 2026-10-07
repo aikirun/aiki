@@ -17,7 +17,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        # macOS 15 is the oldest macOS image that is not deprecated. Bun uses the system's SQLite
+        # there, and an older system's SQLite is the one more likely to lack something a migration
+        # or a query needs.
+        os: [macos-15, windows-latest]
         runtime: [bun, node]
     defaults:
       run:
@@ -50,6 +53,10 @@ jobs:
       - name: Unit Test (Node)
         if: matrix.runtime == 'node'
         run: bun run test:unit:node
+
+      # On macOS this is the system's SQLite, so it says which version the job tested.
+      - name: Print the SQLite version under Bun
+        run: bun -e 'const { DatabaseSync } = await import("node:sqlite"); console.log(new DatabaseSync(":memory:").prepare("select sqlite_version() as version").get().version)'
 
       - name: Migrate test database
         run: bun run test:db:migrate:apply
