@@ -1,6 +1,6 @@
-import { NotFoundError } from "@aikirun/lib/error";
+import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunStateRequest,
 	WorkflowRunTransitionStateRequestV1,
@@ -466,31 +466,38 @@ export function convertDurationToTimestamp(
 	now: TimestampMs
 ): WorkflowRunState {
 	if (request.status === "scheduled") {
+		const scheduledAt = now + request.scheduledInMs;
+		assertIsValidTimestamp(scheduledAt);
 		return {
 			status: "scheduled",
 			reason: request.reason,
-			scheduledAt: now + request.scheduledInMs,
+			scheduledAt,
 		};
 	}
 
 	if (request.status === "sleeping") {
+		const wakeupAt = now + request.durationMs;
+		assertIsValidTimestamp(wakeupAt);
 		return {
 			status: request.status,
 			sleepName: request.sleepName,
-			wakeupAt: now + request.durationMs,
+			wakeupAt,
 		};
 	}
 
 	if (request.status === "awaiting_event" && request.timeoutInMs !== undefined) {
+		const timeoutAt = now + request.timeoutInMs;
+		assertIsValidTimestamp(timeoutAt);
 		return {
 			status: request.status,
 			eventName: request.eventName,
-			timeoutAt: now + request.timeoutInMs,
+			timeoutAt,
 		};
 	}
 
 	if (request.status === "awaiting_retry") {
 		const nextAttemptAt = now + request.nextAttemptInMs;
+		assertIsValidTimestamp(nextAttemptAt);
 		switch (request.cause) {
 			case "task":
 				return {
@@ -517,10 +524,12 @@ export function convertDurationToTimestamp(
 	}
 
 	if (request.status === "awaiting_child_workflow" && request.timeoutInMs !== undefined) {
+		const timeoutAt = now + request.timeoutInMs;
+		assertIsValidTimestamp(timeoutAt);
 		return {
 			status: request.status,
 			childWorkflowRunId: request.childWorkflowRunId,
-			timeoutAt: now + request.timeoutInMs,
+			timeoutAt,
 		};
 	}
 
@@ -532,4 +541,10 @@ export function convertDurationToTimestamp(
 	}
 
 	return request;
+}
+
+function assertIsValidTimestamp(timestamp: number): void {
+	if (timestamp > MAX_TIMESTAMP_MS) {
+		throw new ValidationError("The duration is too long: it ends after the year 9999");
+	}
 }

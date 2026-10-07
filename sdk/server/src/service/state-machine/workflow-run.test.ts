@@ -1,5 +1,6 @@
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { ValidationError } from "@aikirun/lib/error";
+import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import { workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { WorkflowRunStateRequest } from "@aikirun/types/api/workflow-run";
@@ -232,6 +233,39 @@ describe("convertDurationToTimestamp", () => {
 	}).forEach(([status, request]) => {
 		test(`${status}: carries no duration and passes through unchanged`, () => {
 			expect(convertDurationToTimestamp(request, now)).toEqual(request);
+		});
+	});
+
+	Object.entries({
+		scheduled: (durationMs) => ({ status: "scheduled", reason: "event", scheduledInMs: durationMs }),
+		sleeping: (durationMs) => ({ status: "sleeping", sleepName: "nap", durationMs }),
+		awaiting_retry: (durationMs) => ({
+			status: "awaiting_retry",
+			cause: "task",
+			taskId: "task-1",
+			nextAttemptInMs: durationMs,
+		}),
+		awaiting_event: (durationMs) => ({ status: "awaiting_event", eventName: "order-shipped", timeoutInMs: durationMs }),
+		awaiting_child_workflow: (durationMs) => ({
+			status: "awaiting_child_workflow",
+			childWorkflowRunId: "child-1",
+			timeoutInMs: durationMs,
+		}),
+	} satisfies {
+		[Status in Exclude<TimedWorkflowRunStatus, "awaiting_task_retry">]: (
+			durationMs: number
+		) => Extract<WorkflowRunStateRequest, { status: Status }>;
+	}).forEach(([status, requestWithDuration]) => {
+		test(`${status}: accepts a duration that ends in the last millisecond of the year 9999`, () => {
+			const state = convertDurationToTimestamp(requestWithDuration(MAX_TIMESTAMP_MS - now), now);
+
+			expect(Object.values(state)).toContain(MAX_TIMESTAMP_MS);
+		});
+
+		test(`${status}: refuses a duration that ends after the year 9999`, () => {
+			expect(() => convertDurationToTimestamp(requestWithDuration(MAX_TIMESTAMP_MS - now + 1), now)).toThrow(
+				ValidationError
+			);
 		});
 	});
 });

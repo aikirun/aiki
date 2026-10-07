@@ -1,5 +1,5 @@
-import { NotFoundError } from "@aikirun/lib/error";
-import type { TimestampMs } from "@aikirun/lib/timestamp";
+import { NotFoundError, ValidationError } from "@aikirun/lib/error";
+import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import type {
@@ -158,6 +158,10 @@ async function transitionStateInTx(
 							nextAttemptAt: Date.now() + requestTaskState.nextAttemptInMs,
 						}
 					: (requestTaskState satisfies TaskStateFailed);
+	}
+
+	if (taskState.status === "awaiting_retry" && taskState.nextAttemptAt > MAX_TIMESTAMP_MS) {
+		throw new ValidationError("The retry delay is too long: the next attempt would be after the year 9999");
 	}
 
 	assertIsValidTaskStateTransition(runId, taskName, taskId, existingTask.status, taskState.status);
