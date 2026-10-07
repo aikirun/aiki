@@ -3,6 +3,7 @@ import { timerPriorityQueueTestSuite } from "@aikirun/testing/infra/timer";
 import Redis from "ioredis";
 import { describe, expect, test } from "vitest";
 
+import { getTimerKeys } from "./key";
 import { redisTimerPriorityQueue } from "./priority-queue";
 
 timerPriorityQueueTestSuite({ describe, test, expect }, async (fn) => {
@@ -11,11 +12,12 @@ timerPriorityQueueTestSuite({ describe, test, expect }, async (fn) => {
 		const redisClient = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 		redisClient.on("error", () => {});
 		try {
-			const timersKey = "aiki:timers:test";
-			await redisClient.del(timersKey, `${timersKey}:signal`);
+			const key = "aiki:timers:test";
+			const { timersKey, signalKey } = getTimerKeys(key);
+			await redisClient.del(timersKey, signalKey);
 			const queue = redisTimerPriorityQueue(
 				redisClient,
-				timersKey
+				key
 			)({
 				logger: noopLogger,
 				signal: abortController.signal,
@@ -34,10 +36,10 @@ describe("redisTimerPriorityQueue signals", () => {
 		const redisClient = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 		redisClient.on("error", () => {});
 		try {
-			const timersKey = "aiki:timers:test";
-			const signalKey = `${timersKey}:signal`;
+			const key = "aiki:timers:test";
+			const { timersKey, signalKey } = getTimerKeys(key);
 			await redisClient.del(timersKey, signalKey);
-			const queue = redisTimerPriorityQueue(redisClient, timersKey)({ logger: noopLogger });
+			const queue = redisTimerPriorityQueue(redisClient, key)({ logger: noopLogger });
 
 			await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: 0 });
 			// The first add's own signal, taken the way a waiter would have taken it.

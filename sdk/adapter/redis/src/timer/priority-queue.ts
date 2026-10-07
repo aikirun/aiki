@@ -10,6 +10,7 @@ import type {
 } from "@aikirun/types/infra/timer";
 import type { Redis } from "ioredis";
 
+import { getTimerKeys } from "./key";
 import { attachConnectionSupervisor, connectionTracker, untilReadyHandshake } from "../connection";
 
 function encodeMember(type: TimerType, id: string): string {
@@ -85,7 +86,7 @@ return minSignal
 `;
 
 export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerPriorityQueue {
-	const signalKey = `${key}:signal`;
+	const { timersKey, signalKey } = getTimerKeys(key);
 
 	return ({ logger }): TimerPriorityQueue => {
 		const redisTracker = connectionTracker(redis);
@@ -108,7 +109,7 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 				}
 
 				try {
-					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, key, signalKey, minRank, overdueRank, ...args);
+					await redis.eval(ADD_AND_SIGNAL_SCRIPT, 2, timersKey, signalKey, minRank, overdueRank, ...args);
 				} catch (err) {
 					logger.warn("Timer add command failed", { err, "aiki.count": timers.length });
 					return { status: "failed" };
@@ -118,7 +119,7 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 
 			async popDue({ maxRank, limit }: { maxRank: number; limit: number }): Promise<DueTimer[]> {
 				redisTracker.assertIsAvailable();
-				const pairs = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, key, maxRank, limit)) as string[];
+				const pairs = (await redis.eval(POP_DUE_TIMERS_SCRIPT, 1, timersKey, maxRank, limit)) as string[];
 				if (pairs.length === 0) {
 					return [];
 				}
@@ -134,7 +135,7 @@ export function redisTimerPriorityQueue(redis: Redis, key: string): CreateTimerP
 
 			async peekNext(): Promise<{ rank: number } | null> {
 				redisTracker.assertIsAvailable();
-				const result = await redis.zrangebyscore(key, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
+				const result = await redis.zrangebyscore(timersKey, "-inf", "+inf", "WITHSCORES", "LIMIT", 0, 1);
 				if (result.length < 2) {
 					return null;
 				}
