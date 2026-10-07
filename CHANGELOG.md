@@ -4,7 +4,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ## 0.44.0
 
-Timers are more exact: a timer left over from an earlier wait no longer ends a later one, and timers no longer run late after a due-timers consumer stops. Two calls that create the same run or the same schedule at the same moment now both get it. A schedule activated again after being deactivated starts from its next occurrence. The built-in console logger is exported with a level and a pretty option, prints JSON by default, and logs the steps of a run at `debug`. One Postgres migration (`0045`) ships with this release.
+Timers are more exact: a timer left over from an earlier wait no longer ends a later one, and timers no longer run late after a due-timers consumer stops. Two calls that create the same run or the same schedule at the same moment now both get it. A schedule activated again after being deactivated starts from its next occurrence. The built-in console logger is exported with a level and a pretty option, prints JSON by default, and logs the steps of a run at `debug`. A member of an organization can no longer read its invitations. The dashboard asks before a destructive action, and an organization admin can use any of its namespaces. One Postgres migration (`0045`) ships with this release.
 
 ### Breaking Changes
 
@@ -63,6 +63,8 @@ Timers are more exact: a timer left over from an earlier wait no longer ends a l
   add({ timers, overdueRank });
   ```
 
+- **The auth route that lists an organization's invitations is no longer served.** `GET /auth/organization/list-invitations` returns 404. It returned every invitation to any member of the organization, and the dashboard did not use it. An owner or admin still gets the invitations with the rest of the organization, from `/auth/organization/get-full-organization`.
+
 ### New Features
 
 - **`consoleLogger()` is exported from `@aikirun/client` and `@aikirun/server`.** `level` is the lowest level printed: `"trace"`, `"debug"`, `"info"`, `"warn"` or `"error"`, `"info"` by default. `pretty` prints the coloured, multi-line entries, and is `false` by default.
@@ -74,6 +76,10 @@ Timers are more exact: a timer left over from an earlier wait no longer ends a l
 - **`database()` takes a logger.** `database({ provider: "pg", url }, { logger })` sends Postgres warnings to it at `warn` and other notices at `debug`. The driver used to print each notice to the console as a raw object.
 
 - **`migrateApply()` takes a logger.** `migrateApply({ db, logger })` in `@aikirun/server` and `@aikirun/iam` logs each migration it applies, and Postgres notices, through it. Without one it uses the console logger.
+
+### Web UI
+
+- **The dashboard asks before a destructive action.** Removing a namespace or one of its members, cancelling an invitation, revoking an API key, deactivating a schedule and cancelling a run each ran on the first click. The button now turns into a question in place, and the action runs on Confirm. Removing a namespace also revokes its API keys, and the question says so.
 
 ### Improvements
 
@@ -93,6 +99,12 @@ Timers are more exact: a timer left over from an earlier wait no longer ends a l
 - **`return_existing` returns the schedule with its own workflow.** When a reference id already belonged to a schedule of another workflow, the response named the workflow from the request, and a workflow was created for the request's name and version. The response now names the schedule's own workflow, and nothing is written.
 - **Interval schedules longer than 24.8 days work on Postgres.** The interval was stored in a 32-bit column, so activating one failed with a database error. SQLite was not affected.
 - **An unknown CLI command exits with an error.** `aiki` and each package's own CLI printed the help and exited with code 0, so a typo in a script passed as a success. They now print `Unknown command "..."` and exit with 1.
+- **A member of an organization can no longer read its invitations.** An invitation is accepted with its id, by a signed-in user whose address matches the invited one, and Aiki does not verify addresses. The auth API returned every invitation, id included, to any member of the organization. A member could sign up with an invited address that had no account yet and accept that invitation, including one for an admin. Invitations are now returned only to the organization's owner and admins.
+- **An organization owner or admin can use a namespace they are not a member of.** The dashboard listed every namespace to them and showed the one they picked as selected, but its runs did not load unless they had been added to it. Selecting a namespace now works for anyone with a role in it: an owner or admin of the organization, or a member of the namespace.
+
+### Documentation
+
+- New **Defining a Task Inside a Workflow** section in the tasks doc, with a warning about a handler that takes no input. The quick start's workflow sends a receipt from a task when the payment arrives, so the run's completion shows in the terminal. The logging guide covers the built-in console logger, what Aiki logs at each level, and that a line logged in a workflow handler prints again on a replay. The schedules doc compares pausing with deactivating, and the schedules and reference ids docs name the `code` of each conflict error.
 
 ## 0.43.2
 
