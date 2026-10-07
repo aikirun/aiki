@@ -4,7 +4,7 @@ All notable changes to Aiki packages are documented here. All `@aikirun/*` packa
 
 ## 0.44.0
 
-Timers are more exact: a timer left over from an earlier wait no longer ends a later one, and timers no longer run late after a due-timers consumer stops. Two calls that create the same run or the same schedule at the same moment now both get it. A schedule activated again after being deactivated starts from its next occurrence. The built-in console logger is exported with a level and a pretty option, prints JSON by default, and logs the steps of a run at `debug`. A member of an organization can no longer read its invitations. The dashboard asks before a destructive action, and an organization admin can use any of its namespaces. One Postgres migration (`0045`) ships with this release.
+Timers are more exact: a timer left over from an earlier wait no longer ends a later one, and timers no longer run late after a due-timers consumer stops. Two calls that create the same run or the same schedule at the same moment now both get it. A schedule activated again after being deactivated starts from its next occurrence. The built-in console logger is exported with a level and a pretty option, prints JSON by default, and logs the steps of a run at `debug`. A member of an organization can no longer read its invitations. The dashboard asks before a destructive action, and an organization admin can use any of its namespaces. SQLite needs no driver now: Aiki uses the SQLite built into Node.js and Bun, and requires Node.js 22.16 or Bun 1.4. One Postgres migration (`0045`) ships with this release.
 
 ### Breaking Changes
 
@@ -15,6 +15,20 @@ Timers are more exact: a timer left over from an earlier wait no longer ends a l
   # or, with the aiki binary
   aiki migrate apply --package server
   ```
+
+- **SQLite needs no driver: Aiki uses the SQLite built into Node.js and Bun.** `@libsql/client` is no longer used. `@aikirun/server` and `@aikirun/iam` no longer declare it as a peer dependency, so you can remove it from your project. An existing database file works as it is.
+
+  ```bash
+  npm uninstall @libsql/client
+  ```
+
+  On Node.js 22 and 24, a process prints this the first time it opens the database. It is Node's notice about its built-in SQLite:
+
+  ```
+  ExperimentalWarning: SQLite is an experimental feature and might change at any time
+  ```
+
+- **Aiki requires Node.js 22.16 or Bun 1.4.** The minimum was Node.js 22 or Bun 1.0. On an earlier version the SQLite provider fails with `the sqlite provider requires node:sqlite, which ships with Node 22.16 and later and with Bun 1.4 and later`. The published packages declare `engines.node >=22.16`; with npm's `engine-strict` setting on, installs on older Node versions fail. The `aiki` binary and the Docker images are built with Bun 1.4.2, so they need nothing.
 
 - **The default logger prints one JSON line per entry.** The logger that `client()`, `server()` and `migrateApply()` fall back to used to print coloured, multi-line entries. An error in an entry is written with its name, message, stack and the errors it wraps.
 
@@ -88,6 +102,7 @@ Timers are more exact: a timer left over from an earlier wait no longer ends a l
 - **An invalid cron expression or timezone is refused with a 400.** Activating a schedule with one returned a 500. The message names the field: `Invalid cron expression "61 9 * * *": ...` or `Invalid cron timezone "Europe/Atlantis"`.
 - **A time after the year 9999 is refused with a 400.** This covers a run's start delay, a sleep, the timeout of an event wait or a child wait, a retry delay, a task's retry delay, and a schedule's interval. Postgres failed these with a database error, and SQLite stored a time no date can express.
 - **`migrate apply` no longer prints Postgres's skip notices.** On every run after the first, Postgres answered `CREATE SCHEMA IF NOT EXISTS` with a notice that the driver printed as a raw object. The command's own lines now go through the console logger: `Applying migration 0001_blue_firelord`.
+- **The tests also run on macOS and Windows.** CI runs the unit tests and the SQLite integration tests on macOS 15 and on Windows, under Bun and under Node 22. A release waits for them.
 
 ### Bug Fixes
 
