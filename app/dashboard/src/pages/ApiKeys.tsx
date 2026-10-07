@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { organizationAuthedClient } from "../api/client";
 import { useApiKeys } from "../api/hooks";
 import { useAuth } from "../auth/AuthProvider";
+import { ConfirmPrompt } from "../components/common/ConfirmPrompt";
 import { DataBlock } from "../components/common/DataBlock";
 import { RelativeTime } from "../components/common/RelativeTime";
 import { btnPrimary, eyebrow, primaryHover } from "../components/common/ui";
@@ -333,6 +334,7 @@ function ApiKeyRow({
 }) {
 	const queryClient = useQueryClient();
 	const [isRevoking, setIsRevoking] = useState(false);
+	const [isConfirmingRevoke, setIsConfirmingRevoke] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const color = API_KEY_STATUS_COLORS[apiKey.status] ?? "var(--t3)";
@@ -359,9 +361,12 @@ function ApiKeyRow({
 				display: "flex",
 				alignItems: "center",
 				gap: 10,
+				// The question that confirms a revoke is wider than the button. Wrapping gives it a line of
+				// its own on a narrow screen, where it would otherwise squeeze the key's name out of the row.
+				flexWrap: "wrap",
 			}}
 		>
-			<div style={{ flex: 1, minWidth: 0 }}>
+			<div style={{ flex: "1 1 160px", minWidth: 0 }}>
 				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
 					<span
 						style={{
@@ -420,29 +425,40 @@ function ApiKeyRow({
 
 			{error && <span style={{ fontSize: 11, color: "var(--accent-red)", flexShrink: 0 }}>{error}</span>}
 
-			{canManage && apiKey.status === "active" && (
-				<button
-					type="button"
-					onClick={handleRevoke}
-					disabled={isRevoking}
-					style={{
-						background: "none",
-						border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
-						borderRadius: "var(--r-chip)",
-						padding: "4px 10px",
-						fontSize: 11,
-						fontWeight: 600,
-						color: "var(--accent-red)",
-						cursor: isRevoking ? "not-allowed" : "pointer",
-						opacity: isRevoking ? 0.5 : 1,
-						whiteSpace: "nowrap",
-						flexShrink: 0,
-						transition: "border-color 0.15s, opacity 0.15s",
-					}}
-				>
-					{isRevoking ? "Revoking..." : "Revoke"}
-				</button>
-			)}
+			{canManage &&
+				apiKey.status === "active" &&
+				(isConfirmingRevoke ? (
+					<ConfirmPrompt
+						question="Revoke this key? This cannot be undone."
+						onConfirm={() => {
+							setIsConfirmingRevoke(false);
+							handleRevoke();
+						}}
+						onCancel={() => setIsConfirmingRevoke(false)}
+					/>
+				) : (
+					<button
+						type="button"
+						onClick={() => setIsConfirmingRevoke(true)}
+						disabled={isRevoking}
+						style={{
+							background: "none",
+							border: "1px solid color-mix(in srgb, var(--accent-red) var(--edge-mix), transparent)",
+							borderRadius: "var(--r-chip)",
+							padding: "4px 10px",
+							fontSize: 11,
+							fontWeight: 600,
+							color: "var(--accent-red)",
+							cursor: isRevoking ? "not-allowed" : "pointer",
+							opacity: isRevoking ? 0.5 : 1,
+							whiteSpace: "nowrap",
+							flexShrink: 0,
+							transition: "border-color 0.15s, opacity 0.15s",
+						}}
+					>
+						{isRevoking ? "Revoking..." : "Revoke"}
+					</button>
+				))}
 		</div>
 	);
 }
