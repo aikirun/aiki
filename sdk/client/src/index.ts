@@ -1,5 +1,5 @@
 export type { ConsoleLoggerOptions, Logger } from "@aikirun/lib/logger";
-export { createConsoleLogger as consoleLogger } from "@aikirun/lib/logger";
+export { consoleLogger } from "@aikirun/lib/logger";
 export type {
 	ApiClient,
 	Client,

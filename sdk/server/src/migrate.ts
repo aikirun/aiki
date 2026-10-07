@@ -8,7 +8,7 @@ import {
 	type MigrationSource,
 	readMigrationsDirectory,
 } from "@aikirun/lib/db/migrate";
-import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
+import { consoleLogger, type Logger } from "@aikirun/lib/logger";
 
 import pgJournal from "./infra/db/pg/migration/meta/_journal.json" with { type: "json" };
 import sqliteJournal from "./infra/db/sqlite/migration/meta/_journal.json" with { type: "json" };
@@ -46,6 +46,6 @@ export async function migrateApply(params: MigrateApplyParams): Promise<void> {
 		source: migrationSource(params.db.provider),
 		migrationsTable: MIGRATIONS_TABLE,
 		db: params.db,
-		logger: params.logger ?? createConsoleLogger(),
+		logger: params.logger ?? consoleLogger(),
 	});
 }

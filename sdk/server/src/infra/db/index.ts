@@ -1,5 +1,5 @@
 import type { DatabaseConfig } from "@aikirun/lib/db";
-import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
+import { consoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { CreateDatabase, Database, DatabaseCloseOptions } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 
@@ -24,7 +24,7 @@ export function database(config: DatabaseConfig, options?: DatabaseOptions): Cre
 				}
 				case "pg": {
 					const postgres = await importPostgres();
-					const logger = options?.logger ?? createConsoleLogger();
+					const logger = options?.logger ?? consoleLogger();
 					// Keys must be absent, not undefined: the driver merges options by key presence,
 					// so an explicit undefined beats its own default.
 					const client = postgres(config.url, {

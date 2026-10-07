@@ -4,7 +4,7 @@ import { loadDatabaseConfig, loadDatabaseProvider } from "@aikirun/lib/db";
 import { migrateApply, migrateList, migrationSource } from "@aikirun/lib/db/migrate";
 import { isMigrateSubcommand, MIGRATE_SUBCOMMAND_HELP, MIGRATE_SUBCOMMANDS } from "@aikirun/lib/db/migrate/cli";
 import { describeErrorCauses } from "@aikirun/lib/error";
-import { createConsoleLogger } from "@aikirun/lib/logger";
+import { consoleLogger } from "@aikirun/lib/logger";
 import { cac } from "cac";
 import { config as loadEnv } from "dotenv";
 
@@ -76,7 +76,7 @@ cli
 		switch (subcommand) {
 			case "apply": {
 				const dbConfig = loadDatabaseConfig();
-				const logger = createConsoleLogger({ pretty: true });
+				const logger = consoleLogger({ pretty: true });
 				for (const pkg of packages) {
 					const packageData = embeddedMigrationData[pkg];
 					if (!packageData) {

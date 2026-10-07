@@ -1,4 +1,4 @@
-import { createConsoleLogger } from "@aikirun/lib/logger";
+import { consoleLogger } from "@aikirun/lib/logger";
 import type { Serializable } from "@aikirun/lib/serializable";
 import type { ApiClient, Client, ClientParams, EmbeddedClientParams, RemoteClientParams } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -39,7 +39,7 @@ export function client<Context = null, Encoded = never>(
 	params: EmbeddedClientParams<Context, Encoded> & Serializable<Encoded, "encoded">
 ): Client<Context>;
 export function client<Context = null>(params: ClientParams<Context>): Client<Context> {
-	const logger = params.logger ?? createConsoleLogger();
+	const logger = params.logger ?? consoleLogger();
 	const hasher = params.hasher?.({ logger });
 	const codec = params.codec?.({ logger });
 

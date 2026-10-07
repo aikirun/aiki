@@ -32,15 +32,15 @@ export interface ConsoleLoggerOptions {
 	pretty?: boolean;
 }
 
-export function createConsoleLogger(options: ConsoleLoggerOptions = {}): Logger {
-	return createConsoleLoggerWithBindings({
+export function consoleLogger(options: ConsoleLoggerOptions = {}): Logger {
+	return consoleLoggerWithBindings({
 		level: options.level ?? "info",
 		pretty: options.pretty ?? false,
 		bindings: {},
 	});
 }
 
-function createConsoleLoggerWithBindings(params: {
+function consoleLoggerWithBindings(params: {
 	level: LogLevel;
 	pretty: boolean;
 	bindings: Record<string, unknown>;
@@ -120,7 +120,7 @@ function createConsoleLoggerWithBindings(params: {
 			}
 		},
 		child(childBindings) {
-			return createConsoleLoggerWithBindings({
+			return consoleLoggerWithBindings({
 				level: params.level,
 				pretty,
 				bindings: { ...bindings, ...childBindings },

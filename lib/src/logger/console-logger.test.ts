@@ -1,13 +1,13 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { createConsoleLogger } from "./console-logger";
+import { consoleLogger } from "./console-logger";
 
-describe("createConsoleLogger", () => {
+describe("consoleLogger", () => {
 	test("prints each entry as one JSON line by default", () => {
 		const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
 		try {
 			const earliestLogTime = Date.now();
-			createConsoleLogger().info("Payment authorized", { orderId: "order-1" });
+			consoleLogger().info("Payment authorized", { orderId: "order-1" });
 			const latestLogTime = Date.now();
 
 			const lines = consoleInfo.mock.calls.map(([line]) => String(line));
@@ -24,7 +24,7 @@ describe("createConsoleLogger", () => {
 	test("does not print an entry below its level", () => {
 		const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
 		try {
-			createConsoleLogger({ level: "warn" }).info("Payment authorized");
+			consoleLogger({ level: "warn" }).info("Payment authorized");
 
 			expect(consoleInfo.mock.calls).toEqual([]);
 		} finally {
@@ -35,7 +35,7 @@ describe("createConsoleLogger", () => {
 	test("prints an entry at its level", () => {
 		const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
 		try {
-			createConsoleLogger({ level: "warn" }).warn("Payment retried");
+			consoleLogger({ level: "warn" }).warn("Payment retried");
 
 			expect(consoleWarn.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
 				expect.objectContaining({ level: "warn", msg: "Payment retried" }),
@@ -48,7 +48,7 @@ describe("createConsoleLogger", () => {
 	test("adds a child's bindings to each entry", () => {
 		const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
 		try {
-			createConsoleLogger().child({ service: "billing" }).info("Payment authorized", { orderId: "order-1" });
+			consoleLogger().child({ service: "billing" }).info("Payment authorized", { orderId: "order-1" });
 
 			expect(consoleInfo.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
 				expect.objectContaining({ service: "billing", orderId: "order-1", msg: "Payment authorized" }),
@@ -64,7 +64,7 @@ describe("createConsoleLogger", () => {
 			const diskError = Object.assign(new Error("disk quota exceeded"), { code: "EDQUOT" });
 			const exportError = new Error("export failed", { cause: diskError });
 
-			createConsoleLogger().error("Export failed", { err: exportError });
+			consoleLogger().error("Export failed", { err: exportError });
 
 			expect(consoleError.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
 				expect.objectContaining({
@@ -88,7 +88,7 @@ describe("createConsoleLogger", () => {
 			const diskError = Object.assign(new Error("disk quota exceeded"), { code: "EDQUOT" });
 			const exportError = new Error("export failed", { cause: diskError });
 
-			createConsoleLogger({ pretty: true }).error("Export failed", { err: exportError });
+			consoleLogger({ pretty: true }).error("Export failed", { err: exportError });
 
 			expect(consoleError.mock.calls.map(([output]) => withoutColors(String(output)))).toEqual([
 				expect.stringMatching(

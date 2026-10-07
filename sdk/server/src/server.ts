@@ -1,6 +1,6 @@
 import { settleWithin } from "@aikirun/lib/async";
 import type { CreateConfigProvider, CreatePassiveConfigProvider } from "@aikirun/lib/config";
-import { createConsoleLogger, type Logger } from "@aikirun/lib/logger";
+import { consoleLogger, type Logger } from "@aikirun/lib/logger";
 import type { Iam } from "@aikirun/types/iam";
 import type { CreateCache } from "@aikirun/types/infra/cache";
 import type { CreateDatabase } from "@aikirun/types/infra/db";
@@ -47,7 +47,7 @@ export interface Server {
 }
 
 export function server(params: ServerParams): Server {
-	const logger = params.logger ?? createConsoleLogger();
+	const logger = params.logger ?? consoleLogger();
 
 	let handler: Server["handler"] | undefined;
 	let createHandlerPromise: Promise<Server["handler"]> | undefined;

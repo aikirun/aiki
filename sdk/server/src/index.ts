@@ -6,7 +6,7 @@ export type {
 	SqliteDatabaseConfig /*, MysqlDatabaseConfig*/,
 } from "@aikirun/lib/db";
 export type { ConsoleLoggerOptions, Logger } from "@aikirun/lib/logger";
-export { createConsoleLogger as consoleLogger } from "@aikirun/lib/logger";
+export { consoleLogger } from "@aikirun/lib/logger";
 
 export type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./config";
 export { defaultServerRuntimeConfig, dynamicRuntimeConfigProvider, staticRuntimeConfigProvider } from "./config";
