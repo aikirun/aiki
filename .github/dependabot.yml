@@ -23,6 +23,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Only minor and patch updates are grouped. A major update gets its own pull request, so one
+    # that needs migration work does not hold up the rest.
     groups:
       bun:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+    # Aiki's minimum is Node 22.16, so the Node types stay on 22.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
