@@ -2,9 +2,11 @@ import type { Database } from "@aikirun/types/infra/db";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 
 import type { PgClient } from "./infra/db/pg/provider";
+import { createRepos } from "./infra/db/repo";
 import type { SqliteClient } from "./infra/db/sqlite/provider";
 
 type BetterAuthSchema = Record<
@@ -72,7 +74,25 @@ export interface AuthServiceParams {
 	trustedOrigins: string[];
 }
 
+interface OrganizationWithInvitations {
+	id: string;
+	invitations: unknown[];
+}
+
+function isOrganizationWithInvitations(value: unknown): value is OrganizationWithInvitations {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"id" in value &&
+		typeof value.id === "string" &&
+		"invitations" in value &&
+		Array.isArray(value.invitations)
+	);
+}
+
 export async function createAuthService(params: AuthServiceParams) {
+	const repos = await createRepos(params.db);
+
 	return betterAuth({
 		database: await createDrizzleAdapter(params.db),
 		baseURL: params.baseURL,
@@ -90,8 +110,38 @@ export async function createAuthService(params: AuthServiceParams) {
 			enabled: true,
 		},
 
+		// A signed-in user accepts an invitation with its id, and Aiki cannot ask anyone to prove an
+		// address is theirs. An organization's invitations are therefore readable only by the roles
+		// that can send one. This route hands them to any member, and the dashboard does not use it.
+		disabledPaths: ["/organization/list-invitations"],
+
+		hooks: {
+			after: createAuthMiddleware(async (context) => {
+				if (context.path !== "/organization/get-full-organization") {
+					return;
+				}
+
+				const organization = context.context.returned;
+				if (!isOrganizationWithInvitations(organization)) {
+					return;
+				}
+
+				const session = await getSessionFromCtx(context);
+				const organizationRole = session
+					? await repos.organization.getMemberRole(organization.id, session.user.id)
+					: null;
+				if (organizationRole === "owner" || organizationRole === "admin") {
+					return;
+				}
+
+				return context.json({ ...organization, invitations: [] });
+			}),
+		},
+
 		plugins: [
 			organization({
+				// Aiki sends no email, so no address is ever verified. Requiring it would refuse every invitation.
+				requireEmailVerificationOnInvitation: false,
 				organizationHooks: {
 					beforeDeleteTeam: async () => {
 						throw new Error("Namespaces cannot be hard-deleted");
