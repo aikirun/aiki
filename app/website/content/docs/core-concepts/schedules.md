@@ -165,6 +165,21 @@ const handle = await dailyReport
 
 The definition is immutable, so a reference ID that already points at a different definition is a conflict, not an update. With `"error"` the activation throws an error whose `code` is `"SCHEDULE_CONFLICT"`; with `"return_existing"` it returns the existing schedule as-is. Re-activating with the *same* definition is idempotent: it returns the existing schedule. If that schedule is paused, re-activating does not resume it; only `resume()` does. If the schedule was deactivated, re-activating brings it back and it [starts again from its next occurrence](#managing-schedules).
 
+### One Schedule per Definition
+
+A reference ID does not replace the definition as a schedule's identity. It is a second name for it. A definition has one schedule, and that schedule has at most one reference ID. A deactivated schedule keeps both: deactivating frees neither its definition nor its reference ID.
+
+| Activating with | Result |
+|-----------------|--------|
+| The same reference ID and the same definition | Returns the schedule, and brings it back if it was deactivated |
+| The same reference ID and a different definition | The [conflict policy](#conflict-policy) decides |
+| A new reference ID and a new definition | Creates a schedule |
+| A new reference ID and a definition that already has a schedule under another reference ID | Throws an error with code `SCHEDULE_CONFLICT`, whatever the conflict policy |
+| A reference ID and a definition whose schedule has none | That schedule takes the reference ID |
+| No reference ID | Finds the schedule by its definition, whether or not it has a reference ID |
+
+The reason is the schedule's history. A schedule says which workflow version it starts, with which input and options, on which timetable and overlap policy, and every run it created was created under that. An in-place edit, or a second schedule for the same definition, would leave history that no longer matches the schedule.
+
 For more on reference IDs in workflows and events, see the [Reference IDs guide](../guides/reference-ids.md).
 
 ## Managing Schedules

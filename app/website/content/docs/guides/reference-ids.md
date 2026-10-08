@@ -104,6 +104,8 @@ Schedules use the same conflict policies as workflows:
 
 A schedule's definition is immutable, so a reference ID that already points at a different definition is a conflict, never an update. `"error"` throws an error whose `code` is `"SCHEDULE_CONFLICT"`; `"return_existing"` hands back the existing schedule as-is.
 
+The rule also holds the other way: a definition has one schedule, so activating it under a second reference ID throws `SCHEDULE_CONFLICT`, whatever the conflict policy and even if the schedule is deactivated. See [One Schedule per Definition](../core-concepts/schedules.md#one-schedule-per-definition).
+
 See the [Schedules documentation](../core-concepts/schedules.md#reference-ids) for more details.
 
 ## How It Works
