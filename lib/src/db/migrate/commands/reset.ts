@@ -38,7 +38,7 @@ async function resetSqlite(config: SqliteDatabaseConfig, migrationsTable: string
 		const tables = await client.execute(
 			`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`
 		);
-		const tableNames = tables.rows.map((row) => String(row.name));
+		const tableNames = tables.rows.map(([name]) => String(name));
 		if (tableNames.length > 0) {
 			await client.execute("PRAGMA foreign_keys = OFF");
 			try {
