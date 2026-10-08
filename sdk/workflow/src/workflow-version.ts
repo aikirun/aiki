@@ -27,6 +27,7 @@ import type {
 } from "@aikirun/types/workflow/run";
 import {
 	ClientCodecMissingError,
+	ClientCodecSkipForbiddenError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
@@ -226,7 +227,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		return this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
 	}
 
-	// TODO: restrict cancelling codec for child when parent applied!
 	private async startAsChildWithOptions(
 		parentRun: WorkflowRun<Context, EventsDefinition>,
 		startOptions: WorkflowStartOptions,
@@ -238,6 +238,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		} = parentRun;
 		const { assertExecutionAllowed, client } = parentRunHandle[INTERNAL];
 		assertExecutionAllowed();
+
+		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
+			throw new ClientCodecSkipForbiddenError(parentRun.id);
+		}
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;

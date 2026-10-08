@@ -18,6 +18,7 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	ClientCodecMissingError,
+	ClientCodecSkipForbiddenError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -1053,7 +1054,7 @@ describe("creating a workflow run", () => {
 				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBe(encodeError);
 			}));
 
-		test("skips the client codec on the child when clientCodecPolicy is skip, even if the parent applied it", () =>
+		test("rejects skipping the client codec on the child when the parent applied it", () =>
 			withFakeClient(async (client) => {
 				client[INTERNAL].codec = {
 					encode: async () => {
@@ -1067,6 +1068,27 @@ describe("creating a workflow run", () => {
 					},
 				});
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				await expect(
+					childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload")
+				).rejects.toBeInstanceOf(ClientCodecSkipForbiddenError);
+			}));
+
+		test("skips the client codec on the child when clientCodecPolicy is skip and the parent skipped", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);
 				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
 				const inputHash = await hashInput("payload");
