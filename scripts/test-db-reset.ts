@@ -1,9 +1,15 @@
 import { loadDatabaseConfig } from "@aikirun/lib/db";
 import { migrateReset } from "@aikirun/lib/db/migrate";
 
-import { MIGRATIONS_TABLE as iamMigrationsTable } from "../sdk/iam/src/migrate";
-import { MIGRATIONS_TABLE as serverMigrationsTable } from "../sdk/server/src/migrate";
-
 const db = loadDatabaseConfig();
-await migrateReset({ migrationsTable: serverMigrationsTable, db });
-await migrateReset({ migrationsTable: iamMigrationsTable, db });
+
+switch (db.provider) {
+	case "pg":
+		await migrateReset({ db, schemas: ["public", "drizzle"] });
+		break;
+	case "sqlite":
+		await migrateReset({ db });
+		break;
+	default:
+		db satisfies never;
+}
