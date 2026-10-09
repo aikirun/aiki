@@ -27,6 +27,7 @@ import type {
 } from "@aikirun/types/workflow/run";
 import {
 	ClientCodecMissingError,
+	ClientCodecSkipForbiddenError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
@@ -37,7 +38,7 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
-import { noopCodec, toBoundCodec } from "./run/bound-codec";
+import { resolveClientCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import {
 	isRequestUnanswered,
@@ -67,9 +68,10 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	 * Sets one option and returns a copy. The original is unchanged.
 	 *
 	 * Which type comes back depends on what the option answers. `retry` answers "if this fails, try
-	 * three more times"; `pool` answers "run on this kind of workers". Answers like those fit any
-	 * run, so setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which
-	 * you can go on starting as often as you like.
+	 * three more times"; `pool` answers "run on this kind of workers"; `clientCodecPolicy` answers
+	 * "store this run's payloads with or without the client's codec applied". Answers like those fit any run, so
+	 * setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which you can
+	 * go on starting as often as you like.
 	 *
 	 * `reference` answers "this particular run is order-123"; `delay` answers "execute this particular run five minutes from now".
 	 * Both are about one particular run, so setting one returns a {@link WorkflowVersionStart}:
@@ -156,8 +158,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	private runOptions(): WorkflowRunOptions {
-		const { retry, pool, priority } = this.startOptionsBuilder.build();
-		return { retry, pool, priority };
+		const { retry, pool, priority, clientCodecPolicy } = this.startOptionsBuilder.build();
+		return { retry, pool, priority, clientCodecPolicy };
 	}
 
 	public with<Path extends PathFromObject<WorkflowStartOptions>>(
@@ -186,7 +188,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
-		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const { codec, applied: clientCodecApplied } = resolveClientCodec(clientCodec, startOptions.clientCodecPolicy);
 		const schema = this.params.schema?.input;
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(input);
@@ -205,7 +207,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			input: await codec.encode(input),
 			inputHash,
 			clientHasherApplied: clientHasher !== undefined,
-			clientCodecApplied: clientCodec !== undefined,
+			clientCodecApplied,
 			options: startOptions,
 		});
 
@@ -218,8 +220,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		return workflowRunHandle(client, id as WorkflowRunId, this[INTERNAL].eventsDefinition);
 	}
 
-	public async startAsChild(
-		parentRun: WorkflowRun<Context, EventsDefinition>,
+	public async startAsChild<ParentEvents extends EventsDefinition>(
+		parentRun: WorkflowRun<Context, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>> {
 		return this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
@@ -234,8 +236,12 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			logger: parentRunLogger,
 			[INTERNAL]: { handle: parentRunHandle, hasher: parentRunHasher, replayManifest: parentRunReplayManifest },
 		} = parentRun;
-		const { assertExecutionAllowed, client, codec: parentRunCodec } = parentRunHandle[INTERNAL];
+		const { assertExecutionAllowed, client } = parentRunHandle[INTERNAL];
 		assertExecutionAllowed();
+
+		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
+			throw new ClientCodecSkipForbiddenError(parentRun.id);
+		}
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
@@ -246,6 +252,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		// we should use a parent hasher instead of the client to enforce consistency
 		const inputHash = { value: await parentRunHasher(input) };
+		const { codec, applied: clientCodecApplied } = resolveClientCodec(
+			client[INTERNAL].codec,
+			startOptions.clientCodecPolicy
+		);
 
 		const referenceId = startOptions.reference?.id;
 		const address = getCompositeId<WorkflowRunAddress>({
@@ -285,7 +295,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			);
 		}
 
-		const encodedInput = await parentRunCodec.encode(input);
+		const encodedInput = await codec.encode(input);
 
 		let newRun: WorkflowRunRecord;
 		try {
@@ -295,7 +305,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				input: encodedInput,
 				inputHash,
 				clientHasherApplied: parentRunHandle.run.clientHasherApplied,
-				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
+				clientCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: {
 					...startOptions,

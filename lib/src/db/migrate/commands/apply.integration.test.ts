@@ -7,6 +7,7 @@ import { loadDatabaseConfig } from "../../config";
 import { type Migrations, migrationSource } from "../source";
 import {
 	createLegacyMigrationsTable,
+	fromDatabaseBigint,
 	qualifiedMigrationsTable,
 	runSql,
 	withMigrationsFixture,
@@ -285,16 +286,4 @@ async function readMigrationsTable(migrationsTable: string) {
 		hash: migrationRow.hash,
 		createdAtMs: Number(migrationRow.created_at),
 	}));
-}
-
-// Postgres returns a bigint column as a string.
-function fromDatabaseBigint(value: number): number | string {
-	switch (dbConfig.provider) {
-		case "sqlite":
-			return value;
-		case "pg":
-			return String(value);
-		default:
-			return dbConfig satisfies never;
-	}
 }

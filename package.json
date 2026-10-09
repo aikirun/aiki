@@ -33,6 +33,7 @@
 		"test:integration:node": "node --env-file-if-exists=.env.test node_modules/vitest/vitest.mjs run --project integration",
 		"db:migrate:generate": "bun run --cwd sdk/server db:migrate:generate && bun run --cwd sdk/iam db:migrate:generate",
 		"test:db:migrate:apply": "bun sdk/server/src/bin.ts migrate apply --env-file .env.test && bun sdk/iam/src/bin.ts migrate apply --env-file .env.test",
+		"test:db:reset": "bun --env-file=.env.test scripts/test-db-reset.ts",
 		"server": "bun run --cwd app/server start",
 		"server:watch": "bun run --cwd app/server start:watch",
 		"dashboard": "bun run --cwd app/dashboard dev",

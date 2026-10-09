@@ -1,7 +1,21 @@
+import { runSql as runSqlAgainst } from "./sql";
 import { loadDatabaseConfig } from "../../config";
 import type { Migrations } from "../source";
 
+export { fromDatabaseBigint } from "./sql";
+
 const dbConfig = loadDatabaseConfig();
+
+export function qualifiedMigrationsTable(migrationsTable: string): string {
+	switch (dbConfig.provider) {
+		case "sqlite":
+			return `"${migrationsTable}"`;
+		case "pg":
+			return `drizzle."${migrationsTable}"`;
+		default:
+			return dbConfig satisfies never;
+	}
+}
 
 export interface MigrationsFixture {
 	widgetTable: string;
@@ -46,17 +60,6 @@ export async function withMigrationsFixture(fn: (fixture: MigrationsFixture) => 
 	}
 }
 
-export function qualifiedMigrationsTable(migrationsTable: string): string {
-	switch (dbConfig.provider) {
-		case "sqlite":
-			return `"${migrationsTable}"`;
-		case "pg":
-			return `drizzle."${migrationsTable}"`;
-		default:
-			return dbConfig satisfies never;
-	}
-}
-
 // Creates a migrations table in the legacy format, which has no tag column.
 export async function createLegacyMigrationsTable(migrationsTable: string): Promise<void> {
 	switch (dbConfig.provider) {
@@ -77,29 +80,5 @@ export async function createLegacyMigrationsTable(migrationsTable: string): Prom
 }
 
 export async function runSql(statement: string): Promise<Record<string, unknown>[]> {
-	switch (dbConfig.provider) {
-		case "sqlite": {
-			const { openSqliteClient } = await import("../../sqlite");
-			const client = await openSqliteClient(dbConfig);
-			try {
-				const queryResult = await client.execute(statement);
-				return queryResult.rows.map((row) =>
-					Object.fromEntries(queryResult.columns.map((column, columnIndex) => [column, row[columnIndex]]))
-				);
-			} finally {
-				client.close();
-			}
-		}
-		case "pg": {
-			const { default: postgres } = await import("postgres");
-			const client = postgres(dbConfig.url, { max: 1, onnotice: () => {} });
-			try {
-				return [...(await client.unsafe(statement))];
-			} finally {
-				await client.end();
-			}
-		}
-		default:
-			return dbConfig satisfies never;
-	}
+	return runSqlAgainst(dbConfig, statement);
 }

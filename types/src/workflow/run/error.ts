@@ -91,3 +91,17 @@ export class ClientCodecMissingError extends Error {
 		this.id = id;
 	}
 }
+
+/**
+ * A child start asked to skip the client codec while its parent run already applied one.
+ * Children of an encoded parent must keep the same declaration.
+ */
+export class ClientCodecSkipForbiddenError extends Error {
+	public readonly parentId: WorkflowRunId;
+
+	constructor(parentId: WorkflowRunId) {
+		super(`Child workflow cannot skip the client codec when parent run ${parentId} applied it`);
+		this.name = "ClientCodecSkipForbiddenError";
+		this.parentId = parentId;
+	}
+}
