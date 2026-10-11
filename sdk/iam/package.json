@@ -28,9 +28,9 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@orpc/contract": "^1.9.3",
-		"@orpc/server": "^1.9.3",
-		"arktype": "^2.1.29",
+		"@orpc/contract": "^1.15.5",
+		"@orpc/server": "^1.15.5",
+		"arktype": "^2.2.8",
 		"better-auth": "~1.7.7",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",
