@@ -2,7 +2,10 @@
 
 Two tiers: `*.test.ts` are hermetic unit tests (`bun run test:unit`, no database);
 `*.integration.test.ts` run against a live Postgres (`bun run test:integration`, credentials in
-`.env.test` — see DB.md).
+`.env.test` — see DB.md) or SQLite instance (resolved in `.env.test`).
+
+If a test case involves a usage of te real DB instance (Postgres/SQLite), always treat it as
+integration test and keep it in `*.integration.test.ts` file.
 
 Both tiers run on Bun and on Node. `bun run test:unit` and `bun run test:integration` use Bun's
 test runner; `bun run test:unit:node` and `bun run test:integration:node` run the same files on
