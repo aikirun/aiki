@@ -1,4 +1,5 @@
 import { NotFoundError, ValidationError } from "@aikirun/lib/error";
+import { getRetryDelayUpperBoundMs } from "@aikirun/lib/retry";
 import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type { TaskTransitionStateRequestV1 } from "@aikirun/types/api/task";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -92,6 +93,14 @@ async function transitionStateInTx(
 		const taskId = ulid() as TaskId;
 		const stateTransitionId = ulid();
 		const attempts = 1;
+
+		const retry = request.options?.retry;
+		if (retry) {
+			const firstRetryDelayMs = getRetryDelayUpperBoundMs(attempts, retry);
+			if (firstRetryDelayMs !== undefined && Date.now() + firstRetryDelayMs > MAX_TIMESTAMP_MS) {
+				throw new ValidationError("The retry delay is too long: the first retry would be after the year 9999");
+			}
+		}
 
 		const taskState: TaskStateRunning = {
 			status: "running",

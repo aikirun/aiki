@@ -422,3 +422,11 @@ export function isRequestUnanswered(err: unknown): boolean {
 	const status = err != null && typeof err === "object" && "status" in err ? err.status : undefined;
 	return typeof status !== "number" || status >= 500 || status === 408 || status === 429;
 }
+
+/**
+ * True when the server rejected the request as invalid (400). The same request is rejected
+ * again however often it is sent.
+ */
+export function isRequestInvalid(err: unknown): boolean {
+	return err != null && typeof err === "object" && "status" in err && err.status === 400;
+}

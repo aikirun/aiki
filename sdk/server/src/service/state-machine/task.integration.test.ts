@@ -1,3 +1,4 @@
+import { hashInput } from "@aikirun/lib/crypto";
 import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import { MAX_TIMESTAMP_MS } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
@@ -74,6 +75,68 @@ describe("TaskStateMachine transitionState", () => {
 
 			await expect(transitioning).rejects.toThrow(ValidationError);
 			await expect(transitioning).rejects.toThrow("The retry delay is too long");
+		}));
+
+	test("creates a task whose retry delay puts its first retry in the last millisecond of the year 9999", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const taskStateMachine = createTaskStateMachine({ repos });
+			const input = { cardId: "card-1" };
+			const now = Date.now();
+			const retry = { type: "fixed" as const, maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now };
+
+			const taskInfo = await withFakeClock(now, async () =>
+				taskStateMachine.transitionState(context, {
+					type: "create",
+					workflowRunId: runId,
+					expectedWorkflowRunRevision: revisionWhenClaimed,
+					sequence: 1,
+					taskName: "charge-card",
+					input: asOpaquePayload(input),
+					inputHash: await hashInput(input),
+					options: { retry },
+				})
+			);
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					options: { retry },
+					state: expect.objectContaining({ status: "running" }),
+				}),
+			]);
+		}));
+
+	test("refuses to create a task whose retry delay puts its first retry after the year 9999", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const taskStateMachine = createTaskStateMachine({ repos });
+			const input = { cardId: "card-1" };
+			const now = Date.now();
+
+			const creating = withFakeClock(now, async () =>
+				taskStateMachine.transitionState(context, {
+					type: "create",
+					workflowRunId: runId,
+					expectedWorkflowRunRevision: revisionWhenClaimed,
+					sequence: 1,
+					taskName: "charge-card",
+					input: asOpaquePayload(input),
+					inputHash: await hashInput(input),
+					options: { retry: { type: "fixed", maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now + 1 } },
+				})
+			);
+
+			await expect(creating).rejects.toThrow(ValidationError);
+			await expect(creating).rejects.toThrow("The retry delay is too long");
 		}));
 
 	test("retries a running task as the same attempt", () =>

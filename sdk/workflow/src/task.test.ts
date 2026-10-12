@@ -627,6 +627,71 @@ describe("task", () => {
 				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
 			}));
 
+		test("fails the task and throws TaskFailedError when the server rejects the retry as invalid", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: 0 });
+
+				const retry = { type: "fixed", maxAttempts: 2, delayMs: 1_000 } as const;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("down");
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: chargeCard.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.rejectsOnce(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "awaiting_retry",
+								error: expect.objectContaining({ message: "down" }),
+								nextAttemptInMs: 1_000,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ code: "BAD_REQUEST", status: 400 }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "failed",
+								error: expect.objectContaining({ message: "down" }),
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 3,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
+
+				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
+			}));
+
 		test("does not re-run the handler when completing the task fails", () =>
 			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
