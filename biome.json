@@ -63,6 +63,7 @@
 			"!!**/node_modules",
 			"!!**/coverage",
 			"!!notes",
+			"!!.claude",
 			"!!**/.source",
 			"!!**/build",
 			"!!**/.react-router"

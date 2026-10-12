@@ -23,6 +23,9 @@ This document outlines the TypeScript coding style and conventions for the proje
 - Use `import Bar = Foo.Bar` namespace aliases with caution — if `Foo.Bar` is renamed, the alias won't auto-update.
 - Error handling: prefer guard clauses and explicit error types; avoid complex/nested ternaries. Simple ternaries for assignments are acceptable if readable. Guard clauses first, happy path last.
 - A file either holds code or re-exports other files (a barrel), never both. When an `index.ts` that holds code needs to re-export a new file, first move its code into a named file of its own.
+- Model state that changes over time as a discriminated union held in one `let state`, and act on it in a `switch (state.type)` that ends in `default: state satisfies never` (`createBinaryLatch` in `lib/src/async/latch.ts`). Each variant carries only the fields that exist in that state. Do not keep several variables and work out the state by comparing them.
+- Walk a value the code does not control with a loop and a set of visited objects, not with recursion: a circular or very deep value overflows the stack (`describeErrorCauses` in `lib/src/error/cause.ts`, `set` in `lib/src/object/overrider.ts`). Recursion is fine only when a structure the code owns bounds its depth, as the defaults do in `mergeValues` (`lib/src/object/merge.ts`).
+- Leave an optional property out when it has no value; do not write it as `undefined`. `new Error(message, { cause: undefined })` gives the error a `cause` property, and it prints as `[cause]: undefined`. Build the object first, then add the key under an `if`.
 
 ## 2. Naming Conventions
 
@@ -34,6 +37,7 @@ This document outlines the TypeScript coding style and conventions for the proje
 - Name public surfaces (parameters, error classes, error messages) from the caller's side, never from how the implementation stores or shapes the value. The test: if the implementation changed that detail, would the caller's code change? If not, the detail stays out of the name. A codec's `decode` takes `encoded` (what `encode` returned), not `body` (the key it is stored under); the error is `InvalidEncodedValueError`, not `InvalidEnvelopeError`. Names the user chose themselves (a codec's `name`) are caller-side and fine.
 - A factory's required argument object is `XParams`; an optional tuning bag beside it is `XOptions` (`redisSubscriber(params: RedisConnectionParams, options?: RedisSubscriberOptions)`).
 - A local's name is its role and its noun (`pooledChildRun`, `referencedSchedule`), never the role alone (`pooled`, `first`, `own`) and never how the value was produced (`…Seed`). The reader meets the name far from the line that assigned it.
+- Name a function for what it returns on every input, not for one outcome or one caller's use. A function that validates is `validate`, not `describeRejection`, even when its caller only acts on a rejection.
 
 ## 3. Interfaces and Types
 
@@ -43,6 +47,8 @@ This document outlines the TypeScript coding style and conventions for the proje
 - Use type predicate functions (`value is MyType`) for narrowing types in conditionals.
 - Use discriminated unions with exhaustiveness checks (`satisfies` in the default branch) when modelling objects that can be one of several distinct shapes.
 - The runtime validation schemas in `sdk/server/src/contract/schema/` (arktype) duplicate the unions from `types/` as string literals. The contract procedures are compile-time bound to the API types, but the check is one-directional: a schema accepting shapes outside the API type fails `bun run check`, while a schema missing a newly added union member infers a subtype and still compiles — it only fails at runtime parsing. When adding a union member (a new status, reason, or variant) in `types/`, update the matching schema in the same change.
+- A callback reports its verdict in its return value (`{ valid: true } | { valid: false; reason: string }`), and the caller decides what a failure does. A contract of "throws on failure" cannot be written in a type: a callback that returns `false` satisfies `=> void` and is silently treated as success.
+- Keep a mechanism apart from the rule it enforces. The mechanism takes the rule as a parameter and is named for what it does: a config provider that keeps the last valid config takes a `validate` function, and "no setting is NaN" is one validation passed to it.
 
 ## 4. Development flow
 
