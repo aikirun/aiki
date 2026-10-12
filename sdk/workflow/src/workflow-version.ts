@@ -292,11 +292,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			);
 		}
 
-		// execute this check only for the new child starts
+		// Below the replay block on purpose: a replayed start creates nothing, so it is never refused.
 		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
-			const err = new ChildWorkflowRunClientCodecSkippedError(parentRun.id);
-			await parentRunHandle[INTERNAL].transitionStateOptimistic(this.createFailedState(err));
-			throw new WorkflowRunFailedError(parentRun.id, parentRunHandle.run.attempts);
+			const err = new ChildWorkflowRunClientCodecSkippedError(parentRun.id, this.name, this.versionId);
+			return this.failRun(parentRunHandle, { attempts: parentRunHandle.run.attempts, err }, parentRunLogger);
 		}
 
 		const encodedInput = await codec.encode(input);
@@ -481,7 +480,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	private async failRun(
-		handle: WorkflowRunHandle<unknown, Context, TEvents>,
+		handle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 		{ attempts, err }: { attempts: number; err: unknown },
 		logger: Logger
 	): Promise<never> {

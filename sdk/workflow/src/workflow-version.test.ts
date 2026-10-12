@@ -1173,7 +1173,10 @@ describe("creating a workflow run", () => {
 						state: {
 							status: "failed",
 							cause: "self",
-							error: expect.objectContaining({ name: "ChildWorkflowRunClientCodecSkippedError" }),
+							error: expect.objectContaining({
+								name: "ChildWorkflowRunClientCodecSkippedError",
+								message: `Child workflow child-workflow:1.0.0 cannot skip the client codec when parent run ${parentRunRecord.id} applied it`,
+							}),
 						},
 						expectedRevision: parentRunRecord.revision,
 					},
@@ -1184,7 +1187,7 @@ describe("creating a workflow run", () => {
 							cause: "self",
 							error: {
 								name: "ChildWorkflowRunClientCodecSkippedError",
-								message: `Child workflow cannot skip the client codec when parent run ${parentRunRecord.id} applied it`,
+								message: `Child workflow child-workflow:1.0.0 cannot skip the client codec when parent run ${parentRunRecord.id} applied it`,
 							},
 						},
 						attempts: parentRunRecord.attempts,
@@ -1196,9 +1199,6 @@ describe("creating a workflow run", () => {
 				).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
-		// Parent and child were created with clientCodecApplied: true. After a deploy that adds
-		// clientCodecPolicy: "skip" on the child version, parent replay finds the recorded child
-		// and returns it — nothing is created, so the skip-vs-applied check does not run.
 		test("returns the recorded child on replay when clientCodecPolicy is skip and the parent applied the codec", () =>
 			withFakeClient(async (client) => {
 				client[INTERNAL].codec = {
@@ -1240,7 +1240,7 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(recordedChildRun.id);
 			}));
 
-		test("skips the client codec on the child when clientCodecPolicy is skip and the parent skipped", () =>
+		test("skips the client codec on the child when clientCodecPolicy is skip and the parent did not apply it", () =>
 			withFakeClient(async (client) => {
 				client[INTERNAL].codec = {
 					encode: async () => {
@@ -1278,7 +1278,7 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(childRunRecord.id);
 			}));
 
-		test("applies the client codec on the child when clientCodecPolicy is apply and the parent skipped", () =>
+		test("applies the client codec on the child when clientCodecPolicy is apply and the parent did not apply it", () =>
 			withFakeClient(async (client) => {
 				const encodedInput = asOpaquePayload({ encoded: true });
 				client[INTERNAL].codec = {
@@ -1318,7 +1318,7 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(childRunRecord.id);
 			}));
 
-		test("applies the client codec on the child when clientCodecPolicy is unset and the parent skipped", () =>
+		test("applies the client codec on the child when clientCodecPolicy is unset and the parent did not apply it", () =>
 			withFakeClient(async (client) => {
 				const encodedInput = asOpaquePayload({ encoded: true });
 				client[INTERNAL].codec = {

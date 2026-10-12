@@ -1,5 +1,6 @@
 import type { UnconsumedManifestEntries } from "./replay-manifest";
 import type { WorkflowRunId, WorkflowRunStatus } from "./run";
+import type { WorkflowName, WorkflowVersionId } from "../workflow";
 
 export class WorkflowRunNotExecutableError extends Error {
 	public readonly id: WorkflowRunId;
@@ -98,10 +99,16 @@ export class ClientCodecMissingError extends Error {
  */
 export class ChildWorkflowRunClientCodecSkippedError extends Error {
 	public readonly parentId: WorkflowRunId;
+	public readonly childWorkflowName: WorkflowName;
+	public readonly childWorkflowVersionId: WorkflowVersionId;
 
-	constructor(parentId: WorkflowRunId) {
-		super(`Child workflow cannot skip the client codec when parent run ${parentId} applied it`);
+	constructor(parentId: WorkflowRunId, childWorkflowName: WorkflowName, childWorkflowVersionId: WorkflowVersionId) {
+		super(
+			`Child workflow ${childWorkflowName}:${childWorkflowVersionId} cannot skip the client codec when parent run ${parentId} applied it`
+		);
 		this.name = "ChildWorkflowRunClientCodecSkippedError";
 		this.parentId = parentId;
+		this.childWorkflowName = childWorkflowName;
+		this.childWorkflowVersionId = childWorkflowVersionId;
 	}
 }
