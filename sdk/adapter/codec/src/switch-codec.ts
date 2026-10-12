@@ -3,23 +3,23 @@ import type { Codec, CodecContext } from "@aikirun/types/infra/codec";
 import { InvalidEncodedValueError, isEncodedValue, type NamedCreateCodec } from "./codec";
 
 export class UnknownCodecNameError extends Error {
+	public override readonly name = "UnknownCodecNameError";
 	public readonly codecName: string;
 	public readonly knownCodecNames: string[];
 
 	constructor(codecName: string, knownCodecNames: string[]) {
 		super(`No codec named "${codecName}"; known: ${knownCodecNames.map((name) => `"${name}"`).join(", ")}`);
-		this.name = "UnknownCodecNameError";
 		this.codecName = codecName;
 		this.knownCodecNames = knownCodecNames;
 	}
 }
 
 export class DuplicateCodecNameError extends Error {
+	public override readonly name = "DuplicateCodecNameError";
 	public readonly codecName: string;
 
 	constructor(codecName: string) {
 		super(`Codec names must be unique; "${codecName}" appears more than once`);
-		this.name = "DuplicateCodecNameError";
 		this.codecName = codecName;
 	}
 }

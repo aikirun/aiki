@@ -1,6 +1,11 @@
 export abstract class AikiError extends Error {
 	abstract readonly code: string;
 	abstract readonly status: number;
+
+	// biome-ignore lint/complexity/noUselessConstructor: makes the message required for every subclass
+	constructor(message: string) {
+		super(message);
+	}
 }
 
 export function asAikiError(err: unknown): AikiError | undefined {
@@ -17,51 +22,31 @@ export function asAikiError(err: unknown): AikiError | undefined {
 }
 
 export class NotFoundError extends AikiError {
+	override readonly name = "NotFoundError";
 	readonly code = "NOT_FOUND";
 	readonly status = 404;
-
-	constructor(message: string) {
-		super(message);
-		this.name = "NotFoundError";
-	}
 }
 
 export class ValidationError extends AikiError {
+	override readonly name = "ValidationError";
 	readonly code = "BAD_REQUEST";
 	readonly status = 400;
-
-	constructor(message: string) {
-		super(message);
-		this.name = "ValidationError";
-	}
 }
 
 export class UnauthorizedError extends AikiError {
+	override readonly name = "UnauthorizedError";
 	readonly code = "UNAUTHORIZED";
 	readonly status = 401;
-
-	constructor(message: string) {
-		super(message);
-		this.name = "UnauthorizedError";
-	}
 }
 
 export class ForbiddenError extends AikiError {
+	override readonly name = "ForbiddenError";
 	readonly code = "FORBIDDEN";
 	readonly status = 403;
-
-	constructor(message: string) {
-		super(message);
-		this.name = "ForbiddenError";
-	}
 }
 
 export class ConflictError extends AikiError {
+	override readonly name = "ConflictError";
 	readonly code = "CONFLICT";
 	readonly status = 409;
-
-	constructor(message: string) {
-		super(message);
-		this.name = "ConflictError";
-	}
 }

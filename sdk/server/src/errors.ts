@@ -5,6 +5,7 @@ import type { TerminalWorkflowRunStatus, WorkflowRunId, WorkflowRunStatus } from
 import type { TaskId, TaskName, TaskStatus } from "@aikirun/types/workflow/task";
 
 export class WorkflowRunRevisionConflictError extends AikiError {
+	override readonly name = "WorkflowRunRevisionConflictError";
 	readonly code = "WORKFLOW_RUN_REVISION_CONFLICT";
 	readonly status = 409;
 
@@ -13,13 +14,13 @@ export class WorkflowRunRevisionConflictError extends AikiError {
 
 	constructor(workflowRunId: WorkflowRunId, expectedRevision: number) {
 		super(`Revision conflict for workflow ${workflowRunId}: expected ${expectedRevision}`);
-		this.name = "WorkflowRunRevisionConflictError";
 		this.workflowRunId = workflowRunId;
 		this.expectedRevision = expectedRevision;
 	}
 }
 
 export class InvalidWorkflowRunStateTransitionError extends AikiError {
+	override readonly name = "InvalidWorkflowRunStateTransitionError";
 	readonly code = "BAD_REQUEST";
 	readonly status = 400;
 
@@ -32,7 +33,6 @@ export class InvalidWorkflowRunStateTransitionError extends AikiError {
 		const baseMessage = `Cannot transition workflow ${workflowRunId} from ${from} to ${to}`;
 		const message = reason ? `${baseMessage} - ${reason}` : baseMessage;
 		super(message);
-		this.name = "InvalidWorkflowRunStateTransitionError";
 		this.workflowRunId = workflowRunId;
 		this.from = from;
 		this.to = to;
@@ -41,6 +41,7 @@ export class InvalidWorkflowRunStateTransitionError extends AikiError {
 }
 
 export class InvalidScheduleStateTransitionError extends AikiError {
+	override readonly name = "InvalidScheduleStateTransitionError";
 	readonly code = "BAD_REQUEST";
 	readonly status = 400;
 
@@ -50,7 +51,6 @@ export class InvalidScheduleStateTransitionError extends AikiError {
 
 	constructor(scheduleId: string, from: ScheduleStatus, to: ScheduleStatus) {
 		super(`Cannot transition schedule ${scheduleId} from ${from} to ${to}`);
-		this.name = "InvalidScheduleStateTransitionError";
 		this.scheduleId = scheduleId;
 		this.from = from;
 		this.to = to;
@@ -58,6 +58,7 @@ export class InvalidScheduleStateTransitionError extends AikiError {
 }
 
 export class WorkflowRunTerminatedError extends AikiError {
+	override readonly name = "WorkflowRunTerminatedError";
 	readonly code = "WORKFLOW_RUN_TERMINATED";
 	readonly status = 409;
 
@@ -66,13 +67,13 @@ export class WorkflowRunTerminatedError extends AikiError {
 
 	constructor(workflowRunId: WorkflowRunId, runStatus: TerminalWorkflowRunStatus) {
 		super(`Workflow ${workflowRunId} is ${runStatus}; it accepts no further writes`);
-		this.name = "WorkflowRunTerminatedError";
 		this.workflowRunId = workflowRunId;
 		this.runStatus = runStatus;
 	}
 }
 
 export class InvalidTaskStateTransitionError extends AikiError {
+	override readonly name = "InvalidTaskStateTransitionError";
 	readonly code = "BAD_REQUEST";
 	readonly status = 400;
 
@@ -90,13 +91,13 @@ export class InvalidTaskStateTransitionError extends AikiError {
 				? `Cannot transition task ${taskData.taskId} from ${taskData.from} to ${taskData.to} (workflow ${workflowRunId})`
 				: `Cannot create task ${taskData.taskName} directly in ${taskData.to} state (workflow ${workflowRunId})`;
 		super(message);
-		this.name = "InvalidTaskStateTransitionError";
 		this.workflowRunId = workflowRunId;
 		this.taskData = taskData;
 	}
 }
 
 export class TaskStateConflictError extends AikiError {
+	override readonly name = "TaskStateConflictError";
 	readonly code = "TASK_STATE_CONFLICT";
 	readonly status = 409;
 
@@ -109,7 +110,6 @@ export class TaskStateConflictError extends AikiError {
 		super(
 			`State conflict for task ${taskId}: expected ${expected.status} with attempts ${expected.attempts} (workflow ${workflowRunId})`
 		);
-		this.name = "TaskStateConflictError";
 		this.workflowRunId = workflowRunId;
 		this.taskId = taskId;
 		this.expectedStatus = expected.status;
@@ -118,6 +118,7 @@ export class TaskStateConflictError extends AikiError {
 }
 
 export class ScheduleConflictError extends AikiError {
+	override readonly name = "ScheduleConflictError";
 	readonly code = "SCHEDULE_CONFLICT";
 	readonly status = 409;
 
@@ -130,13 +131,13 @@ export class ScheduleConflictError extends AikiError {
 				params.referenceId ? `, referenceId ${params.referenceId}` : ""
 			})`
 		);
-		this.name = "ScheduleConflictError";
 		this.definitionHash = params.definitionHash;
 		this.referenceId = params.referenceId;
 	}
 }
 
 export class WorkflowRunReferenceConflictError extends AikiError {
+	override readonly name = "WorkflowRunReferenceConflictError";
 	readonly code = "WORKFLOW_RUN_REFERENCE_CONFLICT";
 	readonly status = 409;
 
@@ -146,7 +147,6 @@ export class WorkflowRunReferenceConflictError extends AikiError {
 
 	constructor(workflowName: WorkflowName, workflowVersionId: WorkflowVersionId, referenceId: string) {
 		super(`Workflow ${workflowName}:${workflowVersionId} run already exists with reference: ${referenceId}`);
-		this.name = "WorkflowRunReferenceConflictError";
 		this.workflowName = workflowName;
 		this.workflowVersionId = workflowVersionId;
 		this.referenceId = referenceId;

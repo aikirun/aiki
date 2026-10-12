@@ -12,22 +12,22 @@ export type NamedCreateCodec<Encoded = unknown> = CreateCodec<Encoded> & {
 };
 
 export class InvalidEncodedValueError extends Error {
+	public override readonly name = "InvalidEncodedValueError";
 	public readonly codecName: string;
 
 	constructor(codecName: string) {
 		super(`Codec "${codecName}" received a value that was not produced by encode`);
-		this.name = "InvalidEncodedValueError";
 		this.codecName = codecName;
 	}
 }
 
 export class CodecNameMismatchError extends Error {
+	public override readonly name = "CodecNameMismatchError";
 	public readonly codecName: string;
 	public readonly payloadName: string;
 
 	constructor(codecName: string, payloadName: string) {
 		super(`Codec name mismatch: expected "${codecName}", got "${payloadName}"`);
-		this.name = "CodecNameMismatchError";
 		this.codecName = codecName;
 		this.payloadName = payloadName;
 	}
