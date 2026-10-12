@@ -1,5 +1,6 @@
 import type { UnconsumedManifestEntries } from "./replay-manifest";
 import type { WorkflowRunId, WorkflowRunStatus } from "./run";
+import type { TaskName } from "../task";
 import type { WorkflowName, WorkflowVersionId } from "../workflow";
 
 export class WorkflowRunNotExecutableError extends Error {
@@ -110,5 +111,22 @@ export class ChildWorkflowRunClientCodecSkippedError extends Error {
 		this.parentId = parentId;
 		this.childWorkflowName = childWorkflowName;
 		this.childWorkflowVersionId = childWorkflowVersionId;
+	}
+}
+
+/**
+ * A task handler used the workflow run: it started a task or a child workflow, slept, or waited
+ * for an event or a child workflow. Only the workflow handler can do these. The task and the run
+ * fail, and the task is not retried.
+ */
+export class WorkflowRunUsedInTaskHandlerError extends Error {
+	public readonly id: WorkflowRunId;
+	public readonly taskName: TaskName;
+
+	constructor(id: WorkflowRunId, taskName: TaskName) {
+		super(`Task ${taskName} cannot use workflow run ${id} inside its handler`);
+		this.name = "WorkflowRunUsedInTaskHandlerError";
+		this.id = id;
+		this.taskName = taskName;
 	}
 }

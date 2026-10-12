@@ -21,12 +21,14 @@ import {
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
+	WorkflowRunUsedInTaskHandlerError,
 } from "@aikirun/types/workflow/run";
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import { type BoundCodec, bindDeclaredCodec } from "./bound-codec";
 import { isControlFlowError } from "./control-flow-error";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
+import { taskHandlerScopeStorage } from "./task-handler-scope";
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
@@ -418,6 +420,14 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 	}
 
 	private async executeIfAllowed<Result>(fn: () => Promise<Result>): Promise<Result> {
+		const taskHandlerScope = taskHandlerScopeStorage.getStore();
+		if (taskHandlerScope) {
+			const err = new WorkflowRunUsedInTaskHandlerError(this.run.id as WorkflowRunId, taskHandlerScope.taskName);
+			// The task handler may catch this error, so its scope keeps it for the task to find.
+			taskHandlerScope.workflowRunUsedError ??= err;
+			throw err;
+		}
+
 		try {
 			this.assertExecutionAllowed();
 			return await fn();

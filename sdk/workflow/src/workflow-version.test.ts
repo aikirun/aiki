@@ -635,6 +635,7 @@ describe("workflow version execution", () => {
 	describe("control-flow errors propagate unchanged", () => {
 		const controlFlowErrorCases: Array<{ name: string; create: (id: WorkflowRunId, attempts: number) => Error }> = [
 			{ name: "WorkflowRunSuspendedError", create: (id) => new WorkflowRunSuspendedError(id) },
+			{ name: "WorkflowRunNotExecutableError", create: (id) => new WorkflowRunNotExecutableError(id, "paused") },
 			{ name: "WorkflowRunFailedError", create: (id, attempts) => new WorkflowRunFailedError(id, attempts) },
 			{ name: "WorkflowRunRevisionConflictError", create: (id) => new WorkflowRunRevisionConflictError(id) },
 			{

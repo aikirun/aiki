@@ -18,9 +18,8 @@ import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/wo
 import {
 	NonDeterminismError,
 	WorkflowRunFailedError,
-	WorkflowRunRevisionConflictError,
-	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
+	WorkflowRunUsedInTaskHandlerError,
 } from "@aikirun/types/workflow/run";
 import type {
 	TaskAddress,
@@ -38,6 +37,7 @@ import type { WorkflowExecutionConfig } from "./run/execute";
 import { isRequestInvalid, type WorkflowRunHandle } from "./run/handle";
 import { validateWithSchema } from "./run/schema-validation";
 import type { TaskExecutionTracker } from "./run/task-execution-tracker";
+import { type TaskHandlerScope, taskHandlerScopeStorage } from "./run/task-handler-scope";
 
 type UnknownWorkflowRun = WorkflowRun<unknown>;
 type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
@@ -338,15 +338,10 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		while (true) {
 			let outputRaw: Output;
 			try {
-				outputRaw = await this.params.handler(input);
+				outputRaw = await this.executeHandler(input);
 			} catch (err) {
-				if (
-					err instanceof WorkflowRunSuspendedError ||
-					err instanceof WorkflowRunFailedError ||
-					err instanceof WorkflowRunRevisionConflictError ||
-					err instanceof WorkflowRunStateUnknownError
-				) {
-					throw err;
+				if (err instanceof WorkflowRunUsedInTaskHandlerError) {
+					return this.failTaskAndRun(handle, { taskId, attempts, error: createSerializableError(err) }, logger);
 				}
 
 				const serializableError = createSerializableError(err);
@@ -422,6 +417,24 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return this.failTaskAndRun(handle, { taskId, attempts, error: createSerializableError(err) }, logger);
 			}
 		}
+	}
+
+	private async executeHandler(input: Input): Promise<Output> {
+		const taskHandlerScope: TaskHandlerScope = { taskName: this.name };
+
+		let output: Output;
+		try {
+			output = await taskHandlerScopeStorage.run(taskHandlerScope, () => this.params.handler(input));
+		} catch (err) {
+			// The handler may have caught the WorkflowRunUsedInTaskHandlerError and thrown another error.
+			throw taskHandlerScope.workflowRunUsedError ?? err;
+		}
+
+		// The handler may have caught the WorkflowRunUsedInTaskHandlerError and returned.
+		if (taskHandlerScope.workflowRunUsedError) {
+			throw taskHandlerScope.workflowRunUsedError;
+		}
+		return output;
 	}
 
 	private async failTask(
