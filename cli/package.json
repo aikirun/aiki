@@ -13,7 +13,7 @@
 		"@aikirun/server": "workspace:*",
 		"cac": "^6.7.14",
 		"dotenv": "^16.4.5",
-		"drizzle-orm": "^0.45.1",
+		"drizzle-orm": "^0.45.4",
 		"postgres": "^3.4.8"
 	},
 	"devDependencies": {

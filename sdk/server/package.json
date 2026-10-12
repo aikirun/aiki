@@ -28,13 +28,13 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@orpc/contract": "^1.9.3",
-		"@orpc/server": "^1.9.3",
-		"arktype": "^2.1.29",
+		"@orpc/contract": "^1.15.5",
+		"@orpc/server": "^1.15.5",
+		"arktype": "^2.2.8",
 		"cac": "^6.7.14",
-		"cron-parser": "^5.4.0",
+		"cron-parser": "^5.10.2",
 		"dotenv": "^16.4.5",
-		"drizzle-orm": "^0.45.1",
+		"drizzle-orm": "^0.45.4",
 		"ulidx": "^2.4.1"
 	},
 	"peerDependencies": {
