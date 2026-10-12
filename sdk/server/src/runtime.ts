@@ -1,4 +1,10 @@
-import { asConfigProvider, type ConfigProvider, type CreateConfigProvider } from "@aikirun/lib/config";
+import {
+	asConfigProvider,
+	type ConfigProvider,
+	type CreateConfigProvider,
+	validatedConfigProvider,
+	validateNoNaN,
+} from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { merge } from "@aikirun/lib/object";
 import type { Database } from "@aikirun/types/infra/db";
@@ -37,6 +43,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		const config = merge(defaultServerRuntimeConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
+	configProvider = validatedConfigProvider({ provider: configProvider, validate: validateNoNaN, logger });
 
 	const timerPriorityQueue = params.timerPriorityQueue?.({
 		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),

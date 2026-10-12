@@ -26,6 +26,7 @@ import type {
 	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import {
+	ChildWorkflowRunClientCodecSkippedError,
 	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
@@ -37,9 +38,10 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
-import { noopCodec, toBoundCodec } from "./run/bound-codec";
+import { resolveClientCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import {
+	isRequestInvalid,
 	isRequestUnanswered,
 	isWorkflowRunRevisionConflictError,
 	type WorkflowRunHandle,
@@ -67,9 +69,10 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 	 * Sets one option and returns a copy. The original is unchanged.
 	 *
 	 * Which type comes back depends on what the option answers. `retry` answers "if this fails, try
-	 * three more times"; `pool` answers "run on this kind of workers". Answers like those fit any
-	 * run, so setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which
-	 * you can go on starting as often as you like.
+	 * three more times"; `pool` answers "run on this kind of workers"; `clientCodecPolicy` answers
+	 * "store this run's payloads with or without the client's codec applied". Answers like those fit any run, so
+	 * setting one — see {@link WorkflowRunOptions} — returns a {@link WorkflowVersion}, which you can
+	 * go on starting as often as you like.
 	 *
 	 * `reference` answers "this particular run is order-123"; `delay` answers "execute this particular run five minutes from now".
 	 * Both are about one particular run, so setting one returns a {@link WorkflowVersionStart}:
@@ -156,8 +159,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	}
 
 	private runOptions(): WorkflowRunOptions {
-		const { retry, pool, priority } = this.startOptionsBuilder.build();
-		return { retry, pool, priority };
+		const { retry, pool, priority, clientCodecPolicy } = this.startOptionsBuilder.build();
+		return { retry, pool, priority, clientCodecPolicy };
 	}
 
 	public with<Path extends PathFromObject<WorkflowStartOptions>>(
@@ -186,7 +189,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
-		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const { codec, applied: clientCodecApplied } = resolveClientCodec(clientCodec, startOptions.clientCodecPolicy);
 		const schema = this.params.schema?.input;
 		if (schema) {
 			const schemaValidation = schema["~standard"].validate(input);
@@ -205,7 +208,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			input: await codec.encode(input),
 			inputHash,
 			clientHasherApplied: clientHasher !== undefined,
-			clientCodecApplied: clientCodec !== undefined,
+			clientCodecApplied,
 			options: startOptions,
 		});
 
@@ -218,8 +221,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		return workflowRunHandle(client, id as WorkflowRunId, this[INTERNAL].eventsDefinition);
 	}
 
-	public async startAsChild(
-		parentRun: WorkflowRun<Context, EventsDefinition>,
+	public async startAsChild<ParentEvents extends EventsDefinition>(
+		parentRun: WorkflowRun<Context, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>> {
 		return parentRun[INTERNAL].handle[INTERNAL].executeIfAllowed(() =>
@@ -236,7 +239,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			logger: parentRunLogger,
 			[INTERNAL]: { handle: parentRunHandle, hasher: parentRunHasher, replayManifest: parentRunReplayManifest },
 		} = parentRun;
-		const { client, codec: parentRunCodec } = parentRunHandle[INTERNAL];
+		const { client } = parentRunHandle[INTERNAL];
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
@@ -247,6 +250,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		// we should use a parent hasher instead of the client to enforce consistency
 		const inputHash = { value: await parentRunHasher(input) };
+		const { codec, applied: clientCodecApplied } = resolveClientCodec(
+			client[INTERNAL].codec,
+			startOptions.clientCodecPolicy
+		);
 
 		const referenceId = startOptions.reference?.id;
 		const address = getCompositeId<WorkflowRunAddress>({
@@ -286,7 +293,13 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			);
 		}
 
-		const encodedInput = await parentRunCodec.encode(input);
+		// Below the replay block on purpose: a replayed start creates nothing, so it is never refused.
+		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
+			const err = new ChildWorkflowRunClientCodecSkippedError(parentRun.id, this.name, this.versionId);
+			return this.failRun(parentRunHandle, { attempts: parentRunHandle.run.attempts, err }, parentRunLogger);
+		}
+
+		const encodedInput = await codec.encode(input);
 
 		let newRun: WorkflowRunRecord;
 		try {
@@ -296,7 +309,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				input: encodedInput,
 				inputHash,
 				clientHasherApplied: parentRunHandle.run.clientHasherApplied,
-				clientCodecApplied: parentRunHandle.run.clientCodecApplied,
+				clientCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: {
 					...startOptions,
@@ -439,22 +452,23 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				const retryParams = getRetryParams(attempts, retryStrategy);
 
 				if (!retryParams.retriesLeft) {
-					const failedState = this.createFailedState(err);
-					await handle[INTERNAL].transitionStateOptimistic(failedState);
-
-					const logMeta: Record<string, unknown> = {};
-					for (const [key, value] of Object.entries(failedState)) {
-						logMeta[`aiki.${key}`] = value;
-					}
-					logger.error("Workflow failed", {
-						"aiki.attempts": attempts,
-						...logMeta,
-					});
-					throw new WorkflowRunFailedError(run.id, attempts);
+					return this.failRun(handle, { attempts, err }, logger);
 				}
 
 				const awaitingRetryState = this.createAwaitingRetryState(err, retryParams.delayMs);
-				await handle[INTERNAL].transitionStateOptimistic(awaitingRetryState);
+				try {
+					await handle[INTERNAL].transitionStateOptimistic(awaitingRetryState);
+				} catch (retryErr) {
+					if (!isRequestInvalid(retryErr)) {
+						throw retryErr;
+					}
+					logger.error("Workflow retry rejected, failing the run", {
+						"aiki.attempts": attempts,
+						"aiki.nextAttemptInMs": retryParams.delayMs,
+						err: retryErr,
+					});
+					return this.failRun(handle, { attempts, err }, logger);
+				}
 
 				const logMeta: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
@@ -471,6 +485,25 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				throw new WorkflowRunSuspendedError(run.id);
 			}
 		}
+	}
+
+	private async failRun(
+		handle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
+		{ attempts, err }: { attempts: number; err: unknown },
+		logger: Logger
+	): Promise<never> {
+		const failedState = this.createFailedState(err);
+		await handle[INTERNAL].transitionStateOptimistic(failedState);
+
+		const logMeta: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(failedState)) {
+			logMeta[`aiki.${key}`] = value;
+		}
+		logger.error("Workflow failed", {
+			"aiki.attempts": attempts,
+			...logMeta,
+		});
+		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, attempts);
 	}
 
 	private createFailedState(err: unknown): WorkflowRunStateFailed {

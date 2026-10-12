@@ -3,6 +3,7 @@ import { toMilliseconds } from "@aikirun/lib/duration";
 import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import { getCompositeId } from "@aikirun/lib/id";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
+import { getRetryDelayUpperBoundMs } from "@aikirun/lib/retry";
 import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunCancelByIdsRequestV1,
@@ -345,6 +346,14 @@ async function createWorkflowRunInTx(
 		throw new ValidationError("The delay is too long: the run would start after the year 9999");
 	}
 
+	const retry = options?.retry;
+	if (retry) {
+		const firstRetryDelayMs = getRetryDelayUpperBoundMs(1, retry);
+		if (firstRetryDelayMs !== undefined && scheduledAt + firstRetryDelayMs > MAX_TIMESTAMP_MS) {
+			throw new ValidationError("The retry delay is too long: the first retry would be after the year 9999");
+		}
+	}
+
 	const transitionId = ulid();
 
 	const workflowRunEntry: WorkflowRunRowInsert = {
@@ -357,7 +366,12 @@ async function createWorkflowRunInTx(
 		clientCodecApplied: request.clientCodecApplied,
 		input,
 		inputHash: inputHash.value,
-		options: options && { retry: options.retry, pool: options.pool, priority: options.priority },
+		options: options && {
+			retry: options.retry,
+			pool: options.pool,
+			priority: options.priority,
+			clientCodecPolicy: options.clientCodecPolicy,
+		},
 		referenceId,
 		latestStateTransitionId: transitionId,
 		scheduledAt: scheduledAt as TimestampMs,

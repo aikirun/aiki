@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { getRetryParams, withRetry } from "./strategy";
+import { getRetryDelayUpperBoundMs, getRetryParams, type RetryStrategy, withRetry } from "./strategy";
 
 describe("getRetryParams", () => {
 	describe("never strategy", () => {
@@ -125,6 +125,46 @@ describe("getRetryParams", () => {
 			expect(result).toEqual({ retriesLeft: false });
 		});
 	});
+});
+
+describe("getRetryDelayUpperBoundMs", () => {
+	test("is undefined for a strategy that never retries", () => {
+		expect(getRetryDelayUpperBoundMs(1, { type: "never" })).toBeUndefined();
+	});
+
+	test("is the configured delay of a fixed strategy", () => {
+		expect(getRetryDelayUpperBoundMs(1, { type: "fixed", maxAttempts: 3, delayMs: 1000 })).toBe(1000);
+	});
+
+	test("is the delay an exponential strategy gives", () => {
+		const strategy = { type: "exponential" as const, maxAttempts: 5, baseDelayMs: 100 };
+		expect(getRetryDelayUpperBoundMs(1, strategy)).toBe(100);
+		expect(getRetryDelayUpperBoundMs(3, strategy)).toBe(400);
+	});
+
+	test("is the delay a jittered strategy gives before the jitter shortens it", () => {
+		const strategy = { type: "jittered" as const, maxAttempts: 5, baseDelayMs: 100 };
+		expect(getRetryDelayUpperBoundMs(1, strategy)).toBe(100);
+		expect(getRetryDelayUpperBoundMs(3, strategy)).toBe(400);
+	});
+
+	for (const type of ["exponential", "jittered"] as const) {
+		test(`is capped at maxDelayMs for a ${type} strategy`, () => {
+			expect(getRetryDelayUpperBoundMs(3, { type, maxAttempts: 5, baseDelayMs: 100, maxDelayMs: 300 })).toBe(300);
+		});
+	}
+
+	const strategiesOutOfAttempts = {
+		fixed: { type: "fixed", maxAttempts: 3, delayMs: 1000 },
+		exponential: { type: "exponential", maxAttempts: 3, baseDelayMs: 100 },
+		jittered: { type: "jittered", maxAttempts: 3, baseDelayMs: 100 },
+	} satisfies Record<Exclude<RetryStrategy["type"], "never">, RetryStrategy>;
+
+	for (const [type, strategy] of Object.entries(strategiesOutOfAttempts)) {
+		test(`is undefined when a ${type} strategy has no attempts left`, () => {
+			expect(getRetryDelayUpperBoundMs(3, strategy)).toBeUndefined();
+		});
+	}
 });
 
 describe("withRetry", () => {

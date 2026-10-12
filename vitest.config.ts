@@ -13,7 +13,7 @@ export default defineConfig({
 				test: {
 					name: "unit",
 					include: ["**/*.test.ts"],
-					exclude: ["**/*.integration.test.ts", "**/node_modules/**", "**/dist/**"],
+					exclude: ["**/*.integration.test.ts", "**/node_modules/**", "**/dist/**", "**/.claude/**"],
 				},
 			},
 			{
@@ -21,7 +21,7 @@ export default defineConfig({
 				test: {
 					name: "integration",
 					include: ["**/*.integration.test.ts"],
-					exclude: ["**/node_modules/**", "**/dist/**"],
+					exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**"],
 					// The files share one database and one frozen clock, so they run one at a time.
 					fileParallelism: false,
 				},

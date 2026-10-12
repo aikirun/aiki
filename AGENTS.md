@@ -60,7 +60,7 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
 
 - Need full type safety across repo: `bun run check`
 - Need hermetic unit tests (no database): `bun run test:unit`
-- Need integration tests (live Postgres, `.env.test`): `bun run test:integration`
+- Need integration tests (live database selected in `.env.test`): `bun run test:integration`
 - Need either tier on Node instead of Bun: `bun run test:unit:node`, `bun run test:integration:node`
 - Need style/format validation: `bun run lint`
 - Need automatic formatting/lint fixes: `bun run lint:fix`

@@ -20,7 +20,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { isRequestUnanswered, type WorkflowRunHandle, workflowRunHandle } from "./handle";
+import { isRequestInvalid, isRequestUnanswered, type WorkflowRunHandle, workflowRunHandle } from "./handle";
 
 describe("workflowRunHandle", () => {
 	describe("construction", () => {
@@ -593,5 +593,19 @@ describe("isRequestUnanswered", () => {
 
 	test("is false when the server rejects the request", () => {
 		expect(isRequestUnanswered({ code: "BAD_REQUEST", status: 400 })).toBe(false);
+	});
+});
+
+describe("isRequestInvalid", () => {
+	test("is true when the server rejects the request as invalid", () => {
+		expect(isRequestInvalid({ code: "BAD_REQUEST", status: 400 })).toBe(true);
+	});
+
+	test("is false when the server rejects the request for another reason", () => {
+		expect(isRequestInvalid({ code: "NOT_FOUND", status: 404 })).toBe(false);
+	});
+
+	test("is false when no response arrives", () => {
+		expect(isRequestInvalid(new Error("fetch failed"))).toBe(false);
 	});
 });

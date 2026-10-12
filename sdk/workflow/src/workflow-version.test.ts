@@ -535,6 +535,103 @@ describe("workflow version execution", () => {
 			}));
 	});
 
+	describe("a retry the server does not accept", () => {
+		test("fails the run with the handler's error when the server rejects the retry as invalid", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.rejectsOnce(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "awaiting_retry",
+								cause: "self",
+								nextAttemptInMs: 1,
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{ code: "BAD_REQUEST", status: 400 }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+
+		test("reports the run's state as unknown when the retry gets no response", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.rejectsOnce(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "awaiting_retry",
+								cause: "self",
+								nextAttemptInMs: 1,
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						new Error("fetch failed")
+					);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+			}));
+	});
+
 	describe("control-flow errors propagate unchanged", () => {
 		const controlFlowErrorCases: Array<{ name: string; create: (id: WorkflowRunId, attempts: number) => Error }> = [
 			{ name: "WorkflowRunSuspendedError", create: (id) => new WorkflowRunSuspendedError(id) },
@@ -937,6 +1034,84 @@ describe("creating a workflow run", () => {
 
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
+
+		test("skips the client codec when clientCodecPolicy is skip, and still hashes", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				client[INTERNAL].hasher = Object.assign(
+					async (input: unknown) => {
+						expect(input).toBe("world");
+						return { value: "client-hash" };
+					},
+					{ for: async () => null }
+				);
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: true,
+						clientCodecApplied: false,
+						inputHash: { value: "client-hash" },
+						options: { clientCodecPolicy: "skip" },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with("clientCodecPolicy", "skip").start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("applies the client codec when clientCodecPolicy is apply", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("world");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						options: { clientCodecPolicy: "apply" },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with("clientCodecPolicy", "apply").start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
 	});
 
 	describe("startAsChild", () => {
@@ -1030,6 +1205,214 @@ describe("creating a workflow run", () => {
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);
 
 				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBe(encodeError);
+			}));
+
+		test("fails the parent when skipping the client codec on the child while the parent applied it", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: parentRunRecord.id,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: expect.objectContaining({
+								name: "ChildWorkflowRunClientCodecSkippedError",
+								message: `Child workflow child-workflow:1.0.0 cannot skip the client codec when parent run ${parentRunRecord.id} applied it`,
+							}),
+						},
+						expectedRevision: parentRunRecord.revision,
+					},
+					{
+						revision: parentRunRecord.revision,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: {
+								name: "ChildWorkflowRunClientCodecSkippedError",
+								message: `Child workflow child-workflow:1.0.0 cannot skip the client codec when parent run ${parentRunRecord.id} applied it`,
+							},
+						},
+						attempts: parentRunRecord.attempts,
+					}
+				);
+
+				await expect(
+					childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload")
+				).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+
+		test("returns the recorded child on replay when clientCodecPolicy is skip and the parent applied the codec", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({
+					id: recordedChildRun.id,
+					clientCodecApplied: true,
+				});
+
+				client.api.workflowRun.getByIdV1.once({ id: recordedChildRun.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(recordedChildRun.id);
+			}));
+
+		test("skips the client codec on the child when clientCodecPolicy is skip and the parent did not apply it", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: { clientCodecPolicy: "skip" },
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("applies the client codec on the child when clientCodecPolicy is apply and the parent did not apply it", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("payload");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: { clientCodecPolicy: "apply" },
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.with("clientCodecPolicy", "apply").startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("applies the client codec on the child when clientCodecPolicy is unset and the parent did not apply it", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ encoded: true });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toBe("payload");
+						return encodedInput;
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
 			}));
 
 		test("hashes the child input with the parent run's hasher, not the client's", () =>

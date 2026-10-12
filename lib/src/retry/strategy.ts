@@ -180,3 +180,16 @@ export function getRetryParams(attempts: number, strategy: RetryStrategy): Retry
 			return strategyType satisfies never;
 	}
 }
+
+/**
+ * An upper bound on the delay of the retry that follows `attempts` attempts, or `undefined`
+ * when no retry follows.
+ */
+export function getRetryDelayUpperBoundMs(attempts: number, strategy: RetryStrategy): number | undefined {
+	// A jittered delay is a random fraction of the exponential delay with the same settings.
+	const retryParams = getRetryParams(
+		attempts,
+		strategy.type === "jittered" ? { ...strategy, type: "exponential" } : strategy
+	);
+	return retryParams.retriesLeft ? retryParams.delayMs : undefined;
+}

@@ -1,4 +1,10 @@
-import { asConfigProvider, type ConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
+import {
+	asConfigProvider,
+	type ConfigProvider,
+	type CreatePassiveConfigProvider,
+	validatedConfigProvider,
+	validateNoNaN,
+} from "@aikirun/lib/config";
 import { asAikiError } from "@aikirun/lib/error";
 import { SENTINEL_ULID } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
@@ -50,6 +56,7 @@ export async function createHandler(params: CreateHandlerParams) {
 		const config = merge(defaultServerHandlerConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
+	configProvider = validatedConfigProvider({ provider: configProvider, validate: validateNoNaN, logger });
 
 	const timerPriorityQueue = params.timerPriorityQueue?.({
 		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),

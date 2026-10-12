@@ -35,7 +35,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
 import type { WorkflowExecutionConfig } from "./run/execute";
-import type { WorkflowRunHandle } from "./run/handle";
+import { isRequestInvalid, type WorkflowRunHandle } from "./run/handle";
 import { validateWithSchema } from "./run/schema-validation";
 import type { TaskExecutionTracker } from "./run/task-execution-tracker";
 
@@ -353,16 +353,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 				const retryParams = getRetryParams(attempts, retryStrategy);
 				if (!retryParams.retriesLeft) {
-					logger.error("Task failed", {
-						"aiki.attempts": attempts,
-						"aiki.reason": serializableError.message,
-					});
-					await handle[INTERNAL].transitionTaskState({
-						id: taskId,
-						attempts,
-						state: { status: "failed", error: serializableError },
-					});
-					throw new TaskFailedError(taskId, attempts, serializableError.message);
+					return this.failTask(handle, { taskId, attempts, error: serializableError }, logger);
 				}
 
 				logger.debug("Task failed. It will be retried", {
@@ -377,15 +368,27 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 					continue;
 				}
 
-				await handle[INTERNAL].transitionTaskState({
-					id: taskId,
-					attempts,
-					state: {
-						status: "awaiting_retry",
-						error: serializableError,
-						nextAttemptInMs: retryParams.delayMs,
-					},
-				});
+				try {
+					await handle[INTERNAL].transitionTaskState({
+						id: taskId,
+						attempts,
+						state: {
+							status: "awaiting_retry",
+							error: serializableError,
+							nextAttemptInMs: retryParams.delayMs,
+						},
+					});
+				} catch (retryErr) {
+					if (!isRequestInvalid(retryErr)) {
+						throw retryErr;
+					}
+					logger.error("Task retry rejected, failing the task", {
+						"aiki.attempts": attempts,
+						"aiki.nextAttemptInMs": retryParams.delayMs,
+						err: retryErr,
+					});
+					return this.failTask(handle, { taskId, attempts, error: serializableError }, logger);
+				}
 				executionTracker.awaitingRetry();
 				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
@@ -419,6 +422,25 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 				return this.failTaskAndRun(handle, { taskId, attempts, error: createSerializableError(err) }, logger);
 			}
 		}
+	}
+
+	private async failTask(
+		handle: UnknownWorkflowRunHandle,
+		params: { taskId: TaskId; attempts: number; error: SerializableError },
+		logger: Logger
+	): Promise<never> {
+		const { taskId, attempts, error } = params;
+
+		logger.error("Task failed", {
+			"aiki.attempts": attempts,
+			"aiki.reason": error.message,
+		});
+		await handle[INTERNAL].transitionTaskState({
+			id: taskId,
+			attempts,
+			state: { status: "failed", error },
+		});
+		throw new TaskFailedError(taskId, attempts, error.message);
 	}
 
 	// The task is failed before the run. If the run's failure is not recorded, a replay finds the
