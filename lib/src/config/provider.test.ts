@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { asConfigProvider, dynamicConfigProvider } from "./provider";
+import { asConfigProvider, dynamicConfigProvider, validatedConfigProvider } from "./provider";
+import type { ConfigValidationResult } from "./validation";
 import { createBinaryLatch, delay } from "../async";
 import { noopLogger } from "../logger";
 
@@ -171,5 +172,223 @@ describe("dynamicConfigProvider", () => {
 		// After abort, wait several intervals and confirm the count held steady
 		await delay(refreshIntervalMs * 10);
 		expect(refreshCount).toBe(refreshCountAtAbort);
+	});
+});
+
+describe("validatedConfigProvider", () => {
+	function validate(config: { polling: { intervalMs: number } }): ConfigValidationResult {
+		if (config.polling.intervalMs <= 0) {
+			return { valid: false, reason: "polling.intervalMs must be positive" };
+		}
+		return { valid: true };
+	}
+
+	const validationError = new Error("validation broke");
+
+	function validateOrThrow(config: { polling: { intervalMs: number } }): ConfigValidationResult {
+		if (config.polling.intervalMs <= 0) {
+			throw validationError;
+		}
+		return { valid: true };
+	}
+
+	test("hands out the provider's config when it is valid", () => {
+		const config = { polling: { intervalMs: 1_000 } };
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger: noopLogger,
+		});
+		expect(provider.config).toBe(config);
+	});
+
+	test("throws naming the reason when the provider's first config is invalid", () => {
+		const config = { polling: { intervalMs: 0 } };
+		expect(() =>
+			validatedConfigProvider({
+				provider: asConfigProvider(() => config),
+				validate,
+				logger: noopLogger,
+			})
+		).toThrow("Invalid config: polling.intervalMs must be positive");
+	});
+
+	test("throws an error with no cause when the provider's first config is rejected", () => {
+		const config = { polling: { intervalMs: 0 } };
+
+		let thrownError: unknown;
+		try {
+			validatedConfigProvider({
+				provider: asConfigProvider(() => config),
+				validate,
+				logger: noopLogger,
+			});
+		} catch (err) {
+			thrownError = err;
+		}
+
+		expect(thrownError).not.toHaveProperty("cause");
+	});
+
+	test("throws naming the error when the validation throws on the provider's first config", () => {
+		const config = { polling: { intervalMs: 0 } };
+		expect(() =>
+			validatedConfigProvider({
+				provider: asConfigProvider(() => config),
+				validate: validateOrThrow,
+				logger: noopLogger,
+			})
+		).toThrow("Invalid config: the validation threw Error: validation broke");
+	});
+
+	test("keeps the validation's own error as the cause when it throws on the provider's first config", () => {
+		const config = { polling: { intervalMs: 0 } };
+
+		let thrownError: unknown;
+		try {
+			validatedConfigProvider({
+				provider: asConfigProvider(() => config),
+				validate: validateOrThrow,
+				logger: noopLogger,
+			});
+		} catch (err) {
+			thrownError = err;
+		}
+
+		expect(thrownError).toHaveProperty("cause", validationError);
+	});
+
+	test("keeps handing out the last valid config when a later config is invalid", () => {
+		const validConfig = { polling: { intervalMs: 1_000 } };
+		let config = validConfig;
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger: noopLogger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+
+		expect(provider.config).toBe(validConfig);
+	});
+
+	test("keeps handing out the last valid config while one invalid config follows another", () => {
+		const validConfig = { polling: { intervalMs: 1_000 } };
+		let config = validConfig;
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger: noopLogger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+		expect(provider.config).toBe(validConfig);
+		config = { polling: { intervalMs: -1 } };
+
+		expect(provider.config).toBe(validConfig);
+	});
+
+	test("keeps handing out the last valid config when the validation throws on a later config", () => {
+		const validConfig = { polling: { intervalMs: 1_000 } };
+		let config = validConfig;
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate: validateOrThrow,
+			logger: noopLogger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+
+		expect(provider.config).toBe(validConfig);
+	});
+
+	test("hands out a later config again once it is valid", () => {
+		let config = { polling: { intervalMs: 1_000 } };
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger: noopLogger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+		expect(provider.config).toEqual({ polling: { intervalMs: 1_000 } });
+
+		const recoveredConfig = { polling: { intervalMs: 2_000 } };
+		config = recoveredConfig;
+
+		expect(provider.config).toBe(recoveredConfig);
+	});
+
+	test("a scoped provider keeps handing out the last valid config too", () => {
+		let config = { polling: { intervalMs: 1_000 } };
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger: noopLogger,
+		});
+		const pollingProvider = provider.scope("polling");
+
+		config = { polling: { intervalMs: 0 } };
+
+		expect(pollingProvider.config).toEqual({ intervalMs: 1_000 });
+	});
+
+	test("logs the reason once while the config stays invalid", () => {
+		const logger = { ...noopLogger, error: vi.fn() };
+		let config = { polling: { intervalMs: 1_000 } };
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+		provider.config;
+		provider.config;
+		config = { polling: { intervalMs: -1 } };
+		provider.config;
+
+		expect(logger.error.mock.calls).toEqual([
+			["Config is invalid, keeping last-good", { "aiki.reason": "polling.intervalMs must be positive" }],
+		]);
+	});
+
+	test("logs the validation's own error when it throws on a later config", () => {
+		const logger = { ...noopLogger, error: vi.fn() };
+		let config = { polling: { intervalMs: 1_000 } };
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate: validateOrThrow,
+			logger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+		provider.config;
+
+		expect(logger.error.mock.calls).toEqual([
+			[
+				"Config is invalid, keeping last-good",
+				{ "aiki.reason": "the validation threw Error: validation broke", err: validationError },
+			],
+		]);
+	});
+
+	test("logs again when the config turns invalid after being valid", () => {
+		const logger = { ...noopLogger, error: vi.fn() };
+		let config = { polling: { intervalMs: 1_000 } };
+		const provider = validatedConfigProvider({
+			provider: asConfigProvider(() => config),
+			validate,
+			logger,
+		});
+
+		config = { polling: { intervalMs: 0 } };
+		provider.config;
+		config = { polling: { intervalMs: 2_000 } };
+		provider.config;
+		config = { polling: { intervalMs: 0 } };
+		provider.config;
+
+		expect(logger.error.mock.calls).toHaveLength(2);
 	});
 });

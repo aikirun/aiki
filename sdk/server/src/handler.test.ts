@@ -52,6 +52,18 @@ describe("handler API authorization", () => {
 	});
 });
 
+describe("handler config", () => {
+	test("does not create the handler when the config holds a NaN", async () => {
+		const creating = createHandler({
+			db: {} as Database,
+			logger: noopLogger,
+			config: { imminentRuns: { lookaheadWindowMs: Number.NaN } },
+		});
+
+		await expect(creating).rejects.toThrow("imminentRuns.lookaheadWindowMs is NaN");
+	});
+});
+
 describe("handler input validation", () => {
 	test("an invalid request answers 400 naming each invalid field", async () => {
 		const handler = await createHandler({ db: {} as Database, logger: noopLogger });
