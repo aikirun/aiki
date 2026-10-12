@@ -7,12 +7,13 @@ export const durationObjectSchema = type({
 	"minutes?": "number.integer > 0 | undefined",
 	"seconds?": "number.integer > 0 | undefined",
 	"milliseconds?": "number.integer > 0 | undefined",
-}).narrow((obj): obj is DurationObject => {
+}).narrow((obj, ctx): obj is DurationObject => {
 	return (
 		obj.days !== undefined ||
 		obj.hours !== undefined ||
 		obj.minutes !== undefined ||
 		obj.seconds !== undefined ||
-		obj.milliseconds !== undefined
+		obj.milliseconds !== undefined ||
+		ctx.mustBe("a duration with at least one of days, hours, minutes, seconds or milliseconds")
 	);
 });
