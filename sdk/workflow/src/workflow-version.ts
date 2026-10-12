@@ -26,8 +26,8 @@ import type {
 	WorkflowStartOptions,
 } from "@aikirun/types/workflow/run";
 import {
+	ChildWorkflowRunClientCodecSkippedError,
 	ClientCodecMissingError,
-	ClientCodecSkipForbiddenError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
@@ -240,7 +240,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		assertExecutionAllowed();
 
 		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
-			throw new ClientCodecSkipForbiddenError(parentRun.id);
+			throw new ChildWorkflowRunClientCodecSkippedError(parentRun.id);
 		}
 
 		const inputRaw = args[0];

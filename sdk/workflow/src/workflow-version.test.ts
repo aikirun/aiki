@@ -17,8 +17,8 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	ChildWorkflowRunClientCodecSkippedError,
 	ClientCodecMissingError,
-	ClientCodecSkipForbiddenError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -1072,7 +1072,7 @@ describe("creating a workflow run", () => {
 
 				await expect(
 					childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload")
-				).rejects.toBeInstanceOf(ClientCodecSkipForbiddenError);
+				).rejects.toBeInstanceOf(ChildWorkflowRunClientCodecSkippedError);
 			}));
 
 		test("skips the client codec on the child when clientCodecPolicy is skip and the parent skipped", () =>

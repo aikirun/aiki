@@ -87,7 +87,7 @@ export interface WorkflowRunOptions {
 	 * the client has a codec; `"skip"` stores every payload this run writes raw. The choice
 	 * is run-scoped: it covers the workflow input and output and every task payload written under the run.
 	 * A child cannot set `"skip"` when its parent applied the codec — that start fails with
-	 * `ClientCodecSkipForbiddenError`. Identity hashing is unaffected — the client's hasher still runs.
+	 * `ChildWorkflowRunClientCodecSkippedError`. Identity hashing is unaffected — the client's hasher still runs.
 	 * Because this is a run option, it is hashed into a schedule's definition, so flipping it on an
 	 * active schedule does not update that schedule; the next activation creates a twin and the old one
 	 * keeps minting under the old policy until deactivated.
