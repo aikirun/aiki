@@ -7,9 +7,9 @@ import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { ReplayManifest, SleepResult, WorkflowRunId, WorkflowRunOptions } from "@aikirun/types/workflow/run";
 
 import type { EventsDefinition, EventWaiters } from "./event";
-import type { WorkflowExecutionConfig } from "./execute";
-import type { WorkflowRunHandle } from "./handle";
-import type { CreateTaskExecutionTracker } from "./task-execution-tracker";
+import type { CreateTaskExecutionTracker } from "./execution/task-execution-tracker";
+import type { WorkflowExecutionConfig } from "./execution/workflow-run";
+import type { WorkflowRunHandle } from "./handle/workflow-run";
 
 export interface WorkflowRun<Context, TEvents extends EventsDefinition = EventsDefinition> {
 	id: WorkflowRunId;

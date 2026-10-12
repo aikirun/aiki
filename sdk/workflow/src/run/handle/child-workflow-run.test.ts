@@ -10,8 +10,8 @@ import {
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { workflowRunHandle } from "./handle";
-import { childWorkflowRunHandle } from "./handle-child";
+import { childWorkflowRunHandle } from "./child-workflow-run";
+import { workflowRunHandle } from "./workflow-run";
 
 describe("childWorkflowRunHandle", () => {
 	describe("wait", () => {

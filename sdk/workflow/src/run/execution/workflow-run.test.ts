@@ -21,12 +21,12 @@ import {
 import { describe, expect, test, vi } from "vitest";
 
 import type { ControlFlowError } from "./control-flow-error";
-import type { EventsDefinition } from "./event";
-import { executeWorkflowRun } from "./execute";
-import type { WorkflowRun } from "./index";
-import { task } from "../task";
-import { workflow } from "../workflow";
-import type { AnyWorkflowVersion } from "../workflow-version";
+import { executeWorkflowRun } from "./workflow-run";
+import { task } from "../../task";
+import { workflow } from "../../workflow";
+import type { AnyWorkflowVersion } from "../../workflow-version";
+import type { EventsDefinition } from "../event";
+import type { WorkflowRun } from "../index";
 
 const configProvider = asConfigProvider(() => ({
 	claimRefreshIntervalMs: 30_000,

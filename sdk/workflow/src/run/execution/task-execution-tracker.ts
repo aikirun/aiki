@@ -3,7 +3,7 @@ import type { Logger } from "@aikirun/lib/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { WorkflowRunRevisionConflictError } from "@aikirun/types/workflow/run";
 
-import type { WorkflowRunHandle } from "./handle";
+import type { WorkflowRunHandle } from "../handle/workflow-run";
 
 export type CreateTaskExecutionTracker = () => TaskExecutionTracker;
 

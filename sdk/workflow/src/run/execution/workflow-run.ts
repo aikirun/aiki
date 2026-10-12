@@ -18,12 +18,12 @@ import {
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 
-import { createEventWaiters } from "./event";
-import { workflowRunHandle } from "./handle";
 import { createReplayManifest } from "./replay-manifest";
-import { createSleeper } from "./sleeper";
 import { taskExecutionTracker } from "./task-execution-tracker";
-import type { AnyWorkflowVersion } from "../workflow-version";
+import type { AnyWorkflowVersion } from "../../workflow-version";
+import { createEventWaiters } from "../event";
+import { workflowRunHandle } from "../handle/workflow-run";
+import { createSleeper } from "../sleeper";
 
 export interface ExecuteWorkflowParams<Context> {
 	client: Client<Context>;

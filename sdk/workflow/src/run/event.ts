@@ -17,8 +17,8 @@ import type {
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
-import type { WorkflowRunHandle } from "./handle";
+import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./handle/bound-codec";
+import type { WorkflowRunHandle } from "./handle/workflow-run";
 
 /**
  * Defines an event type that can be sent to and waited for by workflows.

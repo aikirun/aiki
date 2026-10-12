@@ -4,7 +4,7 @@ import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import { WorkflowRunFailedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import type { WorkflowRunHandle } from "./handle";
+import type { WorkflowRunHandle } from "./handle/workflow-run";
 
 type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
 

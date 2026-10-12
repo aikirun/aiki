@@ -26,9 +26,9 @@ import {
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import { type BoundCodec, bindDeclaredCodec } from "./bound-codec";
-import { isControlFlowError } from "./control-flow-error";
-import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
-import { taskHandlerScopeStorage } from "./task-handler-scope";
+import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
+import { isControlFlowError } from "../execution/control-flow-error";
+import { taskHandlerScopeStorage } from "../execution/task-handler-scope";
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,

@@ -37,17 +37,17 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
-import { resolveClientCodec } from "./run/bound-codec";
-import { isControlFlowError } from "./run/control-flow-error";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
+import { isControlFlowError } from "./run/execution/control-flow-error";
+import { resolveClientCodec } from "./run/handle/bound-codec";
+import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle/child-workflow-run";
 import {
 	isRequestInvalid,
 	isRequestUnanswered,
 	isWorkflowRunRevisionConflictError,
 	type WorkflowRunHandle,
 	workflowRunHandle,
-} from "./run/handle";
-import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle-child";
+} from "./run/handle/workflow-run";
 import { validateWithSchema } from "./run/schema-validation";
 
 export interface WorkflowVersionParams<Input, Output, Context, TEvents extends EventsDefinition> {

@@ -48,9 +48,9 @@ export type {
 	EventWaiters,
 } from "./run/event";
 export { event } from "./run/event";
-export type { ExecuteWorkflowParams, WorkflowExecutionConfig } from "./run/execute";
-export { executeWorkflowRun } from "./run/execute";
-export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle";
+export type { ExecuteWorkflowParams, WorkflowExecutionConfig } from "./run/execution/workflow-run";
+export { executeWorkflowRun } from "./run/execution/workflow-run";
+export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle/workflow-run";
 export type { ScheduleDefinition, ScheduleHandle, ScheduleParams } from "./schedule";
 export { schedule } from "./schedule";
 export { getSystemWorkflows } from "./system";

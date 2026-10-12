@@ -15,7 +15,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 
 import { createEventMulticasters, createEventSenders, createEventWaiters, event } from "./event";
-import { workflowRunHandle } from "./handle";
+import { workflowRunHandle } from "./handle/workflow-run";
 
 const appendBangSchema: StandardSchemaV1<string> = {
 	"~standard": {

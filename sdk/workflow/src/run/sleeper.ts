@@ -5,7 +5,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { SleepName, SleepResult, WorkflowRunId } from "@aikirun/types/workflow/run";
 import { WorkflowRunFailedError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
-import type { WorkflowRunHandle } from "./handle";
+import type { WorkflowRunHandle } from "./handle/workflow-run";
 
 const MAX_SLEEP_YEARS = 10;
 const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1_000;

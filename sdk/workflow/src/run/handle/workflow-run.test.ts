@@ -20,7 +20,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { isRequestInvalid, isRequestUnanswered, type WorkflowRunHandle, workflowRunHandle } from "./handle";
+import { isRequestInvalid, isRequestUnanswered, type WorkflowRunHandle, workflowRunHandle } from "./workflow-run";
 
 describe("workflowRunHandle", () => {
 	describe("construction", () => {

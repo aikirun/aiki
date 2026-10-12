@@ -6,8 +6,8 @@ import type { Client } from "@aikirun/types/client";
 import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, ScheduleSpec } from "@aikirun/types/schedule";
 import { INTERNAL } from "@aikirun/types/symbols";
 
-import { resolveClientCodec } from "./run/bound-codec";
 import type { EventsDefinition } from "./run/event";
+import { resolveClientCodec } from "./run/handle/bound-codec";
 import type { WorkflowVersion } from "./workflow-version";
 
 export interface CronScheduleParams {

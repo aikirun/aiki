@@ -12,7 +12,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { workflowRunHandle } from "./handle";
+import { workflowRunHandle } from "./handle/workflow-run";
 import { createSleeper } from "./sleeper";
 
 function createTestSleeper(client: Omit<FakeClient, "verify">, record: WorkflowRunRecord) {

@@ -5,13 +5,13 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type WorkflowRunId, type WorkflowRunRecord, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
-import type { EventsDefinition } from "./event";
 import {
 	decodeWaitResultState,
 	type WorkflowRunHandle,
 	type WorkflowRunWaitResultSuccess,
 	workflowRunHandle,
-} from "./handle";
+} from "./workflow-run";
+import type { EventsDefinition } from "../event";
 
 export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,

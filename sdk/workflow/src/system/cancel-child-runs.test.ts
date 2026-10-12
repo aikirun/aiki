@@ -13,9 +13,9 @@ import { describe, expect, test } from "vitest";
 
 import { createCancelChildRunsV1 } from "./cancel-child-runs";
 import type { WorkflowRun } from "../run";
-import { workflowRunHandle } from "../run/handle";
-import { createReplayManifest } from "../run/replay-manifest";
-import { taskExecutionTracker } from "../run/task-execution-tracker";
+import { createReplayManifest } from "../run/execution/replay-manifest";
+import { taskExecutionTracker } from "../run/execution/task-execution-tracker";
+import { workflowRunHandle } from "../run/handle/workflow-run";
 
 const LIST_NON_TERMINAL_CHILDREN_TASK_NAME = "list-non-terminal-child-runs";
 const CANCEL_RUNS_TASK_NAME = "cancel-runs";

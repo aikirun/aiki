@@ -4,8 +4,8 @@ import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/w
 import { INTERNAL } from "@aikirun/types/symbols";
 import { describe, expect, test } from "vitest";
 
-import { workflowRunHandle } from "./handle";
 import { taskExecutionTracker } from "./task-execution-tracker";
+import { workflowRunHandle } from "../handle/workflow-run";
 
 describe("taskExecutionTracker", () => {
 	test("flush waits for open task executions even when none awaited a retry", () =>

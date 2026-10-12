@@ -4,7 +4,7 @@ import { WorkflowRunFailedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 
-import { workflowRunHandle } from "./handle";
+import { workflowRunHandle } from "./handle/workflow-run";
 import { validateWithSchema } from "./schema-validation";
 
 describe("validateWithSchema", () => {
