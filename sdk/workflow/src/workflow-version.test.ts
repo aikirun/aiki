@@ -535,6 +535,103 @@ describe("workflow version execution", () => {
 			}));
 	});
 
+	describe("a retry the server does not accept", () => {
+		test("fails the run with the handler's error when the server rejects the retry as invalid", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.rejectsOnce(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "awaiting_retry",
+								cause: "self",
+								nextAttemptInMs: 1,
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{ code: "BAD_REQUEST", status: 400 }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
+
+		test("reports the run's state as unknown when the retry gets no response", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "error-workflow" }).v("1.0.0", {
+					async handler() {
+						throw new Error("boom");
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.rejectsOnce(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: {
+								status: "awaiting_retry",
+								cause: "self",
+								nextAttemptInMs: 1,
+								error: expect.objectContaining({ message: "boom", name: "Error" }),
+							},
+							expectedRevision: runRecord.revision,
+						},
+						new Error("fetch failed")
+					);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+			}));
+	});
+
 	describe("control-flow errors propagate unchanged", () => {
 		const controlFlowErrorCases: Array<{ name: string; create: (id: WorkflowRunId, attempts: number) => Error }> = [
 			{ name: "WorkflowRunSuspendedError", create: (id) => new WorkflowRunSuspendedError(id) },

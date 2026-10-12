@@ -976,6 +976,80 @@ describe("WorkflowRunService createWorkflowRun delay", () => {
 		}));
 });
 
+describe("WorkflowRunService createWorkflowRun retry delay", () => {
+	test("accepts a retry delay that puts the first retry in the last millisecond of the year 9999", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const now = 1_000_000;
+			const retry = { type: "fixed" as const, maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now };
+
+			const runId = await withFakeClock(now, async () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: await hashInput(input) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: { retry },
+				})
+			);
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, options: expect.objectContaining({ retry }) })
+			);
+		}));
+
+	test("refuses a retry delay that puts the first retry after the year 9999", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const now = 1_000_000;
+
+			const creating = withFakeClock(now, async () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: await hashInput(input) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: { retry: { type: "fixed", maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now + 1 } },
+				})
+			);
+
+			await expect(creating).rejects.toThrow(ValidationError);
+			await expect(creating).rejects.toThrow("The retry delay is too long");
+		}));
+
+	test("refuses a retry delay that puts the first retry after the year 9999 once the run's delay is added", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const now = 1_000_000;
+
+			// Neither delay passes the year 9999 on its own.
+			const creating = withFakeClock(now, async () =>
+				service.createWorkflowRun(context, {
+					name: "checkout",
+					versionId: "v1",
+					input: asOpaquePayload(input),
+					inputHash: { value: await hashInput(input) },
+					clientHasherApplied: false,
+					clientCodecApplied: false,
+					options: {
+						delay: { milliseconds: 1 },
+						retry: { type: "fixed", maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now },
+					},
+				})
+			);
+
+			await expect(creating).rejects.toThrow(ValidationError);
+			await expect(creating).rejects.toThrow("The retry delay is too long");
+		}));
+});
+
 describe("WorkflowRunService imminent run timers", () => {
 	test("creating a due run adds its timer to the priority queue", () =>
 		withHarness(async ({ context, repos }) => {

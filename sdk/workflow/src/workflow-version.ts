@@ -40,6 +40,7 @@ import type { WorkflowRun } from "./run";
 import { noopCodec, toBoundCodec } from "./run/bound-codec";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import {
+	isRequestInvalid,
 	isRequestUnanswered,
 	isWorkflowRunRevisionConflictError,
 	type WorkflowRunHandle,
@@ -431,22 +432,23 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				const retryParams = getRetryParams(attempts, retryStrategy);
 
 				if (!retryParams.retriesLeft) {
-					const failedState = this.createFailedState(err);
-					await handle[INTERNAL].transitionStateOptimistic(failedState);
-
-					const logMeta: Record<string, unknown> = {};
-					for (const [key, value] of Object.entries(failedState)) {
-						logMeta[`aiki.${key}`] = value;
-					}
-					logger.error("Workflow failed", {
-						"aiki.attempts": attempts,
-						...logMeta,
-					});
-					throw new WorkflowRunFailedError(run.id, attempts);
+					return this.failRun(handle, { attempts, err }, logger);
 				}
 
 				const awaitingRetryState = this.createAwaitingRetryState(err, retryParams.delayMs);
-				await handle[INTERNAL].transitionStateOptimistic(awaitingRetryState);
+				try {
+					await handle[INTERNAL].transitionStateOptimistic(awaitingRetryState);
+				} catch (retryErr) {
+					if (!isRequestInvalid(retryErr)) {
+						throw retryErr;
+					}
+					logger.error("Workflow retry rejected, failing the run", {
+						"aiki.attempts": attempts,
+						"aiki.nextAttemptInMs": retryParams.delayMs,
+						err: retryErr,
+					});
+					return this.failRun(handle, { attempts, err }, logger);
+				}
 
 				const logMeta: Record<string, unknown> = {};
 				for (const [key, value] of Object.entries(awaitingRetryState)) {
@@ -463,6 +465,25 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				throw new WorkflowRunSuspendedError(run.id);
 			}
 		}
+	}
+
+	private async failRun(
+		handle: WorkflowRunHandle<unknown, Context, TEvents>,
+		{ attempts, err }: { attempts: number; err: unknown },
+		logger: Logger
+	): Promise<never> {
+		const failedState = this.createFailedState(err);
+		await handle[INTERNAL].transitionStateOptimistic(failedState);
+
+		const logMeta: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(failedState)) {
+			logMeta[`aiki.${key}`] = value;
+		}
+		logger.error("Workflow failed", {
+			"aiki.attempts": attempts,
+			...logMeta,
+		});
+		throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, attempts);
 	}
 
 	private createFailedState(err: unknown): WorkflowRunStateFailed {
