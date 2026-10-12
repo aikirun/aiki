@@ -40,7 +40,7 @@ const aikiClient = client({ url: "http://localhost:9850", logger });
 | Option | Default | Description |
 |--------|---------|-------------|
 | `level` | `"info"` | The lowest level that is printed: `"trace"`, `"debug"`, `"info"`, `"warn"` or `"error"` |
-| `pretty` | `false` | Print coloured, multi-line entries for reading in a terminal. `false` prints one JSON line per entry |
+| `pretty` | `false` | Print each entry as plain text for a person to read, with its metadata on the lines below. `false` prints one JSON line per entry |
 
 ## Logging from Workflow Code
 

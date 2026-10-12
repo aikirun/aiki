@@ -17,7 +17,6 @@ export function createLogger(logLevel: LogLevel, prettyLogs: boolean): Logger {
 		? pino(
 				baseOptions,
 				pretty({
-					colorize: true,
 					ignore: "pid,hostname",
 					translateTime: "yyyy-mm-dd HH:MM:ss",
 					singleLine: false,

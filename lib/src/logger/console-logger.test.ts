@@ -82,6 +82,21 @@ describe("consoleLogger", () => {
 		}
 	});
 
+	test("pretty: prints an entry as plain text", () => {
+		const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+		try {
+			consoleLogger({ pretty: true }).info("Payment authorized", { orderId: "order-1" });
+
+			expect(consoleInfo.mock.calls.map(([output]) => String(output))).toEqual([
+				expect.stringMatching(
+					/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z INFO {2}Payment authorized\n {2}orderId: order-1$/
+				),
+			]);
+		} finally {
+			consoleInfo.mockRestore();
+		}
+	});
+
 	test("pretty: prints the errors an error wraps after its stack", () => {
 		const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 		try {
@@ -90,7 +105,7 @@ describe("consoleLogger", () => {
 
 			consoleLogger({ pretty: true }).error("Export failed", { err: exportError });
 
-			expect(consoleError.mock.calls.map(([output]) => withoutColors(String(output)))).toEqual([
+			expect(consoleError.mock.calls.map(([output]) => String(output))).toEqual([
 				expect.stringMatching(
 					/ {2}err: Error: export failed\n {4}at [\s\S]*\n {2}Caused by: Error \[EDQUOT\]: disk quota exceeded$/
 				),
@@ -99,9 +114,4 @@ describe("consoleLogger", () => {
 			consoleError.mockRestore();
 		}
 	});
-
-	function withoutColors(output: string): string {
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: matches the escape codes the logger colors its output with
-		return output.replace(/\x1b\[[0-9;]*m/g, "");
-	}
 });
