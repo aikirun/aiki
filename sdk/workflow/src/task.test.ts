@@ -20,10 +20,12 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecMissingError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
+	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
@@ -1448,6 +1450,296 @@ describe("task", () => {
 				expect(await sendEmail.with("retry", retry).start(run, input)).toBe(output);
 			}));
 	});
+});
+
+describe("a task handler that uses the workflow run", () => {
+	test("fails the task and the run without a retry when the handler starts another task", () =>
+		withFakeClient(async (client) => {
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			// The max inline wait is long enough for a retry to run at once, in this process. If the task
+			// were retried, the handler would run again and `handlerCalls` would be more than 1.
+			const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: Number.MAX_SAFE_INTEGER });
+
+			const retry = { type: "fixed", maxAttempts: 3, delayMs: 1 } as const;
+			const sendReceipt = task({ name: "send-receipt", handler: async () => "receipt sent" });
+			let handlerCalls = 0;
+			const chargeCard = task({
+				name: "charge-card",
+				handler: async () => {
+					handlerCalls++;
+					return sendReceipt.start(run);
+				},
+				retry,
+			});
+
+			const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+			client.api.task.transitionStateV1
+				.once(
+					{
+						type: "create",
+						input: undefined,
+						inputHash: await hashInput(undefined),
+						taskName: chargeCard.name,
+						options: { retry },
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
+					},
+					{ taskInfo: runningTaskInfo }
+				)
+				.once(
+					{
+						id: runningTaskInfo.id,
+						attempts: 1,
+						state: {
+							status: "failed",
+							error: expect.objectContaining({
+								name: "WorkflowRunUsedInTaskHandlerError",
+								message: `Task charge-card cannot use workflow run ${runRecord.id} inside its handler`,
+							}),
+						},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
+					},
+					{ taskInfo: runningTaskInfo }
+				);
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: runRecord.id,
+					state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+					expectedRevision: runRecord.revision,
+				},
+				{
+					revision: runRecord.revision + 1,
+					state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+					attempts: runRecord.attempts,
+				}
+			);
+
+			await expect(chargeCard.start(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			expect(handlerCalls).toBe(1);
+		}));
+
+	test("fails the task and the run when the handler catches the error and returns", () =>
+		withFakeClient(async (client) => {
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+
+			const sendReceipt = task({ name: "send-receipt", handler: async () => "receipt sent" });
+			const chargeCard = task({
+				name: "charge-card",
+				handler: async () => {
+					try {
+						await sendReceipt.start(run);
+					} catch {}
+					return "charged";
+				},
+			});
+
+			const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+			client.api.task.transitionStateV1
+				.once(
+					{
+						type: "create",
+						input: undefined,
+						inputHash: await hashInput(undefined),
+						taskName: chargeCard.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
+					},
+					{ taskInfo: runningTaskInfo }
+				)
+				.once(
+					{
+						id: runningTaskInfo.id,
+						attempts: 1,
+						state: {
+							status: "failed",
+							error: expect.objectContaining({ name: "WorkflowRunUsedInTaskHandlerError" }),
+						},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
+					},
+					{ taskInfo: runningTaskInfo }
+				);
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: runRecord.id,
+					state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+					expectedRevision: runRecord.revision,
+				},
+				{
+					revision: runRecord.revision + 1,
+					state: { status: "failed", cause: "task", taskId: runningTaskInfo.id },
+					attempts: runRecord.attempts,
+				}
+			);
+
+			await expect(chargeCard.start(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+		}));
+
+	test("lets the workflow handler start a task while another task's handler is running", () =>
+		withFakeClient(async (client) => {
+			const runRecord = runningWorkflowRunRecordFactory.build();
+			const run = createTestWorkflowRun(client, runRecord);
+
+			const chargeCardHandlerStarted = createBinaryLatch();
+			const finishChargeCardHandler = createBinaryLatch();
+			const chargeCard = task({
+				name: "charge-card",
+				handler: async () => {
+					chargeCardHandlerStarted.signal();
+					await finishChargeCardHandler.wait();
+					return "charged";
+				},
+			});
+			const reserveStock = task({ name: "reserve-stock", handler: async () => "reserved" });
+
+			const runningChargeCard = runningTaskInfoFactory.build({ name: chargeCard.name });
+			const completedChargeCard = completedTaskInfoFactory.build({
+				id: runningChargeCard.id,
+				name: chargeCard.name,
+				state: { output: asOpaquePayload("charged") },
+			});
+			const runningReserveStock = runningTaskInfoFactory.build({ name: reserveStock.name });
+			const completedReserveStock = completedTaskInfoFactory.build({
+				id: runningReserveStock.id,
+				name: reserveStock.name,
+				state: { output: asOpaquePayload("reserved") },
+			});
+			const inputHash = await hashInput(undefined);
+
+			client.api.task.transitionStateV1
+				.once(
+					{
+						type: "create",
+						input: undefined,
+						inputHash,
+						taskName: chargeCard.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
+					},
+					{ taskInfo: runningChargeCard }
+				)
+				.once(
+					{
+						type: "create",
+						input: undefined,
+						inputHash,
+						taskName: reserveStock.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 2,
+					},
+					{ taskInfo: runningReserveStock }
+				)
+				.once(
+					{
+						id: runningReserveStock.id,
+						attempts: 1,
+						state: completedReserveStock.state,
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 3,
+					},
+					{ taskInfo: completedReserveStock }
+				)
+				.once(
+					{
+						id: runningChargeCard.id,
+						attempts: 1,
+						state: completedChargeCard.state,
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 4,
+					},
+					{ taskInfo: completedChargeCard }
+				);
+
+			const charging = chargeCard.start(run);
+			await chargeCardHandlerStarted.wait();
+			expect(await reserveStock.start(run)).toBe("reserved");
+			finishChargeCardHandler.signal();
+
+			expect(await charging).toBe("charged");
+		}));
+});
+
+describe("a control-flow error the task handler throws itself", () => {
+	const controlFlowErrorCases: Array<{ name: string; create: (id: WorkflowRunId) => Error }> = [
+		{ name: "WorkflowRunSuspendedError", create: (id) => new WorkflowRunSuspendedError(id) },
+		{
+			name: "WorkflowRunStateUnknownError",
+			create: (id) => new WorkflowRunStateUnknownError(id, new Error("fetch failed")),
+		},
+		{ name: "WorkflowRunRevisionConflictError", create: (id) => new WorkflowRunRevisionConflictError(id) },
+		{ name: "WorkflowRunFailedError", create: (id) => new WorkflowRunFailedError(id, 1) },
+		{ name: "WorkflowRunNotExecutableError", create: (id) => new WorkflowRunNotExecutableError(id, "paused") },
+		{
+			name: "NonDeterminismError",
+			create: (id) => new NonDeterminismError(id, 1, { taskIds: [], childWorkflowRunIds: [] }),
+		},
+		{ name: "ClientCodecMissingError", create: (id) => new ClientCodecMissingError(id) },
+	];
+
+	for (const errorCase of controlFlowErrorCases) {
+		test(`counts a ${errorCase.name} as a failed attempt`, () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const chargeCard = task({
+					name: "charge-card",
+					handler: async (): Promise<string> => {
+						throw errorCase.create(runRecord.id as WorkflowRunId);
+					},
+				});
+
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: undefined,
+							inputHash: await hashInput(undefined),
+							taskName: chargeCard.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "failed",
+								error: expect.objectContaining({ name: errorCase.name }),
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
+
+				await expect(chargeCard.start(run)).rejects.toBeInstanceOf(TaskFailedError);
+			}));
+	}
 });
 
 describe("task input/output serializability", () => {

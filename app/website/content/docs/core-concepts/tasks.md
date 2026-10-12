@@ -108,6 +108,8 @@ const receipt = await task({
 >
 > If you do use it, give each task its own name, which avoids the last two.
 
+A task handler cannot use `run`. If it starts a task or a child workflow, sleeps, or waits through `run`, the task and the run fail, and the task is not retried.
+
 ## Task Retry
 
 Configure automatic retries for failed tasks using the `retry` property:

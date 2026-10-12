@@ -27,7 +27,6 @@ import type {
 } from "@aikirun/types/workflow/run";
 import {
 	ChildWorkflowRunClientCodecSkippedError,
-	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunRevisionConflictError,
@@ -39,6 +38,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
 import { resolveClientCodec } from "./run/bound-codec";
+import { isControlFlowError } from "./run/control-flow-error";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import {
 	isRequestInvalid,
@@ -434,14 +434,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 						: outputSchemaValidationResult;
 				return output;
 			} catch (err) {
-				if (
-					err instanceof WorkflowRunSuspendedError ||
-					err instanceof WorkflowRunFailedError ||
-					err instanceof WorkflowRunRevisionConflictError ||
-					err instanceof WorkflowRunStateUnknownError ||
-					err instanceof NonDeterminismError ||
-					err instanceof ClientCodecMissingError
-				) {
+				if (isControlFlowError(err)) {
 					throw err;
 				}
 
