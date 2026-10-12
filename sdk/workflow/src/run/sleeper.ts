@@ -3,7 +3,11 @@ import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { SleepName, SleepResult, WorkflowRunId } from "@aikirun/types/workflow/run";
-import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import {
+	WorkflowRunFailedError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
 
 import type { WorkflowRunHandle } from "./handle";
 
@@ -15,11 +19,21 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logge
 
 	return async (name: string, duration: DurationObject): Promise<SleepResult> => {
 		const sleepName = name as SleepName;
-		const durationMs = toMilliseconds(duration);
 
-		if (durationMs > MAX_SLEEP_MS) {
-			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
+		const durationValidation = validateSleepDuration(duration);
+		if (!durationValidation.valid) {
+			logger.error("Invalid sleep duration", {
+				"aiki.sleepName": sleepName,
+				"aiki.reason": durationValidation.reason,
+			});
+			await handle[INTERNAL].transitionStateOptimistic({
+				status: "failed",
+				cause: "self",
+				error: { name: "InvalidSleepDurationError", message: durationValidation.reason },
+			});
+			throw new WorkflowRunFailedError(handle.run.id as WorkflowRunId, handle.run.attempts);
 		}
+		const { durationMs } = durationValidation;
 
 		const nextIndex = nextIndexBySleepName[sleepName] ?? 0;
 
@@ -96,4 +110,26 @@ export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logge
 
 		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 	};
+}
+
+type SleepDurationValidationResult = { valid: true; durationMs: number } | { valid: false; reason: string };
+
+function validateSleepDuration(duration: DurationObject): SleepDurationValidationResult {
+	let durationMs: number;
+	try {
+		durationMs = toMilliseconds(duration);
+	} catch (err) {
+		return { valid: false, reason: err instanceof Error ? err.message : String(err) };
+	}
+
+	if (durationMs <= 0) {
+		return { valid: false, reason: "Sleep duration must be greater than zero" };
+	}
+	if (!Number.isInteger(durationMs)) {
+		return { valid: false, reason: `Sleep duration ${durationMs}ms is not a whole number of milliseconds` };
+	}
+	if (durationMs > MAX_SLEEP_MS) {
+		return { valid: false, reason: `Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years` };
+	}
+	return { valid: true, durationMs };
 }
