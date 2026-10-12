@@ -2,6 +2,90 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.45.0
+
+A workflow can keep its payloads out of the client's codec with the new `clientCodecPolicy` run option. A workflow that catches the error the SDK stopped it with now stays stopped, and a task handler that uses `run` fails its task and its run. An invalid sleep duration fails the run at once, and a retry delay that ends after the year 9999 fails the run or task instead of leaving it running. The server refuses a NaN in its config, and pretty logs carry no color codes.
+
+### New Features
+
+- **`clientCodecPolicy` keeps a workflow's payloads out of the client's codec.** It is a run option, `"apply"` or `"skip"`, and `"apply"` is the default. With `"skip"`, the run's input, output and task payloads are stored as they are. The client's hasher still runs.
+
+  ```typescript
+  export const ingestMetricsV1 = ingestMetrics
+    .v("1.0.0", { async handler(run, input) { /* ... */ } })
+    .with("clientCodecPolicy", "skip");
+  ```
+
+  A child run follows its own policy, not its parent's. One start is refused: a child with `"skip"` under a parent whose payloads are encoded, because the parent's data would be stored unencoded in the child's input. The parent fails at once with cause `self` and is not retried. The stored error is `ChildWorkflowRunClientCodecSkippedError`, and its message names the child workflow and version. To start that child under an encoded parent, set the policy at the call:
+
+  ```typescript
+  await ingestMetricsV1.with("clientCodecPolicy", "apply").startAsChild(run, input);
+  ```
+
+  Like every run option, the policy is part of a schedule's definition: changing it on a scheduled workflow creates a second schedule on the next activation, and the old one keeps creating runs under the old policy until it is deactivated.
+
+### Web UI
+
+- **A schedule shows its codec policy.** When a schedule's workflow sets `clientCodecPolicy`, the schedule's details list it as Codec Policy, beside Retry and Pool.
+
+### Improvements
+
+- **The server refuses a NaN in its config.** Nothing checked the numbers in the runtime and handler config. At startup, the runtime now does not start and the handler is not created, and the error names the setting: `Invalid config: daemons.recoverOverdueOutboxEntries.claimIdleTimeoutMs is NaN`. When a config turns invalid later, the server keeps using the last valid one and logs an error naming the setting.
+- **A retry strategy whose first retry would be after the year 9999 is refused with a 400.** Starting a run or a task with one answers `The retry delay is too long: the first retry would be after the year 9999`. A run's first retry counts from its start time, so a start delay is included. Later retries are checked when they are asked for.
+- **An empty duration is refused with a message that names the fields.** `delay: {}` answered `options.delay must be valid according to an anonymous predicate (was {})`. It now answers `options.delay must be a duration with at least one of days, hours, minutes, seconds or milliseconds (was {})`.
+- **Pretty logs carry no color codes when they go to a file.** They printed the terminal's color sequences wherever the output went. `consoleLogger({ pretty: true })` now prints plain text in the same layout, on a terminal too. The server with `PRETTY_LOGS=true` prints color on a terminal, and plain text elsewhere or when `NO_COLOR` is set.
+
+### Bug Fixes
+
+- **A workflow that catches the error that stopped it stays stopped.** The SDK stops workflow code by throwing, for example `WorkflowRunSuspendedError` when a task is waiting for its retry. A bare `catch` received that error too, and the workflow kept going.
+
+  ```typescript
+  try {
+    await chargeCard.start(run);
+  } catch {
+    await refundCard.start(run);
+  }
+  ```
+
+  ```
+  charge-card fails and has retries left
+
+  before   charge-card   awaiting_retry
+           refund-card   completed        a refund for a charge that is still to be retried
+           run           completed        charge-card is never retried
+
+  after    charge-card   awaiting_retry
+           refund-card   not started
+           run           awaiting_task_retry
+  ```
+
+  The first such error now ends the execution. From then on, starting a task or a child workflow, sleeping, and waiting for an event or a child all throw that same error and send nothing, and the run is neither completed nor failed when the handler returns or throws. `TaskFailedError` does not end the execution, so the `catch` above still starts `refund-card` for a failed charge.
+
+  When the run changes on the server before a sleep, an event wait or a child wait is recorded, workflow code now sees `WorkflowRunRevisionConflictError` where it saw `WorkflowRunSuspendedError`. Both end the execution.
+
+- **A task handler that uses `run` fails its task and its run.** A task handler is not given the `run`, but a task defined inside a workflow handler can reach that handler's `run`. Nothing stopped it: a handler that slept ran twice, and one that started another task failed the run with a non-determinism error on a later replay. Starting a task or a child workflow, sleeping, or waiting for an event or a child through `run` is now refused before anything is sent. The task fails with `WorkflowRunUsedInTaskHandlerError` and is not retried, whatever its retry setting, and the run fails with cause `task`. Move the call into the workflow handler:
+
+  ```typescript
+  // Before
+  const chargeCard = task({
+    name: "charge-card",
+    handler: async () => {
+      await callBank();
+      return sendReceipt.start(run);
+    },
+  });
+  await chargeCard.start(run);
+
+  // After
+  const chargeCard = task({ name: "charge-card", handler: () => callBank() });
+  await chargeCard.start(run);
+  await sendReceipt.start(run);
+  ```
+
+- **A retry delay that ends after the year 9999 fails the run or task.** The server answers such a retry with a 400, and workers did not handle it. A run stayed `running`, was run again when its claim timed out, and was refused again, without end and without using up an attempt. A task stayed `running` while its run failed or retried with the 400 as its error. The run now fails with the handler's error, and the task fails and the workflow gets `TaskFailedError`.
+
+- **An invalid sleep duration fails the run at once.** A duration is invalid when its total is zero, over 10 years or a fraction of a millisecond, or when a field is negative, NaN or infinite. It reached the workflow as an ordinary error, so a run with a retry strategy retried, asked for the same sleep and failed the same way until its attempts ran out. `run.sleep()` now fails the run with cause `self` and no retry. The stored error is named `InvalidSleepDurationError`.
+
 ## 0.44.0
 
 Timers are more exact: a timer left over from an earlier wait no longer ends a later one, and timers no longer run late after a due-timers consumer stops. Two calls that create the same run or the same schedule at the same moment now both get it. A schedule activated again after being deactivated starts from its next occurrence. The built-in console logger is exported with a level and a pretty option, prints JSON by default, and logs the steps of a run at `debug`. A member of an organization can no longer read its invitations. The dashboard asks before a destructive action, and an organization admin can use any of its namespaces. SQLite needs no driver now: Aiki uses the SQLite built into Node.js and Bun, and requires Node.js 22.16 or Bun 1.4. One Postgres migration (`0045`) ships with this release.
