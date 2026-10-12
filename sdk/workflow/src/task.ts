@@ -141,7 +141,9 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	public async start(run: UnknownWorkflowRun, ...args: Input extends void ? [] : [Input]): Promise<Output> {
 		const executionTracker = run[INTERNAL].createTaskExecutionTracker();
 		try {
-			return await this.startWithOptions(run, this.startOptionsBuilder.build(), executionTracker, ...args);
+			return await run[INTERNAL].handle[INTERNAL].executeIfAllowed(() =>
+				this.startWithOptions(run, this.startOptionsBuilder.build(), executionTracker, ...args)
+			);
 		} finally {
 			executionTracker.end();
 		}
@@ -157,8 +159,6 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			logger,
 			[INTERNAL]: { handle, hasher, replayManifest, configProvider },
 		} = run;
-
-		handle[INTERNAL].assertExecutionAllowed();
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;

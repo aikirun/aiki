@@ -2,7 +2,12 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import {
+	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
@@ -198,7 +203,7 @@ describe("childWorkflowRunHandle", () => {
 				await expect(childHandle.wait({ timeout: { minutes: 5 } })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
 			}));
 
-		test("maps a parent-transition conflict to a suspension", () =>
+		test("ends the parent's execution when the parent changed before the wait was recorded", () =>
 			withFakeClient(async (client) => {
 				const childRecord = runningWorkflowRunRecordFactory.build();
 				const parentRecord = runningWorkflowRunRecordFactory.build({
@@ -221,7 +226,54 @@ describe("childWorkflowRunHandle", () => {
 					{ code: "WORKFLOW_RUN_REVISION_CONFLICT" }
 				);
 
-				await expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+				await expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunRevisionConflictError);
+
+				expect(() => parentHandle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunRevisionConflictError);
+			}));
+
+		test("ends the parent's execution when the wait request gets no response", () =>
+			withFakeClient(async (client) => {
+				const childRecord = runningWorkflowRunRecordFactory.build();
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: { [childRecord.id]: { timeouts: [] } },
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
+
+				client.api.workflowRun.transitionStateV1.rejectsOnce(
+					{
+						type: "optimistic",
+						id: parentRecord.id,
+						state: {
+							status: "awaiting_child_workflow",
+							childWorkflowRunId: childRecord.id,
+						},
+						expectedRevision: parentRecord.revision,
+						expectedSignalSequence: 0,
+					},
+					new Error("fetch failed")
+				);
+
+				await expect(childHandle.wait()).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+
+				expect(() => parentHandle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunStateUnknownError);
+			}));
+
+		test("refuses to wait once the parent's execution has ended", () =>
+			withFakeClient(async (client) => {
+				const childRecord = runningWorkflowRunRecordFactory.build();
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: { [childRecord.id]: { timeouts: [] } },
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
+
+				const suspension = new WorkflowRunSuspendedError(parentRecord.id as WorkflowRunId);
+				await expect(parentHandle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension))).rejects.toBe(
+					suspension
+				);
+
+				await expect(childHandle.wait()).rejects.toBe(suspension);
 			}));
 	});
 

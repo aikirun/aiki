@@ -676,6 +676,63 @@ describe("workflow version execution", () => {
 		}
 	});
 
+	describe("a workflow handler that catches a suspension", () => {
+		test("does not complete the run when the handler returns a value", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const suspension = new WorkflowRunSuspendedError(runRecord.id as WorkflowRunId);
+				const workflowVersion = workflow({ name: "swallowing-workflow" }).v("1.0.0", {
+					async handler(run) {
+						try {
+							await run[INTERNAL].handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension));
+						} catch {}
+						return "carried on";
+					},
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: runRecord.id,
+						state: { status: "running" },
+						expectedRevision: runRecord.revision,
+					},
+					{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+				);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBe(suspension);
+			}));
+
+		test("does not fail the run when the handler throws another error", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const suspension = new WorkflowRunSuspendedError(runRecord.id as WorkflowRunId);
+				const workflowVersion = workflow({ name: "swallowing-workflow" }).v("1.0.0", {
+					async handler(run) {
+						try {
+							await run[INTERNAL].handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension));
+						} catch {
+							throw new Error("thrown after the catch");
+						}
+					},
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: runRecord.id,
+						state: { status: "running" },
+						expectedRevision: runRecord.revision,
+					},
+					{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+				);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBe(suspension);
+			}));
+	});
+
 	describe("execution guard", () => {
 		for (const status of WORKFLOW_RUN_STATUSES) {
 			if (status === "queued" || status === "running") {
@@ -1481,6 +1538,40 @@ describe("creating a workflow run", () => {
 				);
 
 				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
+			}));
+
+		test("ends the parent's execution when creating the child gets no response", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.rejectsOnce(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					new Error("fetch failed")
+				);
+
+				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBeInstanceOf(
+					WorkflowRunStateUnknownError
+				);
+
+				expect(() => parentRun[INTERNAL].handle[INTERNAL].assertExecutionAllowed()).toThrow(
 					WorkflowRunStateUnknownError
 				);
 			}));

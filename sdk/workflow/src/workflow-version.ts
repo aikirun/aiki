@@ -225,7 +225,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		parentRun: WorkflowRun<Context, ParentEvents>,
 		...args: Input extends void ? [] : [Input]
 	): Promise<ChildWorkflowRunHandle<Output, Context, TEvents>> {
-		return this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args);
+		return parentRun[INTERNAL].handle[INTERNAL].executeIfAllowed(() =>
+			this.startAsChildWithOptions(parentRun, this.startOptionsBuilder.build(), ...args)
+		);
 	}
 
 	private async startAsChildWithOptions(
@@ -237,8 +239,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			logger: parentRunLogger,
 			[INTERNAL]: { handle: parentRunHandle, hasher: parentRunHasher, replayManifest: parentRunReplayManifest },
 		} = parentRun;
-		const { assertExecutionAllowed, client } = parentRunHandle[INTERNAL];
-		assertExecutionAllowed();
+		const { client } = parentRunHandle[INTERNAL];
 
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
@@ -419,6 +420,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		while (true) {
 			try {
 				const outputRaw = await this.params.handler(run, input);
+
+				// The handler may have caught the error that ended the execution and carried on.
+				handle[INTERNAL].assertExecutionAllowed();
+
 				const outputSchema = this.params.schema?.output;
 				const outputSchemaValidationResult = outputSchema
 					? validateWithSchema(handle, outputSchema, outputRaw, logger, "Invalid workflow data")
@@ -439,6 +444,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				) {
 					throw err;
 				}
+
+				// The handler may have caught the error that ended the execution and thrown another.
+				handle[INTERNAL].assertExecutionAllowed();
 
 				const attempts = handle.run.attempts;
 				const retryParams = getRetryParams(attempts, retryStrategy);

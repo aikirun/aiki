@@ -4,7 +4,13 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
-import { ClientCodecMissingError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import {
+	ClientCodecMissingError,
+	WorkflowRunRevisionConflictError,
+	WorkflowRunStateUnknownError,
+	WorkflowRunSuspendedError,
+} from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 
@@ -225,7 +231,7 @@ describe("createEventWaiters", () => {
 			);
 		}));
 
-	test("maps a revision conflict on the awaiting_event transition to a suspension", () =>
+	test("ends the execution when the run changed before the wait was recorded", () =>
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
@@ -243,7 +249,9 @@ describe("createEventWaiters", () => {
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
-			await expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			await expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunRevisionConflictError);
+
+			expect(() => handle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunRevisionConflictError);
 		}));
 
 	test("advances the cursor across calls, consuming recorded waits in order", () =>
@@ -263,6 +271,42 @@ describe("createEventWaiters", () => {
 
 			expect((await waiters.orderShipped.wait()).data).toBe("first");
 			expect((await waiters.orderShipped.wait()).data).toBe("second");
+		}));
+
+	test("ends the execution when the wait request gets no response", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+			client.api.workflowRun.transitionStateV1.rejectsOnce(
+				{
+					type: "optimistic",
+					id: record.id,
+					state: { status: "awaiting_event", eventName: "orderShipped" },
+					expectedRevision: 0,
+					expectedSignalSequence: 0,
+				},
+				new Error("fetch failed")
+			);
+
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			await expect(waiters.orderShipped.wait()).rejects.toBeInstanceOf(WorkflowRunStateUnknownError);
+
+			expect(() => handle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunStateUnknownError);
+		}));
+
+	test("refuses to wait once the execution has ended", () =>
+		withFakeClient(async (client) => {
+			const record = runningWorkflowRunRecordFactory.build();
+			const definition = { orderShipped: event() };
+			const handle = workflowRunHandle(client, record, definition);
+			const waiters = createEventWaiters(handle, definition, client.logger);
+
+			const suspension = new WorkflowRunSuspendedError(record.id as WorkflowRunId);
+			await expect(handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension))).rejects.toBe(suspension);
+
+			await expect(waiters.orderShipped.wait()).rejects.toBe(suspension);
 		}));
 });
 

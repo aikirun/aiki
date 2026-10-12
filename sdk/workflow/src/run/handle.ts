@@ -25,6 +25,7 @@ import {
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import { type BoundCodec, bindDeclaredCodec } from "./bound-codec";
+import { isControlFlowError } from "./control-flow-error";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "./event";
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
@@ -150,6 +151,7 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 			>
 		) => Promise<TaskInfo>;
 		assertExecutionAllowed: () => void;
+		executeIfAllowed: <Result>(fn: () => Promise<Result>) => Promise<Result>;
 	};
 }
 
@@ -200,6 +202,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 {
 	private readonly api: ApiClient;
 	private taskTransitionSequence = 0;
+	private executionEndedError: Error | undefined;
 	public readonly events: EventSenders<TEvents>;
 	public readonly [INTERNAL]: WorkflowRunHandle<Output, Context, TEvents>[typeof INTERNAL];
 
@@ -221,6 +224,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
+			executeIfAllowed: this.executeIfAllowed.bind(this),
 		};
 	}
 
@@ -403,9 +407,25 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 	}
 
 	private assertExecutionAllowed() {
+		if (this.executionEndedError) {
+			throw this.executionEndedError;
+		}
+
 		const status = this.run.state.status;
 		if (status !== "queued" && status !== "running") {
 			throw new WorkflowRunNotExecutableError(this.run.id as WorkflowRunId, status);
+		}
+	}
+
+	private async executeIfAllowed<Result>(fn: () => Promise<Result>): Promise<Result> {
+		try {
+			this.assertExecutionAllowed();
+			return await fn();
+		} catch (err) {
+			if (isControlFlowError(err)) {
+				this.executionEndedError ??= err;
+			}
+			throw err;
 		}
 	}
 }
