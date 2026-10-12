@@ -77,7 +77,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: inputHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				options: { pool: "eu-west" },
+				options: { pool: "eu-west", clientCodecPolicy: "skip" },
 			});
 
 			const run = await service.getWorkflowRunById(context, runId);
@@ -95,7 +95,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					inputHash,
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					options: { pool: "eu-west" },
+					options: { pool: "eu-west", clientCodecPolicy: "skip" },
 					attempts: 1,
 					tasks: {},
 					sleeps: {},

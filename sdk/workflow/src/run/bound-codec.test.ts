@@ -4,7 +4,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import { ClientCodecMissingError, type WorkflowRunId } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
-import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
+import { bindDeclaredCodec, noopCodec, resolveClientCodec, toBoundCodec } from "./bound-codec";
 
 describe("toBoundCodec", () => {
 	test("delegates encode and decode to the codec", async () => {
@@ -25,6 +25,43 @@ describe("noopCodec", () => {
 
 		expect(await noopCodec.encode(payload)).toBe(asOpaquePayload(payload));
 		expect(await noopCodec.decode(asOpaquePayload(payload))).toBe(payload);
+	});
+});
+
+describe("resolveClientCodec", () => {
+	const clientCodec = {
+		encode: async (payload: unknown) => ({ marked: payload }),
+		decode: async (payload: unknown) => ({ unmarked: payload }),
+	};
+
+	test("applies the client codec when the policy is unset", async () => {
+		const { codec, applied } = resolveClientCodec(clientCodec, undefined);
+		const payload = { value: 1 };
+
+		expect(applied).toBe(true);
+		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
+	});
+
+	test("applies the client codec when the policy is apply", async () => {
+		const { codec, applied } = resolveClientCodec(clientCodec, "apply");
+		const payload = { value: 1 };
+
+		expect(applied).toBe(true);
+		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
+	});
+
+	test("skips the client codec when the policy is skip", async () => {
+		const { codec, applied } = resolveClientCodec(clientCodec, "skip");
+		const payload = { value: 1 };
+
+		expect(applied).toBe(false);
+		expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
+	});
+
+	test("skips when the client has no codec, whatever the policy", async () => {
+		expect(resolveClientCodec(undefined, "apply")).toEqual({ codec: noopCodec, applied: false });
+		expect(resolveClientCodec(undefined, "skip")).toEqual({ codec: noopCodec, applied: false });
+		expect(resolveClientCodec(undefined, undefined)).toEqual({ codec: noopCodec, applied: false });
 	});
 });
 

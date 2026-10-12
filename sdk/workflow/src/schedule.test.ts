@@ -215,6 +215,30 @@ describe("schedule", () => {
 					{ warehouseId: "wh-1" }
 				);
 			}));
+
+		test("skips the client codec when the workflow sets clientCodecPolicy to skip", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequest.build({
+						workflowRunInput: asOpaquePayload(workflowRunInput),
+						clientCodecApplied: false,
+						workflowRunOptions: { clientCodecPolicy: "skip" },
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					syncInventoryWorkflow.with("clientCodecPolicy", "skip"),
+					workflowRunInput
+				);
+			}));
 	});
 
 	describe("handle operations", () => {

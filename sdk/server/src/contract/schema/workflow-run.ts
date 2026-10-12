@@ -24,6 +24,7 @@ export const workflowRunOptionsSchema = type({
 	"pool?": "string | undefined",
 	"retry?": retryStrategySchema,
 	"priority?": "0 <= number.integer <= 9 | undefined",
+	"clientCodecPolicy?": "'apply' | 'skip' | undefined",
 });
 
 export const workflowStartOptionsSchema = workflowRunOptionsSchema.and({
