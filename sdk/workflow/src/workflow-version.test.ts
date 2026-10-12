@@ -30,6 +30,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 
 import type { WorkflowRun } from "./run";
+import type { ControlFlowError } from "./run/control-flow-error";
 import { workflowRunHandle } from "./run/handle";
 import { createReplayManifest } from "./run/replay-manifest";
 import { taskExecutionTracker } from "./run/task-execution-tracker";
@@ -633,27 +634,24 @@ describe("workflow version execution", () => {
 	});
 
 	describe("control-flow errors propagate unchanged", () => {
-		const controlFlowErrorCases: Array<{ name: string; create: (id: WorkflowRunId, attempts: number) => Error }> = [
-			{ name: "WorkflowRunSuspendedError", create: (id) => new WorkflowRunSuspendedError(id) },
-			{ name: "WorkflowRunNotExecutableError", create: (id) => new WorkflowRunNotExecutableError(id, "paused") },
-			{ name: "WorkflowRunFailedError", create: (id, attempts) => new WorkflowRunFailedError(id, attempts) },
-			{ name: "WorkflowRunRevisionConflictError", create: (id) => new WorkflowRunRevisionConflictError(id) },
-			{
-				name: "WorkflowRunStateUnknownError",
-				create: (id) => new WorkflowRunStateUnknownError(id, new Error("fetch failed")),
-			},
-			{
-				name: "NonDeterminismError",
-				create: (id, attempts) => new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
-			},
-			{ name: "ClientCodecMissingError", create: (id) => new ClientCodecMissingError(id) },
-		];
+		const createControlFlowErrorByName: {
+			[Member in ControlFlowError as Member["name"]]: (id: WorkflowRunId, attempts: number) => Member;
+		} = {
+			WorkflowRunSuspendedError: (id) => new WorkflowRunSuspendedError(id),
+			WorkflowRunNotExecutableError: (id) => new WorkflowRunNotExecutableError(id, "paused"),
+			WorkflowRunFailedError: (id, attempts) => new WorkflowRunFailedError(id, attempts),
+			WorkflowRunRevisionConflictError: (id) => new WorkflowRunRevisionConflictError(id),
+			WorkflowRunStateUnknownError: (id) => new WorkflowRunStateUnknownError(id, new Error("fetch failed")),
+			NonDeterminismError: (id, attempts) =>
+				new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
+			ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
+		};
 
-		for (const errorCase of controlFlowErrorCases) {
-			test(`rethrows ${errorCase.name} as-is without an additional state transition`, () =>
+		for (const [name, createControlFlowError] of Object.entries(createControlFlowErrorByName)) {
+			test(`rethrows ${name} as-is without an additional state transition`, () =>
 				withFakeClient(async (client) => {
 					const runRecord = runningWorkflowRunRecordFactory.build();
-					const thrownError = errorCase.create(runRecord.id as WorkflowRunId, runRecord.attempts);
+					const thrownError = createControlFlowError(runRecord.id as WorkflowRunId, runRecord.attempts);
 					const workflowVersion = workflow({ name: "control-flow-workflow" }).v("1.0.0", {
 						async handler() {
 							throw thrownError;

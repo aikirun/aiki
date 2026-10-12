@@ -12,24 +12,21 @@ import type { TaskId } from "@aikirun/types/workflow/task";
 import { TaskFailedError } from "@aikirun/types/workflow/task";
 import { describe, expect, test } from "vitest";
 
-import { isControlFlowError } from "./control-flow-error";
+import { type ControlFlowError, isControlFlowError } from "./control-flow-error";
 
 describe("isControlFlowError", () => {
 	const runId = "run-1" as WorkflowRunId;
-	const controlFlowErrors: Array<{ name: string; error: Error }> = [
-		{ name: "WorkflowRunSuspendedError", error: new WorkflowRunSuspendedError(runId) },
-		{ name: "WorkflowRunStateUnknownError", error: new WorkflowRunStateUnknownError(runId, new Error("fetch failed")) },
-		{ name: "WorkflowRunRevisionConflictError", error: new WorkflowRunRevisionConflictError(runId) },
-		{ name: "WorkflowRunFailedError", error: new WorkflowRunFailedError(runId, 1) },
-		{ name: "WorkflowRunNotExecutableError", error: new WorkflowRunNotExecutableError(runId, "paused") },
-		{
-			name: "NonDeterminismError",
-			error: new NonDeterminismError(runId, 1, { taskIds: [], childWorkflowRunIds: [] }),
-		},
-		{ name: "ClientCodecMissingError", error: new ClientCodecMissingError(runId) },
-	];
+	const controlFlowErrors: { [Member in ControlFlowError as Member["name"]]: Member } = {
+		WorkflowRunSuspendedError: new WorkflowRunSuspendedError(runId),
+		WorkflowRunStateUnknownError: new WorkflowRunStateUnknownError(runId, new Error("fetch failed")),
+		WorkflowRunRevisionConflictError: new WorkflowRunRevisionConflictError(runId),
+		WorkflowRunFailedError: new WorkflowRunFailedError(runId, 1),
+		WorkflowRunNotExecutableError: new WorkflowRunNotExecutableError(runId, "paused"),
+		NonDeterminismError: new NonDeterminismError(runId, 1, { taskIds: [], childWorkflowRunIds: [] }),
+		ClientCodecMissingError: new ClientCodecMissingError(runId),
+	};
 
-	for (const { name, error } of controlFlowErrors) {
+	for (const [name, error] of Object.entries(controlFlowErrors)) {
 		test(`is true for ${name}`, () => {
 			expect(isControlFlowError(error)).toBe(true);
 		});

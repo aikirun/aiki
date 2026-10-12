@@ -20,6 +20,7 @@ import {
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test, vi } from "vitest";
 
+import type { ControlFlowError } from "./control-flow-error";
 import type { EventsDefinition } from "./event";
 import { executeWorkflowRun } from "./execute";
 import type { WorkflowRun } from "./index";
@@ -44,29 +45,27 @@ function fakeWorkflowVersion(
 
 describe("executeWorkflowRun", () => {
 	describe("error classification", () => {
-		const controlFlowErrors: Array<{ name: string; make: () => Error }> = [
-			{
-				name: "WorkflowRunNotExecutableError",
-				make: () => new WorkflowRunNotExecutableError("run-1" as WorkflowRunId, "paused"),
-			},
-			{ name: "WorkflowRunSuspendedError", make: () => new WorkflowRunSuspendedError("run-1" as WorkflowRunId) },
-			{ name: "WorkflowRunFailedError", make: () => new WorkflowRunFailedError("run-1" as WorkflowRunId, 1) },
-			{
-				name: "WorkflowRunRevisionConflictError",
-				make: () => new WorkflowRunRevisionConflictError("run-1" as WorkflowRunId),
-			},
-			{
-				name: "NonDeterminismError",
-				make: () => new NonDeterminismError("run-1" as WorkflowRunId, 1, { taskIds: [], childWorkflowRunIds: [] }),
-			},
-		];
+		// ClientCodecMissingError and WorkflowRunStateUnknownError return false, and have their own tests below.
+		const createControlFlowErrorByName: {
+			[Member in Exclude<
+				ControlFlowError,
+				ClientCodecMissingError | WorkflowRunStateUnknownError
+			> as Member["name"]]: () => Member;
+		} = {
+			WorkflowRunNotExecutableError: () => new WorkflowRunNotExecutableError("run-1" as WorkflowRunId, "paused"),
+			WorkflowRunSuspendedError: () => new WorkflowRunSuspendedError("run-1" as WorkflowRunId),
+			WorkflowRunFailedError: () => new WorkflowRunFailedError("run-1" as WorkflowRunId, 1),
+			WorkflowRunRevisionConflictError: () => new WorkflowRunRevisionConflictError("run-1" as WorkflowRunId),
+			NonDeterminismError: () =>
+				new NonDeterminismError("run-1" as WorkflowRunId, 1, { taskIds: [], childWorkflowRunIds: [] }),
+		};
 
-		for (const errorCase of controlFlowErrors) {
-			test(`returns true when the handler throws ${errorCase.name}`, () =>
+		for (const [name, createControlFlowError] of Object.entries(createControlFlowErrorByName)) {
+			test(`returns true when the handler throws ${name}`, () =>
 				withFakeClient(async (client) => {
 					const workflowRun = runningWorkflowRunRecordFactory.build();
 					const workflowVersion = fakeWorkflowVersion(async () => {
-						throw errorCase.make();
+						throw createControlFlowError();
 					});
 
 					const result = await executeWorkflowRun({

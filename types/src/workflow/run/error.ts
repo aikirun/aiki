@@ -4,28 +4,29 @@ import type { TaskName } from "../task";
 import type { WorkflowName, WorkflowVersionId } from "../workflow";
 
 export class WorkflowRunNotExecutableError extends Error {
+	public override readonly name = "WorkflowRunNotExecutableError";
 	public readonly id: WorkflowRunId;
 	public readonly status: WorkflowRunStatus;
 
 	constructor(id: WorkflowRunId, status: WorkflowRunStatus) {
 		super(`Workflow ${id} is not executable while ${status}`);
-		this.name = "WorkflowRunNotExecutableError";
 		this.id = id;
 		this.status = status;
 	}
 }
 
 export class WorkflowRunSuspendedError extends Error {
+	public override readonly name = "WorkflowRunSuspendedError";
 	public readonly id: WorkflowRunId;
 
 	constructor(id: WorkflowRunId) {
 		super(`Workflow ${id} is suspended`);
-		this.name = "WorkflowRunSuspendedError";
 		this.id = id;
 	}
 }
 
 export class WorkflowRunFailedError extends Error {
+	public override readonly name = "WorkflowRunFailedError";
 	public readonly id: WorkflowRunId;
 	public readonly attempts: number;
 	public readonly reason?: string;
@@ -35,7 +36,6 @@ export class WorkflowRunFailedError extends Error {
 			? `Workflow ${id} failed after ${attempts} attempt(s): ${reason}`
 			: `Workflow ${id} failed after ${attempts} attempt(s)`;
 		super(message);
-		this.name = "WorkflowRunFailedError";
 		this.id = id;
 		this.attempts = attempts;
 		this.reason = reason;
@@ -43,11 +43,11 @@ export class WorkflowRunFailedError extends Error {
 }
 
 export class WorkflowRunRevisionConflictError extends Error {
+	public override readonly name = "WorkflowRunRevisionConflictError";
 	public readonly id: WorkflowRunId;
 
 	constructor(id: WorkflowRunId) {
 		super(`Conflict while trying to update Workflow run ${id}`);
-		this.name = "WorkflowRunRevisionConflictError";
 		this.id = id;
 	}
 }
@@ -57,16 +57,17 @@ export class WorkflowRunRevisionConflictError extends Error {
  * the server recorded. The run is left for recovery, which replays it from what the server has.
  */
 export class WorkflowRunStateUnknownError extends Error {
+	public override readonly name = "WorkflowRunStateUnknownError";
 	public readonly id: WorkflowRunId;
 
 	constructor(id: WorkflowRunId, cause: unknown) {
 		super(`The state of workflow run ${id} is unknown`, { cause });
-		this.name = "WorkflowRunStateUnknownError";
 		this.id = id;
 	}
 }
 
 export class NonDeterminismError extends Error {
+	public override readonly name = "NonDeterminismError";
 	public readonly id: WorkflowRunId;
 	public readonly attempts: number;
 	public readonly unconsumedManifestEntries: UnconsumedManifestEntries;
@@ -77,7 +78,6 @@ export class NonDeterminismError extends Error {
 		unconsumedManifestEntries: { taskIds: string[]; childWorkflowRunIds: string[] }
 	) {
 		super(`Replay divergence for Workflow run ${id}`);
-		this.name = "NonDeterminismError";
 		this.id = id;
 		this.attempts = attempts;
 		this.unconsumedManifestEntries = unconsumedManifestEntries;
@@ -85,11 +85,11 @@ export class NonDeterminismError extends Error {
 }
 
 export class ClientCodecMissingError extends Error {
+	public override readonly name = "ClientCodecMissingError";
 	public readonly id: WorkflowRunId;
 
 	constructor(id: WorkflowRunId) {
 		super(`Workflow ${id} expects a client codec, but none present`);
-		this.name = "ClientCodecMissingError";
 		this.id = id;
 	}
 }
@@ -99,6 +99,7 @@ export class ClientCodecMissingError extends Error {
  * Children of an encoded parent must keep the same declaration.
  */
 export class ChildWorkflowRunClientCodecSkippedError extends Error {
+	public override readonly name = "ChildWorkflowRunClientCodecSkippedError";
 	public readonly parentId: WorkflowRunId;
 	public readonly childWorkflowName: WorkflowName;
 	public readonly childWorkflowVersionId: WorkflowVersionId;
@@ -107,7 +108,6 @@ export class ChildWorkflowRunClientCodecSkippedError extends Error {
 		super(
 			`Child workflow ${childWorkflowName}:${childWorkflowVersionId} cannot skip the client codec when parent run ${parentId} applied it`
 		);
-		this.name = "ChildWorkflowRunClientCodecSkippedError";
 		this.parentId = parentId;
 		this.childWorkflowName = childWorkflowName;
 		this.childWorkflowVersionId = childWorkflowVersionId;
@@ -120,12 +120,12 @@ export class ChildWorkflowRunClientCodecSkippedError extends Error {
  * fail, and the task is not retried.
  */
 export class WorkflowRunUsedInTaskHandlerError extends Error {
+	public override readonly name = "WorkflowRunUsedInTaskHandlerError";
 	public readonly id: WorkflowRunId;
 	public readonly taskName: TaskName;
 
 	constructor(id: WorkflowRunId, taskName: TaskName) {
 		super(`Task ${taskName} cannot use workflow run ${id} inside its handler`);
-		this.name = "WorkflowRunUsedInTaskHandlerError";
 		this.id = id;
 		this.taskName = taskName;
 	}

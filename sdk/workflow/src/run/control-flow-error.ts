@@ -12,7 +12,7 @@ import {
  * True for an error the SDK throws to stop the workflow code and end the execution. It does not
  * report a failure the workflow code can handle.
  */
-export function isControlFlowError(err: unknown): err is Error {
+export function isControlFlowError(err: unknown) {
 	return (
 		err instanceof WorkflowRunSuspendedError ||
 		err instanceof WorkflowRunStateUnknownError ||
@@ -23,3 +23,7 @@ export function isControlFlowError(err: unknown): err is Error {
 		err instanceof ClientCodecMissingError
 	);
 }
+
+export type ControlFlowError = typeof isControlFlowError extends (err: unknown) => err is infer Guarded
+	? Guarded
+	: never;
