@@ -1075,6 +1075,50 @@ describe("creating a workflow run", () => {
 				).rejects.toBeInstanceOf(ChildWorkflowRunClientCodecSkippedError);
 			}));
 
+		// Parent and child were created with clientCodecApplied: true. After a deploy that adds
+		// clientCodecPolicy: "skip" on the child version, parent replay finds the recorded child
+		// and returns it — nothing is created, so the skip-vs-applied check does not run.
+		test("returns the recorded child on replay when clientCodecPolicy is skip and the parent applied the codec", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({
+					id: recordedChildRun.id,
+					clientCodecApplied: true,
+				});
+
+				client.api.workflowRun.getByIdV1.once({ id: recordedChildRun.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(recordedChildRun.id);
+			}));
+
 		test("skips the client codec on the child when clientCodecPolicy is skip and the parent skipped", () =>
 			withFakeClient(async (client) => {
 				client[INTERNAL].codec = {

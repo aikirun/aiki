@@ -239,10 +239,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const { assertExecutionAllowed, client } = parentRunHandle[INTERNAL];
 		assertExecutionAllowed();
 
-		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
-			throw new ChildWorkflowRunClientCodecSkippedError(parentRun.id);
-		}
-
 		const inputRaw = args[0];
 		const inputSchema = this.params.schema?.input;
 		const inputSchemaValidationResult = inputSchema
@@ -293,6 +289,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				parentRunReplayManifest,
 				parentRunLogger
 			);
+		}
+
+		// execute this check only for the new child starts
+		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
+			throw new ChildWorkflowRunClientCodecSkippedError(parentRun.id);
 		}
 
 		const encodedInput = await codec.encode(input);
