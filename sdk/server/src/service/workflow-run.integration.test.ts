@@ -77,7 +77,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: inputHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				options: { pool: "eu-west", clientCodecPolicy: "skip" },
+				options: { pool: "eu-west" },
 			});
 
 			const run = await service.getWorkflowRunById(context, runId);
@@ -95,7 +95,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					inputHash,
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					options: { pool: "eu-west", clientCodecPolicy: "skip" },
+					options: { pool: "eu-west" },
 					attempts: 1,
 					tasks: {},
 					sleeps: {},
@@ -144,6 +144,26 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 
 			expect(await service.getWorkflowRunById(context, runId)).toEqual(
 				expect.objectContaining({ id: runId, clientHasherApplied: true })
+			);
+		}));
+
+	test("keeps the client codec policy the run was created with", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				options: { clientCodecPolicy: "skip" },
+			});
+
+			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+				expect.objectContaining({ id: runId, options: { clientCodecPolicy: "skip" } })
 			);
 		}));
 
