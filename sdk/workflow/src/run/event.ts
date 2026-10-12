@@ -14,7 +14,7 @@ import type {
 	EventWaitResult,
 	WorkflowRunId,
 } from "@aikirun/types/workflow/run";
-import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./bound-codec";
@@ -141,34 +141,34 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 	async function wait(options?: EventWaitOptions<false>): Promise<EventWaitResult<Data, false>>;
 	async function wait(options: EventWaitOptions<true>): Promise<EventWaitResult<Data, true>>;
 	async function wait(options?: EventWaitOptions<boolean>): Promise<EventWaitResult<Data, boolean>> {
-		const eventWaits = handle.run.eventWaits[eventName] ?? [];
+		return handle[INTERNAL].executeIfAllowed(async () => {
+			const eventWaits = handle.run.eventWaits[eventName] ?? [];
 
-		const existingEventWait = eventWaits[nextIndex];
-		if (existingEventWait) {
-			nextIndex++;
+			const existingEventWait = eventWaits[nextIndex];
+			if (existingEventWait) {
+				nextIndex++;
 
-			if (existingEventWait.status === "timeout") {
-				logger.debug("Timed out waiting for event");
-				return { timeout: true, timedOutAt: existingEventWait.timedOutAt };
+				if (existingEventWait.status === "timeout") {
+					logger.debug("Timed out waiting for event");
+					return { timeout: true, timedOutAt: existingEventWait.timedOutAt };
+				}
+
+				// The data decodes by its sender's declaration, not the run's: the sender's client
+				// wrote it, and that client may hold a codec this run's creator did not, or vice versa.
+				const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+					runId: handle.run.id as WorkflowRunId,
+					clientCodecApplied: existingEventWait.clientCodecApplied,
+				});
+				logger.debug("Event received");
+				return {
+					timeout: false,
+					data: (await codec.decode(existingEventWait.data)) as Data,
+					receivedAt: existingEventWait.receivedAt,
+				};
 			}
 
-			// The data decodes by its sender's declaration, not the run's: the sender's client
-			// wrote it, and that client may hold a codec this run's creator did not, or vice versa.
-			const codec = bindDeclaredCodec(handle[INTERNAL].client, {
-				runId: handle.run.id as WorkflowRunId,
-				clientCodecApplied: existingEventWait.clientCodecApplied,
-			});
-			logger.debug("Event received");
-			return {
-				timeout: false,
-				data: (await codec.decode(existingEventWait.data)) as Data,
-				receivedAt: existingEventWait.receivedAt,
-			};
-		}
+			const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 
-		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
-
-		try {
 			await handle[INTERNAL].transitionStateOptimistic({
 				status: "awaiting_event",
 				eventName,
@@ -177,14 +177,8 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 			logger.debug("Waiting for event", {
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
-		} catch (err) {
-			if (err instanceof WorkflowRunRevisionConflictError) {
-				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
-			}
-			throw err;
-		}
-
-		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+		});
 	}
 
 	return { wait };

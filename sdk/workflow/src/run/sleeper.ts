@@ -3,7 +3,7 @@ import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { SleepName, SleepResult, WorkflowRunId } from "@aikirun/types/workflow/run";
-import { WorkflowRunRevisionConflictError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import type { WorkflowRunHandle } from "./handle";
 
@@ -13,87 +13,76 @@ const MAX_SLEEP_MS = MAX_SLEEP_YEARS * 365 * 24 * 60 * 60 * 1_000;
 export function createSleeper(handle: WorkflowRunHandle<unknown, unknown>, logger: Logger) {
 	const nextIndexBySleepName: Record<SleepName, number> = {};
 
-	return async (name: string, duration: DurationObject): Promise<SleepResult> => {
-		const sleepName = name as SleepName;
-		const durationMs = toMilliseconds(duration);
+	return (name: string, duration: DurationObject): Promise<SleepResult> =>
+		handle[INTERNAL].executeIfAllowed(async () => {
+			const sleepName = name as SleepName;
+			const durationMs = toMilliseconds(duration);
 
-		if (durationMs > MAX_SLEEP_MS) {
-			throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
-		}
+			if (durationMs > MAX_SLEEP_MS) {
+				throw new Error(`Sleep duration ${durationMs}ms exceeds maximum of ${MAX_SLEEP_YEARS} years`);
+			}
 
-		const nextIndex = nextIndexBySleepName[sleepName] ?? 0;
+			const nextIndex = nextIndexBySleepName[sleepName] ?? 0;
 
-		const sleeps = handle.run.sleeps[sleepName] ?? [];
-		const existingSleep = sleeps[nextIndex];
+			const sleeps = handle.run.sleeps[sleepName] ?? [];
+			const existingSleep = sleeps[nextIndex];
 
-		if (!existingSleep) {
-			try {
+			if (!existingSleep) {
 				await handle[INTERNAL].transitionStateOptimistic({ status: "sleeping", sleepName, durationMs });
 				logger.debug("Going to sleep", {
 					"aiki.sleepName": sleepName,
 					"aiki.durationMs": durationMs,
 				});
-			} catch (err) {
-				if (err instanceof WorkflowRunRevisionConflictError) {
-					throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
-				}
-				throw err;
+				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
 			}
 
-			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
-		}
+			if (existingSleep.status === "sleeping") {
+				logger.debug("Already sleeping", {
+					"aiki.sleepName": sleepName,
+					"aiki.wakeupAt": existingSleep.wakeupAt,
+				});
+				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+			}
 
-		if (existingSleep.status === "sleeping") {
-			logger.debug("Already sleeping", {
+			existingSleep.status satisfies "cancelled" | "completed";
+			nextIndexBySleepName[sleepName] = nextIndex + 1;
+
+			if (existingSleep.status === "cancelled") {
+				logger.debug("Sleep cancelled", {
+					"aiki.sleepName": sleepName,
+					"aiki.cancelledAt": existingSleep.cancelledAt,
+				});
+				return { cancelled: true };
+			}
+
+			if (durationMs === existingSleep.durationMs) {
+				logger.debug("Sleep completed", {
+					"aiki.sleepName": sleepName,
+					"aiki.durationMs": durationMs,
+					"aiki.completedAt": existingSleep.completedAt,
+				});
+				return { cancelled: false };
+			}
+
+			if (durationMs < existingSleep.durationMs) {
+				return { cancelled: false };
+			}
+
+			logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
 				"aiki.sleepName": sleepName,
-				"aiki.wakeupAt": existingSleep.wakeupAt,
+				"aiki.historicDurationMs": existingSleep.durationMs,
+				"aiki.latestDurationMs": durationMs,
 			});
-			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
-		}
-
-		existingSleep.status satisfies "cancelled" | "completed";
-		nextIndexBySleepName[sleepName] = nextIndex + 1;
-
-		if (existingSleep.status === "cancelled") {
-			logger.debug("Sleep cancelled", {
-				"aiki.sleepName": sleepName,
-				"aiki.cancelledAt": existingSleep.cancelledAt,
+			const durationLeftMs = durationMs - existingSleep.durationMs;
+			await handle[INTERNAL].transitionStateOptimistic({
+				status: "sleeping",
+				sleepName,
+				durationMs: durationLeftMs,
 			});
-			return { cancelled: true };
-		}
-
-		if (durationMs === existingSleep.durationMs) {
-			logger.debug("Sleep completed", {
-				"aiki.sleepName": sleepName,
-				"aiki.durationMs": durationMs,
-				"aiki.completedAt": existingSleep.completedAt,
-			});
-			return { cancelled: false };
-		}
-
-		if (durationMs < existingSleep.durationMs) {
-			return { cancelled: false };
-		}
-
-		logger.warn("Higher sleep duration encountered during replay. Sleeping for remaining duration", {
-			"aiki.sleepName": sleepName,
-			"aiki.historicDurationMs": existingSleep.durationMs,
-			"aiki.latestDurationMs": durationMs,
-		});
-		const durationLeftMs = durationMs - existingSleep.durationMs;
-		try {
-			await handle[INTERNAL].transitionStateOptimistic({ status: "sleeping", sleepName, durationMs: durationLeftMs });
 			logger.debug("Sleeping", {
 				"aiki.sleepName": sleepName,
 				"aiki.durationMs": durationLeftMs,
 			});
-		} catch (err) {
-			if (err instanceof WorkflowRunRevisionConflictError) {
-				throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
-			}
-			throw err;
-		}
-
-		throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
-	};
+			throw new WorkflowRunSuspendedError(handle.run.id as WorkflowRunId);
+		});
 }

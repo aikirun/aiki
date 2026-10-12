@@ -1,3 +1,4 @@
+import { createBinaryLatch } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
@@ -294,6 +295,59 @@ describe("task", () => {
 					);
 
 				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			}));
+
+		test("ends the execution when the task suspends for a retry", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord, { maxInlineWaitMs: 0 });
+
+				const retry = { type: "fixed", maxAttempts: 2, delayMs: 1_000 } as const;
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("down");
+					},
+					retry,
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: chargeCard.name,
+							options: { retry },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "awaiting_retry",
+								error: expect.objectContaining({ message: "down" }),
+								nextAttemptInMs: 1_000,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
+
+				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+
+				expect(() => run[INTERNAL].handle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunSuspendedError);
 			}));
 
 		test("retries a due replayed task with the strategy from its stored options", () =>
@@ -625,6 +679,118 @@ describe("task", () => {
 					);
 
 				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
+			}));
+
+		test("leaves the execution going when the task fails", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("declined");
+					},
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: chargeCard.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "failed",
+								error: expect.objectContaining({ message: "declined" }),
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: runningTaskInfo }
+					);
+
+				await expect(chargeCard.start(run, input)).rejects.toBeInstanceOf(TaskFailedError);
+
+				expect(() => run[INTERNAL].handle[INTERNAL].assertExecutionAllowed()).not.toThrow();
+			}));
+
+		test("records the task's result when the execution ends while its handler is running", () =>
+			withFakeClient(async (client) => {
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const handlerStarted = createBinaryLatch();
+				const finishHandler = createBinaryLatch();
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => {
+						handlerStarted.signal();
+						await finishHandler.wait();
+						return "charged";
+					},
+				});
+
+				const input = { cardId: "card-1" };
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: chargeCard.name,
+					state: { output: asOpaquePayload("charged") },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: chargeCard.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: completedTaskInfo.state,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				const charging = chargeCard.start(run, input);
+				await handlerStarted.wait();
+				const suspension = new WorkflowRunSuspendedError(runRecord.id as WorkflowRunId);
+				await expect(run[INTERNAL].handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension))).rejects.toBe(
+					suspension
+				);
+				finishHandler.signal();
+
+				expect(await charging).toBe("charged");
 			}));
 
 		test("does not re-run the handler when completing the task fails", () =>

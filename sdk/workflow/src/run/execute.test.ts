@@ -4,7 +4,7 @@ import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
-import { awaitingRetryTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import { awaitingRetryTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -24,6 +24,7 @@ import type { EventsDefinition } from "./event";
 import { executeWorkflowRun } from "./execute";
 import type { WorkflowRun } from "./index";
 import { task } from "../task";
+import { workflow } from "../workflow";
 import type { AnyWorkflowVersion } from "../workflow-version";
 
 const configProvider = asConfigProvider(() => ({
@@ -196,6 +197,157 @@ describe("executeWorkflowRun", () => {
 						attempts: workflowRun.attempts,
 					}
 				);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(true);
+			}));
+	});
+
+	describe("a workflow handler that catches a task's error and starts a second task", () => {
+		test("does not start the second task when the first task's completion gets no response, and leaves the run for recovery", () =>
+			withFakeClient(async (client) => {
+				const chargeCard = task({ name: "charge-card", handler: async () => "charged" });
+				const refundCard = task({ name: "refund-card", handler: async () => "refunded" });
+				const workflowVersion = workflow({ name: "checkout" }).v("1.0.0", {
+					async handler(run) {
+						try {
+							await chargeCard.start(run);
+						} catch {
+							await refundCard.start(run);
+						}
+					},
+				});
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const chargeCardTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "running" },
+						expectedRevision: workflowRun.revision,
+					},
+					{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+				);
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: undefined,
+							inputHash: await hashInput(undefined),
+							taskName: chargeCard.name,
+							options: {},
+							workflowRunId: workflowRun.id,
+							expectedWorkflowRunRevision: workflowRun.revision,
+							sequence: 1,
+						},
+						{ taskInfo: chargeCardTaskInfo }
+					)
+					.rejectsOnce(
+						{
+							id: chargeCardTaskInfo.id,
+							attempts: 1,
+							state: { status: "completed", output: asOpaquePayload("charged") },
+							workflowRunId: workflowRun.id,
+							expectedWorkflowRunRevision: workflowRun.revision,
+							sequence: 2,
+						},
+						new Error("fetch failed")
+					);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("does not start the second task when the first task is awaiting a retry, and transitions the run to awaiting_task_retry", () =>
+			withFakeClient(async (client) => {
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				const chargeCard = task({
+					name: "charge-card",
+					handler: async () => {
+						throw new Error("card network down");
+					},
+					retry,
+				});
+				const refundCard = task({ name: "refund-card", handler: async () => "refunded" });
+				const workflowVersion = workflow({ name: "checkout" }).v("1.0.0", {
+					async handler(run) {
+						try {
+							await chargeCard.start(run);
+						} catch {
+							await refundCard.start(run);
+						}
+					},
+				});
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const chargeCardTaskInfo = runningTaskInfoFactory.build({ name: chargeCard.name });
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "running" },
+							expectedRevision: workflowRun.revision,
+						},
+						{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "awaiting_task_retry" },
+							expectedRevision: workflowRun.revision,
+						},
+						{
+							revision: workflowRun.revision + 1,
+							state: { status: "awaiting_task_retry", nextAttemptAt: 60_000 },
+							attempts: workflowRun.attempts,
+						}
+					);
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: undefined,
+							inputHash: await hashInput(undefined),
+							taskName: chargeCard.name,
+							options: { retry },
+							workflowRunId: workflowRun.id,
+							expectedWorkflowRunRevision: workflowRun.revision,
+							sequence: 1,
+						},
+						{ taskInfo: chargeCardTaskInfo }
+					)
+					.once(
+						{
+							id: chargeCardTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "awaiting_retry",
+								error: expect.objectContaining({ message: "card network down" }),
+								nextAttemptInMs: 60_000,
+							},
+							workflowRunId: workflowRun.id,
+							expectedWorkflowRunRevision: workflowRun.revision,
+							sequence: 2,
+						},
+						{ taskInfo: chargeCardTaskInfo }
+					);
 
 				const result = await executeWorkflowRun({
 					client,

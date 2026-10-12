@@ -3,12 +3,7 @@ import { toMilliseconds } from "@aikirun/lib/duration";
 import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
-import {
-	type WorkflowRunId,
-	type WorkflowRunRecord,
-	WorkflowRunRevisionConflictError,
-	WorkflowRunSuspendedError,
-} from "@aikirun/types/workflow/run";
+import { type WorkflowRunId, type WorkflowRunRecord, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import type { EventsDefinition } from "./event";
 import {
@@ -110,31 +105,31 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 	async function wait(
 		options?: ChildWorkflowRunWaitOptions<boolean>
 	): Promise<ChildWorkflowRunWaitResult<Output, boolean>> {
-		const { run } = handle;
-		const waits = parentRunHandle.run.childWorkflowRunWaits[run.id] ?? { timeouts: [] };
+		return parentRunHandle[INTERNAL].executeIfAllowed(async () => {
+			const { run } = handle;
+			const waits = parentRunHandle.run.childWorkflowRunWaits[run.id] ?? { timeouts: [] };
 
-		const timedOutWait = waits.timeouts[nextTimeoutIndex];
-		if (timedOutWait) {
-			nextTimeoutIndex++;
+			const timedOutWait = waits.timeouts[nextTimeoutIndex];
+			if (timedOutWait) {
+				nextTimeoutIndex++;
 
-			logger.debug("Timed out waiting for child workflow");
-			return {
-				success: false,
-				cause: "timeout",
-			};
-		}
+				logger.debug("Timed out waiting for child workflow");
+				return {
+					success: false,
+					cause: "timeout",
+				};
+			}
 
-		const { terminal } = waits;
-		if (terminal) {
-			return {
-				success: true,
-				state: await decodeWaitResultState<Output>(handle[INTERNAL].codec, terminal.state),
-			};
-		}
+			const { terminal } = waits;
+			if (terminal) {
+				return {
+					success: true,
+					state: await decodeWaitResultState<Output>(handle[INTERNAL].codec, terminal.state),
+				};
+			}
 
-		const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
+			const timeoutInMs = options?.timeout && toMilliseconds(options.timeout);
 
-		try {
 			await parentRunHandle[INTERNAL].transitionStateOptimistic({
 				status: "awaiting_child_workflow",
 				childWorkflowRunId: run.id,
@@ -143,14 +138,8 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 			logger.debug("Waiting for child Workflow", {
 				...(timeoutInMs !== undefined ? { "aiki.timeoutInMs": timeoutInMs } : {}),
 			});
-		} catch (err) {
-			if (err instanceof WorkflowRunRevisionConflictError) {
-				throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
-			}
-			throw err;
-		}
-
-		throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
+			throw new WorkflowRunSuspendedError(parentRunHandle.run.id as WorkflowRunId);
+		});
 	}
 
 	return wait;

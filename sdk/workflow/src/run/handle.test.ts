@@ -16,6 +16,7 @@ import {
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
+	WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
@@ -288,6 +289,68 @@ describe("workflowRunHandle", () => {
 					}));
 			}
 		}
+	});
+
+	describe("executeIfAllowed", () => {
+		test("returns what the function returns", () =>
+			withFakeClient(async (client) => {
+				const handle = workflowRunHandle(client, runningWorkflowRunRecordFactory.build());
+
+				expect(await handle[INTERNAL].executeIfAllowed(async () => "charged")).toBe("charged");
+			}));
+
+		test("ends the execution when the function throws a control-flow error", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build();
+				const handle = workflowRunHandle(client, record);
+				const suspension = new WorkflowRunSuspendedError(record.id as WorkflowRunId);
+
+				await expect(handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension))).rejects.toBe(suspension);
+
+				expect(() => handle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunSuspendedError);
+			}));
+
+		test("leaves the execution going when the function throws a plain Error", () =>
+			withFakeClient(async (client) => {
+				const handle = workflowRunHandle(client, runningWorkflowRunRecordFactory.build());
+				const cardDeclined = new Error("card declined");
+
+				await expect(handle[INTERNAL].executeIfAllowed(() => Promise.reject(cardDeclined))).rejects.toBe(cardDeclined);
+
+				expect(() => handle[INTERNAL].assertExecutionAllowed()).not.toThrow();
+			}));
+
+		test("does not run the function once the execution has ended", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build();
+				const handle = workflowRunHandle(client, record);
+				const suspension = new WorkflowRunSuspendedError(record.id as WorkflowRunId);
+				await expect(handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension))).rejects.toBe(suspension);
+
+				let functionRan = false;
+				await expect(
+					handle[INTERNAL].executeIfAllowed(async () => {
+						functionRan = true;
+					})
+				).rejects.toBe(suspension);
+
+				expect(functionRan).toBe(false);
+			}));
+
+		test("keeps the first error when two calls end the execution", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build();
+				const handle = workflowRunHandle(client, record);
+				const suspension = new WorkflowRunSuspendedError(record.id as WorkflowRunId);
+				const stateUnknown = new WorkflowRunStateUnknownError(record.id as WorkflowRunId, new Error("fetch failed"));
+
+				await Promise.allSettled([
+					handle[INTERNAL].executeIfAllowed(() => Promise.reject(suspension)),
+					handle[INTERNAL].executeIfAllowed(() => Promise.reject(stateUnknown)),
+				]);
+
+				expect(() => handle[INTERNAL].assertExecutionAllowed()).toThrow(WorkflowRunSuspendedError);
+			}));
 	});
 
 	describe("lifecycle transitions take the pessimistic path", () => {
