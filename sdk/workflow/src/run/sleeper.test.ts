@@ -1,8 +1,9 @@
+import type { DurationObject } from "@aikirun/lib/duration";
 import type { FakeClient } from "@aikirun/testing/client";
 import { withFakeClient } from "@aikirun/testing/client";
 import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
-import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
+import { WorkflowRunFailedError, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
 import { workflowRunHandle } from "./handle";
@@ -165,11 +166,64 @@ describe("createSleeper", () => {
 			}));
 	});
 
-	test("throws when the duration exceeds the maximum", () =>
-		withFakeClient(async (client) => {
-			const record = runningWorkflowRunRecordFactory.build();
-			const sleep = createTestSleeper(client, record);
+	describe("duration limits", () => {
+		test("sleeps for exactly ten years", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
+				const sleep = createTestSleeper(client, record);
 
-			await expect(sleep("nap", { days: 3651 })).rejects.toThrow(/exceeds maximum/);
-		}));
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: record.id,
+						state: { status: "sleeping", sleepName: "nap", durationMs: 315_360_000_000 },
+						expectedRevision: 0,
+					},
+					{ revision: 1, state: { status: "sleeping", sleepName: "nap", wakeupAt: 0 }, attempts: 1 }
+				);
+
+				await expect(sleep("nap", { days: 3650 })).rejects.toBeInstanceOf(WorkflowRunSuspendedError);
+			}));
+
+		const invalidDurations: Record<string, { duration: DurationObject; reason: string }> = {
+			"longer than ten years": {
+				duration: { days: 3651 },
+				reason: "Sleep duration 315446400000ms exceeds maximum of 10 years",
+			},
+			zero: { duration: { seconds: 0 }, reason: "Sleep duration must be greater than zero" },
+			"a fraction of a millisecond": {
+				duration: { milliseconds: 0.5 },
+				reason: "Sleep duration 0.5ms is not a whole number of milliseconds",
+			},
+			negative: { duration: { hours: -1 }, reason: "'hours' duration must be non-negative. Received: -1" },
+			"not a number": {
+				duration: { seconds: Number.NaN },
+				reason: "'seconds' duration must be finite. Received: NaN",
+			},
+			infinite: {
+				duration: { days: Number.POSITIVE_INFINITY },
+				reason: "'days' duration must be finite. Received: Infinity",
+			},
+		};
+
+		for (const [situation, { duration, reason }] of Object.entries(invalidDurations)) {
+			test(`fails the run when the duration is ${situation}`, () =>
+				withFakeClient(async (client) => {
+					const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
+					const sleep = createTestSleeper(client, record);
+					const failedState = {
+						status: "failed" as const,
+						cause: "self" as const,
+						error: { name: "InvalidSleepDurationError", message: reason },
+					};
+
+					client.api.workflowRun.transitionStateV1.once(
+						{ type: "optimistic", id: record.id, state: failedState, expectedRevision: 0 },
+						{ revision: 1, state: failedState, attempts: 1 }
+					);
+
+					await expect(sleep("nap", duration)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+				}));
+		}
+	});
 });

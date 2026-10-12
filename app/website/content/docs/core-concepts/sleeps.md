@@ -35,6 +35,8 @@ await run.sleep("short-delay", { milliseconds: 5000 });
 
 Available fields: `days`, `hours`, `minutes`, `seconds`, `milliseconds`. Set at least one.
 
+The fields are added up into one total, in milliseconds. That total must be a whole number: `{ hours: 1.5 }` is fine, `{ milliseconds: 0.5 }` is not. It must also be more than zero and at most 10 years (3,650 days). A sleep with an invalid duration fails the run at once, with no retry.
+
 ## How Sleeps Work
 
 When a workflow calls `run.sleep()`:
