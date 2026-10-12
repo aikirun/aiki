@@ -17,7 +17,6 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
-	ChildWorkflowRunClientCodecSkippedError,
 	ClientCodecMissingError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
@@ -1054,7 +1053,7 @@ describe("creating a workflow run", () => {
 				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBe(encodeError);
 			}));
 
-		test("rejects skipping the client codec on the child when the parent applied it", () =>
+		test("fails the parent when skipping the client codec on the child while the parent applied it", () =>
 			withFakeClient(async (client) => {
 				client[INTERNAL].codec = {
 					encode: async () => {
@@ -1070,9 +1069,34 @@ describe("creating a workflow run", () => {
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);
 
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: parentRunRecord.id,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: expect.objectContaining({ name: "ChildWorkflowRunClientCodecSkippedError" }),
+						},
+						expectedRevision: parentRunRecord.revision,
+					},
+					{
+						revision: parentRunRecord.revision,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: {
+								name: "ChildWorkflowRunClientCodecSkippedError",
+								message: `Child workflow cannot skip the client codec when parent run ${parentRunRecord.id} applied it`,
+							},
+						},
+						attempts: parentRunRecord.attempts,
+					}
+				);
+
 				await expect(
 					childWorkflow.with("clientCodecPolicy", "skip").startAsChild(parentRun, "payload")
-				).rejects.toBeInstanceOf(ChildWorkflowRunClientCodecSkippedError);
+				).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
 
 		// Parent and child were created with clientCodecApplied: true. After a deploy that adds

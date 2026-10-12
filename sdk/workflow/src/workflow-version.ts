@@ -293,7 +293,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		// execute this check only for the new child starts
 		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
-			throw new ChildWorkflowRunClientCodecSkippedError(parentRun.id);
+			const err = new ChildWorkflowRunClientCodecSkippedError(parentRun.id);
+			await parentRunHandle[INTERNAL].transitionStateOptimistic(this.createFailedState(err));
+			throw new WorkflowRunFailedError(parentRun.id, parentRunHandle.run.attempts);
 		}
 
 		const encodedInput = await codec.encode(input);

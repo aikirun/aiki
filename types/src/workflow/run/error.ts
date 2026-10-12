@@ -93,7 +93,7 @@ export class ClientCodecMissingError extends Error {
 }
 
 /**
- * A child start asked to skip the client codec while its parent run already applied one.
+ * Indicates that a child start asked to skip the client codec while its parent run already applied one.
  * Children of an encoded parent must keep the same declaration.
  */
 export class ChildWorkflowRunClientCodecSkippedError extends Error {
