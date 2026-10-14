@@ -2,6 +2,7 @@ import { createBinaryLatch } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
 import { withFakeClock } from "../../../testing/clock";
@@ -300,7 +301,7 @@ describe("claimPending", () => {
 				workflowVersionId,
 			});
 			const ownRow = rowFactory.build({ namespaceId: namespaceRequestContext.namespaceId });
-			const otherNamespaceRow = rowFactory.build({ namespaceId: namespaceRequestContextFactory.build().namespaceId });
+			const otherNamespaceRow = rowFactory.build({ namespaceId: ulid() });
 			await repos.workflowRunOutbox.createBatch([otherNamespaceRow, ownRow]);
 
 			const claimedRows = await repos.workflowRunOutbox.claimPending(
@@ -675,7 +676,8 @@ describe("markClaimed", () => {
 				repos,
 			});
 
-			await repos.workflowRunOutbox.markClaimed(namespaceRequestContextFactory.build().namespaceId, runId);
+			const otherNamespaceId = ulid();
+			await repos.workflowRunOutbox.markClaimed(otherNamespaceId, runId);
 
 			const pendingRow = await repos.workflowRunOutbox.getByWorkflowRunId({
 				namespaceId: namespaceRequestContext.namespaceId,
@@ -725,9 +727,8 @@ describe("refreshClaim", () => {
 				repos.workflowRunOutbox.markClaimed(namespaceRequestContext.namespaceId, runId)
 			);
 
-			await withFakeClock(refreshAttemptedAt, () =>
-				repos.workflowRunOutbox.refreshClaim(namespaceRequestContextFactory.build().namespaceId, runId)
-			);
+			const otherNamespaceId = ulid();
+			await withFakeClock(refreshAttemptedAt, () => repos.workflowRunOutbox.refreshClaim(otherNamespaceId, runId));
 
 			const claimedRow = await repos.workflowRunOutbox.getByWorkflowRunId({
 				namespaceId: namespaceRequestContext.namespaceId,
@@ -991,10 +992,11 @@ describe("deleteByWorkflowRunId", () => {
 	test("deletes the run's row only within its namespace", () =>
 		withHarness(async ({ repos }) => {
 			const row = pendingWorkflowRunOutboxRowFactory.build();
+			const otherNamespaceId = ulid();
 			await repos.workflowRunOutbox.createBatch([row]);
 
 			await repos.workflowRunOutbox.deleteByWorkflowRunId({
-				namespaceId: namespaceRequestContextFactory.build().namespaceId,
+				namespaceId: otherNamespaceId,
 				workflowRunId: row.workflowRunId,
 			});
 			expect(
@@ -1014,5 +1016,76 @@ describe("deleteByWorkflowRunId", () => {
 					workflowRunId: row.workflowRunId,
 				})
 			).toBeNull();
+		}));
+
+	test("leaves another run's row in the same namespace", () =>
+		withHarness(async ({ repos }) => {
+			const deletedRow = pendingWorkflowRunOutboxRowFactory.build();
+			const keptRow = pendingWorkflowRunOutboxRowFactory.build({ namespaceId: deletedRow.namespaceId });
+			await repos.workflowRunOutbox.createBatch([deletedRow, keptRow]);
+
+			await repos.workflowRunOutbox.deleteByWorkflowRunId({
+				namespaceId: deletedRow.namespaceId,
+				workflowRunId: deletedRow.workflowRunId,
+			});
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: deletedRow.namespaceId,
+					workflowRunId: deletedRow.workflowRunId,
+				})
+			).toBeNull();
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: keptRow.namespaceId,
+					workflowRunId: keptRow.workflowRunId,
+				})
+			).toEqual(expect.objectContaining({ id: keptRow.id }));
+		}));
+});
+
+describe("getByWorkflowRunId", () => {
+	test("finds the run's row only within its namespace", () =>
+		withHarness(async ({ repos }) => {
+			const row = pendingWorkflowRunOutboxRowFactory.build();
+			const otherNamespaceId = ulid();
+			await repos.workflowRunOutbox.createBatch([row]);
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: row.namespaceId,
+					workflowRunId: row.workflowRunId,
+				})
+			).toEqual(expect.objectContaining(row));
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: otherNamespaceId,
+					workflowRunId: row.workflowRunId,
+				})
+			).toBeNull();
+		}));
+});
+
+describe("createBatch", () => {
+	test("inserts every row it is given", () =>
+		withHarness(async ({ repos }) => {
+			// Each row's rank and next publish attempt rank differ, so a column written to the wrong place shows.
+			const firstRow = pendingWorkflowRunOutboxRowFactory.build({ rank: 10, nextPublishAttemptRank: 20 });
+			const secondRow = pendingWorkflowRunOutboxRowFactory.build({ rank: 30, nextPublishAttemptRank: 40 });
+
+			await repos.workflowRunOutbox.createBatch([firstRow, secondRow]);
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: firstRow.namespaceId,
+					workflowRunId: firstRow.workflowRunId,
+				})
+			).toEqual(expect.objectContaining(firstRow));
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({
+					namespaceId: secondRow.namespaceId,
+					workflowRunId: secondRow.workflowRunId,
+				})
+			).toEqual(expect.objectContaining(secondRow));
 		}));
 });
