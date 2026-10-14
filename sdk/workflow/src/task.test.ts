@@ -66,6 +66,7 @@ function createTestWorkflowRun(
 				maxInlineWaitMs: options.maxInlineWaitMs ?? 10,
 			})),
 			hasher: hashInput,
+			createContext: () => null,
 		},
 	};
 }
