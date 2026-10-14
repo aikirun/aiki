@@ -1,3 +1,4 @@
+import { MAX_TIMER_DELAY_MS } from "@aikirun/lib/async";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
 import { createMinHeap } from "@aikirun/lib/collection/heap";
 import type {
@@ -154,11 +155,14 @@ export function inMemoryTimerPriorityQueue(): InMemoryTimerPriorityQueue {
 							// until a signal arrives or the waiter is closed
 							timeout:
 								timeoutSeconds > 0
-									? setTimeout(() => {
-											detach();
-											signals.length = 0;
-											resolve(null);
-										}, timeoutSeconds * 1_000)
+									? setTimeout(
+											() => {
+												detach();
+												signals.length = 0;
+												resolve(null);
+											},
+											Math.min(timeoutSeconds * 1_000, MAX_TIMER_DELAY_MS)
+										)
 									: undefined,
 							wake: () => {
 								detach();

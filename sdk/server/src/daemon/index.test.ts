@@ -1,4 +1,4 @@
-import { createBinaryLatch } from "@aikirun/lib/async";
+import { createBinaryLatch, delay, MAX_TIMER_DELAY_MS } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { type Logger, noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
@@ -148,6 +148,31 @@ describe("pollingDaemon", () => {
 		);
 
 		await firstTickReached.wait();
+		abortController.abort();
+		await loop;
+
+		expect(tickCount).toBe(1);
+	});
+
+	test("waits between ticks when the interval is longer than a timer can wait", async () => {
+		const abortController = new AbortController();
+		const firstTickReached = createBinaryLatch();
+		let tickCount = 0;
+
+		const loop = startPollingLoop(
+			abortController.signal,
+			// Twice the limit: whatever the jitter, the wait is past what a timer can hold.
+			() => ({ intervalMs: 2 * MAX_TIMER_DELAY_MS }),
+			async () => {
+				tickCount++;
+				firstTickReached.signal();
+			},
+			{}
+		);
+
+		await firstTickReached.wait();
+		// Absence check: a wait past the limit fires after 1 ms, so a second tick would land in this window.
+		await delay(50);
 		abortController.abort();
 		await loop;
 

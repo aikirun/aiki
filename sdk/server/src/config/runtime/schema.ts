@@ -1,3 +1,4 @@
+import { MAX_TIMER_DELAY_MS } from "@aikirun/lib/async";
 import type { ConfigValidationResult } from "@aikirun/lib/config";
 import type { DeepPartial } from "@aikirun/lib/object";
 import { type } from "arktype";
@@ -13,7 +14,7 @@ const pageProcessingConfigSchema = type({
 });
 
 const pollingDaemonConfigSchema = pageProcessingConfigSchema.and({
-	intervalMs: "number.integer > 0",
+	intervalMs: type("number.integer > 0").atMost(MAX_TIMER_DELAY_MS),
 });
 
 const imminentPollingDaemonConfigSchema = pollingDaemonConfigSchema.and({
@@ -50,7 +51,7 @@ const serverRuntimeConfigSchema = type({
 			overshootMs: "number.integer >= 0",
 		},
 	},
-	gracefulShutdownTimeoutMs: "number.integer >= 0",
+	gracefulShutdownTimeoutMs: type("number.integer >= 0").atMost(MAX_TIMER_DELAY_MS),
 });
 
 export type PageProcessingConfig = typeof pageProcessingConfigSchema.infer;

@@ -1,3 +1,4 @@
+import { MAX_TIMER_DELAY_MS } from "@aikirun/lib/async/delay";
 import type { TimerPriorityQueue, TimerPriorityQueueWaiter } from "@aikirun/types/infra/timer";
 
 /** The subset of a test framework's `expect(...)` result the test suite uses. */
@@ -247,6 +248,19 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 					await waiter.close();
 
 					expect(await waitPromise).toBeNull();
+				}));
+
+			test("a wait longer than a timer can hold does not end at once", () =>
+				withQueueAndWaiter(async (_, waiter) => {
+					const waitPromise = waiter.wait((2 * MAX_TIMER_DELAY_MS) / 1_000);
+
+					// If the timer isn't capped at MAX_TIMER_DELAY_MS, it will fire after 1ms
+					const stillBlocked = await Promise.race([
+						waitPromise.then(() => false),
+						new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 50)),
+					]);
+
+					expect(stillBlocked).toEqual(true);
 				}));
 		});
 	});

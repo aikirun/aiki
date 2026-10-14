@@ -1,3 +1,6 @@
+/** The longest delay a timer can wait in memory. A longer one fires after 1 ms. */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 export function delay(ms: number, options?: { signal?: AbortSignal }): Promise<void> {
 	const signal = options?.signal;
 	if (signal?.aborted) {

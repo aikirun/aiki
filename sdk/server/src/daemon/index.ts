@@ -1,4 +1,4 @@
-import { delay } from "@aikirun/lib/async";
+import { delay, MAX_TIMER_DELAY_MS } from "@aikirun/lib/async";
 import { asConfigProvider, type ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { withRetry } from "@aikirun/lib/retry";
@@ -71,7 +71,7 @@ export const pollingDaemon = <DaemonConfig>(
 						const durationUntilNextTickMs = config.intervalMs - durationMs;
 						const jitterMs = (Math.random() * 2 - 1) * JITTER_FRACTION * config.intervalMs;
 						const delayMs = Math.max(MIN_GAP_FRACTION * config.intervalMs, durationUntilNextTickMs) + jitterMs;
-						await delay(delayMs, { signal });
+						await delay(Math.min(delayMs, MAX_TIMER_DELAY_MS), { signal });
 					},
 					{ type: "jittered", maxAttempts: Number.POSITIVE_INFINITY, baseDelayMs: 1_000, maxDelayMs: 30_000 },
 					{
