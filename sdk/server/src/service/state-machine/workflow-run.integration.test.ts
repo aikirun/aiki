@@ -22,6 +22,7 @@ import { allowsConcurrentWriteTransactions } from "../../testing/infra/db/transa
 import { NO_DUE_TIMES, readWorkflowRunDueTimes, type WorkflowRunDueTimes } from "../../testing/infra/db/workflow-run";
 import {
 	claimRun,
+	seedAwaitingChildRun,
 	seedClaimedRun,
 	seedCompletedRun,
 	seedPublishedRun,
@@ -37,6 +38,8 @@ import { createEventService } from "../event";
 const withHarness = createServiceHarness();
 
 const daemonContext = daemonContextFactory.build();
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function createStateMachine(repos: Repositories, imminentTimerQueue?: ImminentTimerQueue) {
 	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller(), imminentTimerQueue });
@@ -1538,8 +1541,6 @@ describe("WorkflowRunStateMachine outbox row", () => {
 });
 
 describe("WorkflowRunStateMachine due times", () => {
-	const OneHourMs = 60 * 60 * 1000;
-
 	type DueTimes = Record<keyof WorkflowRunDueTimes, number | null>;
 
 	type SeedRunWithDueTimes = (deps: Pick<ServiceHarnessDeps, "context" | "repos" | "publisher">) => Promise<{
@@ -1555,7 +1556,7 @@ describe("WorkflowRunStateMachine due times", () => {
 		scheduled: async ({ context, repos, publisher }) => {
 			const { runId, wakeupAt } = await seedSleepingRun(
 				{ namespaceRequestContext: context, repos, publisher },
-				{ sleepName: "cool-down", durationMs: OneHourMs }
+				{ sleepName: "cool-down", durationMs: ONE_HOUR_MS }
 			);
 			return {
 				runId,
@@ -1599,10 +1600,10 @@ describe("WorkflowRunStateMachine due times", () => {
 					createStateMachine(repos).transitionState(context, {
 						type: "optimistic",
 						id: runId,
-						state: { status: "sleeping", sleepName: "cool-down", durationMs: OneHourMs },
+						state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
 						expectedRevision: revisionWhenClaimed,
 					}),
-				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, wakeupAt: movedAt + OneHourMs }),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, wakeupAt: movedAt + ONE_HOUR_MS }),
 			};
 		},
 		awaiting_event: async ({ context, repos, publisher }) => {
@@ -1618,11 +1619,11 @@ describe("WorkflowRunStateMachine due times", () => {
 					createStateMachine(repos).transitionState(context, {
 						type: "optimistic",
 						id: runId,
-						state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: OneHourMs },
+						state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: ONE_HOUR_MS },
 						expectedRevision: revisionWhenClaimed,
 						expectedSignalSequence: 0,
 					}),
-				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, timeoutAt: movedAt + OneHourMs }),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, timeoutAt: movedAt + ONE_HOUR_MS }),
 			};
 		},
 		awaiting_retry: async ({ context, repos, publisher }) => {
@@ -1642,11 +1643,11 @@ describe("WorkflowRunStateMachine due times", () => {
 							status: "awaiting_retry",
 							cause: "self",
 							error: { name: "Error", message: "inventory service unavailable" },
-							nextAttemptInMs: OneHourMs,
+							nextAttemptInMs: ONE_HOUR_MS,
 						},
 						expectedRevision: revisionWhenClaimed,
 					}),
-				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, nextAttemptAt: movedAt + OneHourMs }),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, nextAttemptAt: movedAt + ONE_HOUR_MS }),
 			};
 		},
 		awaiting_task_retry: async ({ context, repos, publisher }) => {
@@ -1684,18 +1685,18 @@ describe("WorkflowRunStateMachine due times", () => {
 						state: {
 							status: "awaiting_child_workflow",
 							childWorkflowRunId: childRun.runId,
-							timeoutInMs: OneHourMs,
+							timeoutInMs: ONE_HOUR_MS,
 						},
 						expectedRevision: parentRun.revisionWhenClaimed,
 						expectedSignalSequence: 0,
 					}),
-				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, timeoutAt: movedAt + OneHourMs }),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, timeoutAt: movedAt + ONE_HOUR_MS }),
 			};
 		},
 		cancelled: async ({ context, repos, publisher }) => {
 			const { runId, wakeupAt } = await seedSleepingRun(
 				{ namespaceRequestContext: context, repos, publisher },
-				{ sleepName: "cool-down", durationMs: OneHourMs }
+				{ sleepName: "cool-down", durationMs: ONE_HOUR_MS }
 			);
 			return {
 				runId,
@@ -1751,7 +1752,7 @@ describe("WorkflowRunStateMachine due times", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: OneHourMs },
+					state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: ONE_HOUR_MS },
 					expectedRevision: revisionWhenClaimed,
 					// The sequence the worker read before the event landed.
 					expectedSignalSequence: 0,
@@ -1759,5 +1760,240 @@ describe("WorkflowRunStateMachine due times", () => {
 			);
 
 			expect(await readWorkflowRunDueTimes(db, runId)).toEqual({ ...NO_DUE_TIMES, scheduledAt: movedAt });
+		}));
+});
+
+describe("WorkflowRunStateMachine failed transitions", () => {
+	function reposWithWrappedTxRepos(
+		repos: Repositories,
+		wrapTxRepos: (txRepos: TxRepositories) => TxRepositories
+	): Repositories {
+		return {
+			...repos,
+			transaction: <T>(fn: (txRepos: TxRepositories) => Promise<T>) =>
+				repos.transaction((txRepos) => fn(wrapTxRepos(txRepos))),
+		};
+	}
+
+	test("a move to sleeping that fails at its last write leaves the run, its outbox row and its sleeps as they were", () =>
+		withHarness(async ({ context, db, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			let writtenBeforeFailure: unknown;
+			const stateMachine = createStateMachine(
+				reposWithWrappedTxRepos(repos, (txRepos) => ({
+					...txRepos,
+					stateTransition: {
+						...txRepos.stateTransition,
+						append: async () => {
+							writtenBeforeFailure = {
+								run: await txRepos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId }),
+								outboxRow: await txRepos.workflowRunOutbox.getByWorkflowRunId({
+									namespaceId: context.namespaceId,
+									workflowRunId: runId,
+								}),
+								sleeps: await txRepos.sleep.listByWorkflowRunId(runId),
+							};
+							throw new Error("transition append failed");
+						},
+					},
+				}))
+			);
+			await expect(
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
+					expectedRevision: revisionWhenClaimed,
+				})
+			).rejects.toThrow("transition append failed");
+			expect(writtenBeforeFailure).toEqual({
+				run: { id: runId, status: "sleeping", revision: revisionWhenClaimed + 1 },
+				outboxRow: null,
+				sleeps: [expect.objectContaining({ workflowRunId: runId, name: "cool-down", status: "sleeping" })],
+			});
+
+			expect(await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId })).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: runId,
+						status: "running",
+						revision: revisionWhenClaimed,
+						attempts: attemptsWhenClaimed,
+					}),
+					state: { status: "running" },
+				})
+			);
+			expect(await readWorkflowRunDueTimes(db, runId)).toEqual(NO_DUE_TIMES);
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toEqual(expect.objectContaining({ workflowRunId: runId, status: "claimed" }));
+			expect(await repos.sleep.listByWorkflowRunId(runId)).toEqual([]);
+		}));
+
+	test("a cancel that fails after its child canceller ran leaves the run, its task and the namespace's runs as they were", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const childRun = await seedScheduledRun(
+				{ namespaceRequestContext: context, repos },
+				{ parent: { workflowRunId: runId, expectedRevision: revisionWhenClaimed } }
+			);
+
+			const childRunCanceller = createChildRunCanceller();
+			let writtenBeforeFailure: unknown;
+			const stateMachine = createWorkflowRunStateMachine({
+				repos,
+				childRunCanceller: {
+					cancel: async (runs, txRepos, logger) => {
+						await childRunCanceller.cancel(runs, txRepos, logger);
+						writtenBeforeFailure = {
+							run: await txRepos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId }),
+							discardedTasks: await txRepos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"]),
+							runCount: (
+								await txRepos.workflowRun.listByFilters({ namespaceId: context.namespaceId }, 10, 0, { order: "asc" })
+							).total,
+						};
+						throw new Error("child cancel failed");
+					},
+				},
+			});
+			await expect(
+				stateMachine.transitionState(context, { type: "pessimistic", id: runId, state: { status: "cancelled" } })
+			).rejects.toThrow("child cancel failed");
+			// The third run is the one the canceller created to cancel the child.
+			expect(writtenBeforeFailure).toEqual({
+				run: { id: runId, status: "cancelled", revision: revisionWhenClaimed + 1 },
+				discardedTasks: [expect.objectContaining({ id: taskInfo.id })],
+				runCount: 3,
+			});
+
+			expect(await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId })).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: runId, status: "running", revision: revisionWhenClaimed }),
+				})
+			);
+			expect(await repos.task.listByWorkflowRunIdsAndStatuses(runId, ["running"])).toEqual([
+				expect.objectContaining({ id: taskInfo.id }),
+			]);
+			expect(
+				await repos.workflowRun.listByFilters({ namespaceId: context.namespaceId }, 10, 0, { order: "asc" })
+			).toEqual({
+				rows: [runId, childRun.runId].sort().map((id) => expect.objectContaining({ id })),
+				total: 2,
+			});
+		}));
+
+	test("a child's completion that fails at its last write leaves the parent waiting", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parentRun = await seedAwaitingChildRun({ namespaceRequestContext: context, repos, publisher });
+
+			let writtenBeforeFailure: unknown;
+			const stateMachine = createStateMachine(
+				reposWithWrappedTxRepos(repos, (txRepos) => ({
+					...txRepos,
+					stateTransition: {
+						...txRepos.stateTransition,
+						appendBatch: async () => {
+							writtenBeforeFailure = {
+								parentRun: await txRepos.workflowRun.getById({
+									namespaceId: context.namespaceId,
+									id: parentRun.runId,
+								}),
+								childRunWaits: await txRepos.childWorkflowRunWait.listByParentRunIdWithChildState(parentRun.runId),
+							};
+							throw new Error("parent transition append failed");
+						},
+					},
+				}))
+			);
+			await expect(
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: parentRun.child.runId,
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					expectedRevision: parentRun.child.revisionWhenClaimed,
+				})
+			).rejects.toThrow("parent transition append failed");
+			expect(writtenBeforeFailure).toEqual({
+				parentRun: { id: parentRun.runId, status: "scheduled", revision: parentRun.revisionWhenSuspended + 1 },
+				childRunWaits: [expect.objectContaining({ childWorkflowRunId: parentRun.child.runId, status: "completed" })],
+			});
+
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: parentRun.runId })
+			).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parentRun.runId,
+						status: "awaiting_child_workflow",
+						revision: parentRun.revisionWhenSuspended,
+						signalSequence: 0,
+					}),
+				})
+			);
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: parentRun.child.runId })
+			).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({
+						id: parentRun.child.runId,
+						status: "running",
+						revision: parentRun.child.revisionWhenClaimed,
+					}),
+				})
+			);
+			expect(await repos.childWorkflowRunWait.listByParentRunIdWithChildState(parentRun.runId)).toEqual([]);
+		}));
+
+	test("adds the timer for a sleep only after the transaction commits", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 2 * ONE_HOUR_MS, overshootMs: 0 })),
+					logger: noopLogger,
+				})
+			);
+			const sleepRequest: WorkflowRunTransitionStateRequestV1 = {
+				type: "optimistic",
+				id: runId,
+				state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
+				expectedRevision: revisionWhenClaimed,
+			};
+
+			// A caller such as the event service can move the run inside its own transaction and then
+			// fail, which undoes the move.
+			const movedAt = Date.now();
+			await withFakeClock(movedAt, () =>
+				expect(
+					repos.transaction(async (txRepos) => {
+						await stateMachine.transitionState(context, sleepRequest, txRepos);
+						throw new Error("caller failed after the move");
+					})
+				).rejects.toThrow("caller failed after the move")
+			);
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([]);
+
+			// The same move again, this time in a transaction that commits.
+			await withFakeClock(movedAt, () => stateMachine.transitionState(context, sleepRequest));
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
+				{ type: "sleep", id: runId, rank: computeRank({ dueAt: movedAt + ONE_HOUR_MS }) },
+			]);
 		}));
 });
