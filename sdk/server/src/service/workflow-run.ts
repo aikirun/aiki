@@ -532,10 +532,10 @@ async function getWorkflowRun(
 	// The run row (carrying signalSequence) is must be read before these rows.
 	// A signal landing between the two reads then shows up in the read event_wait/child_workflow_run_wait
 	// rows but not in the read signalSequence (it will be stale).
-	// A park request using using the stale signalSequence simply reschedules — safe.
+	// A suspend request using the stale signalSequence simply reschedules — safe.
 	// In the reverse order i.e. these rows being read before the run row, the signalSequence
 	// will be current but there will be no corresponding event_wait/child_workflow_run_wait rows is
-	// catastrophic because the wait would find no rows to replay against, then attempt park, which succeeds
+	// catastrophic because the wait would find no rows to replay against, then attempt to suspend, which succeeds
 	// because the expectedSignalSequence matches, therefore, sleeping through a signal that is already recorded.
 	const [taskRows, sleepRows, eventWaitRows, childRunRows, childWorkflowRunWaitRows] = await Promise.all([
 		repos.task.listByWorkflowRunIdWithState(run.id),

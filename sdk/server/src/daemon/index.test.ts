@@ -132,7 +132,7 @@ describe("pollingDaemon", () => {
 		expect(tickCount).toBeGreaterThanOrEqual(2);
 	});
 
-	test("resolves promptly when aborted while parked in the inter-tick delay", async () => {
+	test("resolves promptly when aborted while waiting in the inter-tick delay", async () => {
 		const abortController = new AbortController();
 		const firstTickReached = createBinaryLatch();
 		let tickCount = 0;

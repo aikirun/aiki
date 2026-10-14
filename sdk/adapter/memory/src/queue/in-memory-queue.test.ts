@@ -204,17 +204,17 @@ describe("inMemoryQueue publish/subscribe", () => {
 	});
 });
 
-describe("in-memory subscriber parking", () => {
-	test("wakes a parked subscriber when a run is published", () =>
+describe("in-memory subscriber waiting for work", () => {
+	test("wakes a waiting subscriber when a run is published", () =>
 		withFakeClient(async (client) => {
 			client.api.identity.getV1.once({}, identity);
 			const broker = createBroker();
-			const parkReached = createBinaryLatch();
-			// The subscriber calls getOrCreateQueue only when it parks on a queue.
+			const waitReached = createBinaryLatch();
+			// The subscriber calls getOrCreateQueue only when it waits on a queue.
 			const subscriberBroker: Broker = {
 				...broker,
 				getOrCreateQueue: (queueName) => {
-					parkReached.signal();
+					waitReached.signal();
 					return broker.getOrCreateQueue(queueName);
 				},
 			};
@@ -222,7 +222,7 @@ describe("in-memory subscriber parking", () => {
 			const subscriber = createInMemorySubscriber(subscriberBroker)(subscriberContext(client.api));
 
 			const pendingRuns = subscriber.getReadyRuns(10);
-			await parkReached.wait();
+			await waitReached.wait();
 			await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-1" })]);
 
 			expect<string[]>((await pendingRuns).map(({ data }) => data.id)).toEqual(["run-1"]);
@@ -267,16 +267,16 @@ describe("in-memory subscriber parking", () => {
 			expect(await pendingRuns).toEqual([]);
 		}));
 
-	test("releases a parked subscriber when its signal aborts", () =>
+	test("releases a waiting subscriber when its signal aborts", () =>
 		withFakeClient(async (client) => {
 			client.api.identity.getV1.once({}, identity);
 			const broker = createBroker();
-			const parkReached = createBinaryLatch();
-			// The subscriber calls getOrCreateQueue only when it parks on a queue.
+			const waitReached = createBinaryLatch();
+			// The subscriber calls getOrCreateQueue only when it waits on a queue.
 			const subscriberBroker: Broker = {
 				...broker,
 				getOrCreateQueue: (queueName) => {
-					parkReached.signal();
+					waitReached.signal();
 					return broker.getOrCreateQueue(queueName);
 				},
 			};
@@ -286,22 +286,22 @@ describe("in-memory subscriber parking", () => {
 			);
 
 			const pendingRuns = subscriber.getReadyRuns(10);
-			await parkReached.wait();
+			await waitReached.wait();
 			controller.abort();
 
 			expect(await pendingRuns).toEqual([]);
 		}));
 
-	test("keeps a parked waiter through clear, which still receives work published after it", () =>
+	test("keeps a waiting subscriber through clear, which still receives work published after it", () =>
 		withFakeClient(async (client) => {
 			client.api.identity.getV1.once({}, identity);
 			const broker = createBroker();
-			const parkReached = createBinaryLatch();
-			// The subscriber calls getOrCreateQueue only when it parks on a queue.
+			const waitReached = createBinaryLatch();
+			// The subscriber calls getOrCreateQueue only when it waits on a queue.
 			const subscriberBroker: Broker = {
 				...broker,
 				getOrCreateQueue: (queueName) => {
-					parkReached.signal();
+					waitReached.signal();
 					return broker.getOrCreateQueue(queueName);
 				},
 			};
@@ -309,7 +309,7 @@ describe("in-memory subscriber parking", () => {
 			const subscriber = createInMemorySubscriber(subscriberBroker)(subscriberContext(client.api));
 
 			const pendingRuns = subscriber.getReadyRuns(10);
-			await parkReached.wait();
+			await waitReached.wait();
 			broker.clear();
 			await publisher.publishRuns([readyWorkflowRunFactory.build({ id: "run-after-clear" })]);
 

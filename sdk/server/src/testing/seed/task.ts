@@ -72,7 +72,7 @@ export async function seedDiscardedTask(
 	return seeded;
 }
 
-/** An `awaiting_retry` task on a run that has not parked yet — the state between a task park and the run park. */
+/** An `awaiting_retry` task on a run that is not suspended yet — the state between the task's retry and the run's suspension. */
 export async function seedAwaitingRetryTask(
 	deps: SeedRunDeps & { publisher: FakePublisher },
 	params: { nextAttemptAt: number },
@@ -148,7 +148,7 @@ export async function seedSiblingAwaitingRetryTasks(
 	};
 }
 
-/** A run parked as `awaiting_task_retry`, with one `awaiting_retry` task carrying the deadline. */
+/** A run suspended in `awaiting_task_retry`, with one `awaiting_retry` task carrying the deadline. */
 export async function seedAwaitingTaskRetryRun(
 	deps: SeedRunDeps & { publisher: FakePublisher },
 	params: { nextAttemptAt: number },
@@ -166,14 +166,14 @@ export async function seedAwaitingTaskRetryRun(
 		repos,
 		childRunCanceller: createChildRunCanceller(),
 	});
-	const parked = await workflowRunStateMachine.transitionState(namespaceRequestContext, {
+	const suspendedRun = await workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: seeded.runId,
 		state: { status: "awaiting_task_retry" },
 		expectedRevision: seeded.revisionWhenClaimed,
 	});
 
-	return { ...seeded, revisionWhenParked: parked.revision };
+	return { ...seeded, revisionWhenSuspended: suspendedRun.revision };
 }
 
 export async function seedCompletedTask(

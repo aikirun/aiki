@@ -21,7 +21,7 @@ const chunkConfigByTimerType = {
 };
 
 describe("startDueTimersConsumer", () => {
-	test("resolves when the runtime signal aborts while parked in an indefinite wait", async () => {
+	test("resolves when the runtime signal aborts while blocked in an indefinite wait", async () => {
 		const abortController = new AbortController();
 		const { signal } = abortController;
 		const waitReached = createBinaryLatch();
@@ -122,7 +122,7 @@ describe("startDueTimersConsumer", () => {
 		const startConsumer = () => {
 			const abortController = new AbortController();
 			const { signal } = abortController;
-			const parkedIndefinitely = createBinaryLatch();
+			const waitingIndefinitely = createBinaryLatch();
 			const processingReached = createBinaryLatch();
 
 			const realTimerPriorityQueue = createTimerPriorityQueue({ logger: noopLogger, signal });
@@ -134,7 +134,7 @@ describe("startDueTimersConsumer", () => {
 						...realWaiter,
 						wait: async (timeoutSeconds: number) => {
 							if (timeoutSeconds === 0) {
-								parkedIndefinitely.signal();
+								waitingIndefinitely.signal();
 							}
 							const wake = await realWaiter.wait(timeoutSeconds);
 							// Whichever consumer is woken first stops before it can act on the wake,
@@ -175,18 +175,18 @@ describe("startDueTimersConsumer", () => {
 				})),
 			});
 
-			return { abortController, parkedIndefinitely, processingReached, seenRunLookups, stopped };
+			return { abortController, waitingIndefinitely, processingReached, seenRunLookups, stopped };
 		};
 
 		const consumerA = startConsumer();
 		const consumerB = startConsumer();
-		await consumerA.parkedIndefinitely.wait();
-		await consumerB.parkedIndefinitely.wait();
+		await consumerA.waitingIndefinitely.wait();
+		await consumerB.waitingIndefinitely.wait();
 
 		await timerPriorityQueue.add({ timers: [{ type: "scheduled", id: "run-1", rank: 5 }], overdueRank: 0 });
 		await Promise.race([consumerA.stopped, consumerB.stopped]);
 		expect(firstWokenAbortController).toBeDefined();
-		const [stoppedConsumer, parkedConsumer] =
+		const [stoppedConsumer, waitingConsumer] =
 			firstWokenAbortController === consumerA.abortController ? [consumerA, consumerB] : [consumerB, consumerA];
 
 		// The stopped consumer took the wake and nothing else: the timer is still queued.
@@ -196,14 +196,14 @@ describe("startDueTimersConsumer", () => {
 		// run-1 is still the queue front, and its rank sits at the overdue rank.
 		await timerPriorityQueue.add({ timers: [{ type: "scheduled", id: "run-2", rank: 6 }], overdueRank: 5 });
 
-		// No time limit here: if nothing wakes the parked consumer, the test times out.
-		while (parkedConsumer.seenRunLookups.flatMap((lookup) => lookup.ids).length < 2) {
-			await parkedConsumer.processingReached.wait();
+		// No time limit here: if nothing wakes the waiting consumer, the test times out.
+		while (waitingConsumer.seenRunLookups.flatMap((lookup) => lookup.ids).length < 2) {
+			await waitingConsumer.processingReached.wait();
 		}
-		parkedConsumer.abortController.abort();
-		await parkedConsumer.stopped;
+		waitingConsumer.abortController.abort();
+		await waitingConsumer.stopped;
 
-		expect(parkedConsumer.seenRunLookups.flatMap((lookup) => lookup.ids).sort()).toEqual(["run-1", "run-2"]);
+		expect(waitingConsumer.seenRunLookups.flatMap((lookup) => lookup.ids).sort()).toEqual(["run-1", "run-2"]);
 		expect(await timerPriorityQueue.peekNext()).toBeNull();
 	});
 });

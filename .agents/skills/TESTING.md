@@ -77,7 +77,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
   must carry a value.
 - To catch the moment the code under test reaches a blocking call, wrap the dependency it
   blocks on: an object that fires a latch on entry, then forwards to the real thing. This turns
-  "has it parked yet?" into an event instead of sleeping for a while and hoping:
+  "is it blocked yet?" into an event instead of sleeping for a while and hoping:
 
   ```ts
   const waitReached = createBinaryLatch();
@@ -230,7 +230,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
   against the cheapest one: the consumer's unit tests hardcode the in-memory queue as a
   stand-in for "anything the contract suite has proven". The other half of that bargain:
   every behavior a consumer leans on must actually be a contract test. The consumer's
-  shutdown always relied on close resolving a parked wait — nothing proved it, and when the
+  shutdown always relied on close resolving a blocked wait — nothing proved it, and when the
   contract test was finally written, one adapter turned out to get it wrong.
 - Pick fixture data semantically orthogonal to the subject: don't give a time-based test
   time-shaped input.

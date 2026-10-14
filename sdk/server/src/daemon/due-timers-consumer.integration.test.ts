@@ -126,19 +126,19 @@ describe("processDueTimers", () => {
 			]);
 		}));
 
-	test("an event wait timeout timer leaves a wait parked when its deadline has not passed", () =>
+	test("an event wait timeout timer leaves a run waiting when its deadline has not passed", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const parkedAt = Date.now() as TimestampMs;
-			const { runId, revisionWhenParked } = await withFakeClock(parkedAt, () =>
+			const suspendedAt = Date.now() as TimestampMs;
+			const { runId, revisionWhenSuspended } = await withFakeClock(suspendedAt, () =>
 				seedAwaitingEventRun(
 					{ daemonContext: context, namespaceRequestContext, repos, publisher },
 					{ eventName: "orderShipped", timeoutInMs: ONE_HOUR_MS }
 				)
 			);
 
-			// Frozen at the park instant: the wait's own deadline is an hour ahead, while the timer
+			// Frozen at the instant the run was suspended: the wait's own deadline is an hour ahead, while the timer
 			// handed in is one set for an earlier wait that has already come due.
-			await withFakeClock(parkedAt, () =>
+			await withFakeClock(suspendedAt, () =>
 				processDueTimers(
 					context,
 					{
@@ -165,7 +165,7 @@ describe("processDueTimers", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenParked }),
+					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenSuspended }),
 				})
 			);
 			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([]);
@@ -216,15 +216,15 @@ describe("processDueTimers", () => {
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([]);
 		}));
 
-	test("an event wait timeout timer never times out a wait parked without a deadline", () =>
+	test("an event wait timeout timer never times out a wait without a deadline", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenParked } = await seedAwaitingEventRun(
+			const { runId, revisionWhenSuspended } = await seedAwaitingEventRun(
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ eventName: "orderShipped" }
 			);
 
 			// The queue never drops a timer: one set for an earlier wait that received its event
-			// still comes due while the run is parked in a later wait with no deadline.
+			// still comes due while the run is suspended in a later wait with no deadline.
 			await processDueTimers(
 				context,
 				{
@@ -250,7 +250,7 @@ describe("processDueTimers", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenParked }),
+					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenSuspended }),
 				})
 			);
 			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([]);

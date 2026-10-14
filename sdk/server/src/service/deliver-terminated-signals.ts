@@ -25,7 +25,7 @@ export interface TerminatedChildRun {
 /**
  * Delivers the terminal signal of each child run to its parent, in one batch: writes the
  * terminal wait rows, bumps each parent's signal sequence once, and wakes the parents that
- * are parked on one of the children. Every path that takes a run with a parent to a
+ * are suspended on one of the children. Every path that takes a run with a parent to a
  * terminal state must pass through here — a path that skips it opens a path to a lost-wakeup race.
  */
 export async function deliverTerminatedSignalToParentRun(
@@ -70,13 +70,13 @@ export async function deliverTerminatedSignalToParentRun(
 		})
 	);
 
-	const parkedParentsRuns = incrementedParentsRuns.filter((parent) => parent.status === "awaiting_child_workflow");
-	if (!isNonEmptyArray(parkedParentsRuns)) {
+	const suspendedParentsRuns = incrementedParentsRuns.filter((parent) => parent.status === "awaiting_child_workflow");
+	if (!isNonEmptyArray(suspendedParentsRuns)) {
 		return;
 	}
 
 	const parentRunsLatestTransition = await txRepos.stateTransition.getByIds(
-		asNonEmptyArray(parkedParentsRuns.map((parent) => parent.latestStateTransitionId))
+		asNonEmptyArray(suspendedParentsRuns.map((parent) => parent.latestStateTransitionId))
 	);
 	const parentRunStateByTransitionId = new Map(
 		parentRunsLatestTransition.map((transition) => [transition.id, transition.state as WorkflowRunState])
@@ -89,11 +89,11 @@ export async function deliverTerminatedSignalToParentRun(
 		update: { stateTransitionId: string };
 	}[] = [];
 
-	for (const parentRun of parkedParentsRuns) {
+	for (const parentRun of suspendedParentsRuns) {
 		const parentRunState = parentRunStateByTransitionId.get(parentRun.latestStateTransitionId);
 		if (
 			parentRunState?.status !== "awaiting_child_workflow" ||
-			// skip wake if parent is parked on a child not part of the batch generating the signal
+			// skip wake if parent is suspended on a child not part of the batch generating the signal
 			!childRunIds.has(parentRunState.childWorkflowRunId)
 		) {
 			continue;
@@ -157,5 +157,5 @@ export async function deliverTerminatedSignalToParentRun(
 		);
 	}
 
-	logger.debug("Woke parents parked on terminal children", { "aiki.parentRunIds": scheduledParentRunIds });
+	logger.debug("Woke parents waiting on terminal children", { "aiki.parentRunIds": scheduledParentRunIds });
 }

@@ -234,12 +234,12 @@ describe("state transition repository getLatestTaskSequence", () => {
 
 	test("returns null at a revision no task transition was written at, even when an earlier revision has some", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenParked } = await seedAwaitingTaskRetryRun(
+			const { runId, revisionWhenSuspended } = await seedAwaitingTaskRetryRun(
 				{ namespaceRequestContext: context, repos, publisher },
 				{ nextAttemptAt: 3_000_000 }
 			);
 
-			expect(await repos.stateTransition.getLatestTaskSequence(runId, revisionWhenParked)).toBeNull();
+			expect(await repos.stateTransition.getLatestTaskSequence(runId, revisionWhenSuspended)).toBeNull();
 		}));
 });
 

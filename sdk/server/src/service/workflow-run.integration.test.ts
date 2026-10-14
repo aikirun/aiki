@@ -500,7 +500,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			]);
 		}));
 
-	test("cancelling a child wakes a parent parked on it", () =>
+	test("cancelling a child wakes a parent waiting on it", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
 			const child = await seedClaimedRun(
@@ -509,7 +509,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			);
 
 			const { service, stateMachine } = createService(repos);
-			const parked = await stateMachine.transitionState(context, {
+			const suspendedParent = await stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: parent.runId,
 				state: {
@@ -532,7 +532,7 @@ describe("WorkflowRunService cancelByIds", () => {
 					run: expect.objectContaining({
 						id: parent.runId,
 						status: "scheduled",
-						revision: parked.revision + 1,
+						revision: suspendedParent.revision + 1,
 						signalSequence: 1,
 					}),
 					state: { status: "scheduled", reason: "child_workflow", scheduledAt: cancelledAt },

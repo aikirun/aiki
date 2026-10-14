@@ -46,9 +46,9 @@ import type { DueWorkflowRun } from "../types/workflow-run";
 const withHarness = createServiceHarness();
 
 // Seeds a claimed run with its ulid minted at the frozen `mintedAtMs` — later instants mint
-// larger ids, pinning the id order the cursor walk depends on — then parks it on a child wait
+// larger ids, pinning the id order the cursor walk depends on — then suspends it on a child wait
 // due at `timeoutAt`.
-async function parkRunOnChildWait(
+async function suspendRunOnChildWait(
 	deps: { context: NamespaceRequestContext; repos: Repositories; publisher: FakePublisher },
 	params: { mintedAtMs: TimestampMs; timeoutAt: TimestampMs }
 ): Promise<string> {
@@ -531,18 +531,18 @@ describe("update", () => {
 		test("writes the schedule for a scheduled update", () =>
 			withHarness(async ({ context, repos, publisher }) => {
 				const scheduledAt = 2_000_000 as TimestampMs;
-				const { runId, revisionWhenParked } = await seedAwaitingEventRun(
+				const { runId, revisionWhenSuspended } = await seedAwaitingEventRun(
 					{ namespaceRequestContext: context, repos, publisher },
 					{ eventName: "orderShipped" }
 				);
 
 				const result = await repos.workflowRun.update({
 					waitForSignal: false,
-					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenParked },
+					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenSuspended },
 					updates: { status: "scheduled", attempts: 1, latestStateTransitionId: ulid(), scheduledAt },
 				});
 
-				expect(result).toEqual({ revision: revisionWhenParked + 1, signalSequence: 0 });
+				expect(result).toEqual({ revision: revisionWhenSuspended + 1, signalSequence: 0 });
 
 				const daemonContext = daemonContextFactory.build();
 
@@ -690,7 +690,7 @@ describe("incrementSignalSequence", () => {
 
 	test("returns the state recorded by the run's latest transition", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenParked } = await seedAwaitingEventRun(
+			const { runId, revisionWhenSuspended } = await seedAwaitingEventRun(
 				{ namespaceRequestContext: context, repos, publisher },
 				{ eventName: "orderShipped" }
 			);
@@ -701,7 +701,7 @@ describe("incrementSignalSequence", () => {
 					id: runId as WorkflowRunId,
 				})
 			).toEqual({
-				run: { status: "awaiting_event", revision: revisionWhenParked, signalSequence: 1 },
+				run: { status: "awaiting_event", revision: revisionWhenSuspended, signalSequence: 1 },
 				state: { status: "awaiting_event", eventName: "orderShipped" },
 			});
 		}));
@@ -792,7 +792,7 @@ describe("listDueByIdsAndStatus", () => {
 		}));
 
 	describe("due time", () => {
-		const parkedAt = 1_000 as TimestampMs;
+		const suspendedAt = 1_000 as TimestampMs;
 		const dueAt = 4_000_000 as TimestampMs;
 
 		/** One run per status that waits on a due time, each seeded so that its due time is `dueAt`. */
@@ -804,7 +804,9 @@ describe("listDueByIdsAndStatus", () => {
 			sleeping: {
 				status: "sleeping",
 				seedRun: (deps) =>
-					withFakeClock(parkedAt, () => seedSleepingRun(deps, { sleepName: "cooldown", durationMs: dueAt - parkedAt })),
+					withFakeClock(suspendedAt, () =>
+						seedSleepingRun(deps, { sleepName: "cooldown", durationMs: dueAt - suspendedAt })
+					),
 			},
 			awaiting_retry: {
 				status: "awaiting_retry",
@@ -817,13 +819,14 @@ describe("listDueByIdsAndStatus", () => {
 			awaiting_event: {
 				status: "awaiting_event",
 				seedRun: (deps) =>
-					withFakeClock(parkedAt, () =>
-						seedAwaitingEventRun(deps, { eventName: "orderShipped", timeoutInMs: dueAt - parkedAt })
+					withFakeClock(suspendedAt, () =>
+						seedAwaitingEventRun(deps, { eventName: "orderShipped", timeoutInMs: dueAt - suspendedAt })
 					),
 			},
 			awaiting_child_workflow: {
 				status: "awaiting_child_workflow",
-				seedRun: (deps) => withFakeClock(parkedAt, () => seedAwaitingChildRun(deps, { timeoutInMs: dueAt - parkedAt })),
+				seedRun: (deps) =>
+					withFakeClock(suspendedAt, () => seedAwaitingChildRun(deps, { timeoutInMs: dueAt - suspendedAt })),
 			},
 		} satisfies { [Status in TimedWorkflowRunStatus]: { status: Status; seedRun: RunSeed } };
 
@@ -846,7 +849,7 @@ describe("listDueByIdsAndStatus", () => {
 				}));
 		}
 
-		/** The two waits that can be parked with no deadline at all. */
+		/** The two waits that can have no deadline at all. */
 		const waitWithoutDeadlineCaseByStatus = {
 			awaiting_event: {
 				status: "awaiting_event",
@@ -859,7 +862,7 @@ describe("listDueByIdsAndStatus", () => {
 		} satisfies { [Status in WaitingForSignalWorkflowRunStatus]: { status: Status; seedRun: RunSeed } };
 
 		for (const { status, seedRun } of Object.values(waitWithoutDeadlineCaseByStatus)) {
-			test(`never lists a run in ${status} parked without a deadline`, () =>
+			test(`never lists a run in ${status} without a deadline`, () =>
 				withHarness(async ({ context, repos, publisher }) => {
 					const { runId } = await seedRun({ namespaceRequestContext: context, repos, publisher });
 
@@ -1294,7 +1297,7 @@ describe("listByFilters", () => {
 });
 
 describe("listTaskRetryableRuns", () => {
-	test("lists a run parked on a task retry due at the cutoff and skips one due after it", () =>
+	test("lists a run suspended on a task retry due at the cutoff and skips one due after it", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const nextAttemptAt = 4_000_000 as TimestampMs;
 			const { runId } = await seedAwaitingTaskRetryRun(
@@ -1316,15 +1319,15 @@ describe("listChildRunWaitTimedOutRuns", () => {
 	test("resumes past the frontier to later deadlines", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const deps = { context, repos, publisher };
-			const runA = await parkRunOnChildWait(deps, {
+			const runA = await suspendRunOnChildWait(deps, {
 				mintedAtMs: 1_000 as TimestampMs,
 				timeoutAt: 1_000_000 as TimestampMs,
 			});
-			const runB = await parkRunOnChildWait(deps, {
+			const runB = await suspendRunOnChildWait(deps, {
 				mintedAtMs: 2_000 as TimestampMs,
 				timeoutAt: 2_000_000 as TimestampMs,
 			});
-			const runC = await parkRunOnChildWait(deps, {
+			const runC = await suspendRunOnChildWait(deps, {
 				mintedAtMs: 3_000 as TimestampMs,
 				timeoutAt: 3_000_000 as TimestampMs,
 			});
@@ -1350,8 +1353,8 @@ describe("listChildRunWaitTimedOutRuns", () => {
 		withHarness(async ({ context, repos, publisher }) => {
 			const deps = { context, repos, publisher };
 			const sharedDeadline = 1_000_000 as TimestampMs;
-			const runA = await parkRunOnChildWait(deps, { mintedAtMs: 1_000 as TimestampMs, timeoutAt: sharedDeadline });
-			const runB = await parkRunOnChildWait(deps, { mintedAtMs: 2_000 as TimestampMs, timeoutAt: sharedDeadline });
+			const runA = await suspendRunOnChildWait(deps, { mintedAtMs: 1_000 as TimestampMs, timeoutAt: sharedDeadline });
+			const runB = await suspendRunOnChildWait(deps, { mintedAtMs: 2_000 as TimestampMs, timeoutAt: sharedDeadline });
 
 			const daemonContext = daemonContextFactory.build();
 
@@ -1373,14 +1376,14 @@ describe("listChildRunWaitTimedOutRuns", () => {
 			const deps = { context, repos, publisher };
 			// Already-walked bystander: due behind the frontier with an id below maxSeenId, so
 			// the late-insert clause must not resurrect it.
-			await parkRunOnChildWait(deps, { mintedAtMs: 1_000 as TimestampMs, timeoutAt: 1_000_000 as TimestampMs });
-			const runB = await parkRunOnChildWait(deps, {
+			await suspendRunOnChildWait(deps, { mintedAtMs: 1_000 as TimestampMs, timeoutAt: 1_000_000 as TimestampMs });
+			const runB = await suspendRunOnChildWait(deps, {
 				mintedAtMs: 2_000 as TimestampMs,
 				timeoutAt: 2_000_000 as TimestampMs,
 			});
 			// Minted after the walk passed its deadline: due behind the frontier, ulid above
 			// maxSeenId — the late insert the third clause exists for.
-			const lateRun = await parkRunOnChildWait(deps, {
+			const lateRun = await suspendRunOnChildWait(deps, {
 				mintedAtMs: 3_000 as TimestampMs,
 				timeoutAt: 1_500_000 as TimestampMs,
 			});
@@ -1477,7 +1480,7 @@ describe("bulkTransitionToQueued", () => {
 	test("charges an attempt when asked", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const nextAttemptAt = 4_000_000;
-			const { runId, revisionWhenParked, attemptsWhenClaimed } = await seedAwaitingRetryRun(
+			const { runId, revisionWhenSuspended, attemptsWhenClaimed } = await seedAwaitingRetryRun(
 				{ namespaceRequestContext: context, repos, publisher },
 				{ nextAttemptAt }
 			);
@@ -1487,23 +1490,23 @@ describe("bulkTransitionToQueued", () => {
 				workflowRunId: runId,
 				type: "workflow_run",
 				attempt: attemptsWhenClaimed + 1,
-				revision: revisionWhenParked + 1,
+				revision: revisionWhenSuspended + 1,
 				state: { status: "queued", reason: "retry" },
 			});
 
 			const queuedRuns = await repos.workflowRun.bulkTransitionToQueued(
 				daemonContextFactory.build(),
 				"awaiting_retry",
-				[{ filter: { id: runId, revision: revisionWhenParked }, update: { stateTransitionId: transitionId } }],
+				[{ filter: { id: runId, revision: revisionWhenSuspended }, update: { stateTransitionId: transitionId } }],
 				{ incrementAttempts: true }
 			);
 
-			expect(queuedRuns).toEqual([{ id: runId, revision: revisionWhenParked + 1 }]);
+			expect(queuedRuns).toEqual([{ id: runId, revision: revisionWhenSuspended + 1 }]);
 			expect(await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId })).toEqual({
 				run: expect.objectContaining({
 					id: runId,
 					status: "queued",
-					revision: revisionWhenParked + 1,
+					revision: revisionWhenSuspended + 1,
 					attempts: attemptsWhenClaimed + 1,
 				}),
 				state: { status: "queued", reason: "retry" },
@@ -1562,7 +1565,7 @@ describe("bulkTransitionToQueued", () => {
 });
 
 describe("bulkTransitionToScheduled", () => {
-	test("schedules the parked runs whose expected revision matches at the given time and returns their ids", () =>
+	test("schedules the suspended runs whose expected revision matches at the given time and returns their ids", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const scheduledAt = 2_000_000 as TimestampMs;
 			const matchedRun = await seedAwaitingEventRun(
@@ -1580,7 +1583,7 @@ describe("bulkTransitionToScheduled", () => {
 				workflowRunId: matchedRun.runId,
 				type: "workflow_run",
 				attempt: matchedRun.attemptsWhenClaimed,
-				revision: matchedRun.revisionWhenParked + 1,
+				revision: matchedRun.revisionWhenSuspended + 1,
 				state: { status: "scheduled", reason: "event", scheduledAt },
 			});
 
@@ -1589,7 +1592,7 @@ describe("bulkTransitionToScheduled", () => {
 					filter: {
 						namespaceId: context.namespaceId,
 						id: matchedRun.runId,
-						revision: matchedRun.revisionWhenParked,
+						revision: matchedRun.revisionWhenSuspended,
 					},
 					update: { stateTransitionId: transitionId },
 				},
@@ -1597,7 +1600,7 @@ describe("bulkTransitionToScheduled", () => {
 					filter: {
 						namespaceId: context.namespaceId,
 						id: staleRevisionRun.runId,
-						revision: staleRevisionRun.revisionWhenParked - 1,
+						revision: staleRevisionRun.revisionWhenSuspended - 1,
 					},
 					update: { stateTransitionId: ulid() },
 				},
@@ -1610,7 +1613,7 @@ describe("bulkTransitionToScheduled", () => {
 				run: expect.objectContaining({
 					id: matchedRun.runId,
 					status: "scheduled",
-					revision: matchedRun.revisionWhenParked + 1,
+					revision: matchedRun.revisionWhenSuspended + 1,
 					latestStateTransitionId: transitionId,
 				}),
 				state: { status: "scheduled", reason: "event", scheduledAt },
@@ -1629,7 +1632,7 @@ describe("bulkTransitionToScheduled", () => {
 
 	test("leaves a run alone when the namespace does not match", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenParked } = await seedAwaitingEventRun(
+			const { runId, revisionWhenSuspended } = await seedAwaitingEventRun(
 				{ namespaceRequestContext: context, repos, publisher },
 				{ eventName: "orderShipped" }
 			);
@@ -1641,7 +1644,7 @@ describe("bulkTransitionToScheduled", () => {
 				2_000_000 as TimestampMs,
 				[
 					{
-						filter: { namespaceId: otherNamespaceId, id: runId, revision: revisionWhenParked },
+						filter: { namespaceId: otherNamespaceId, id: runId, revision: revisionWhenSuspended },
 						update: { stateTransitionId: ulid() },
 					},
 				]
@@ -1653,7 +1656,7 @@ describe("bulkTransitionToScheduled", () => {
 
 	test("moves a run from the status it is told to move from", () =>
 		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenParked } = await seedAwaitingChildRun({
+			const { runId, revisionWhenSuspended } = await seedAwaitingChildRun({
 				namespaceRequestContext: context,
 				repos,
 				publisher,
@@ -1664,7 +1667,7 @@ describe("bulkTransitionToScheduled", () => {
 				2_000_000 as TimestampMs,
 				[
 					{
-						filter: { namespaceId: context.namespaceId, id: runId, revision: revisionWhenParked },
+						filter: { namespaceId: context.namespaceId, id: runId, revision: revisionWhenSuspended },
 						update: { stateTransitionId: ulid() },
 					},
 				]
@@ -1673,7 +1676,7 @@ describe("bulkTransitionToScheduled", () => {
 			expect(scheduledIds).toEqual([runId]);
 			expect(await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId })).toEqual({
 				id: runId,
-				revision: revisionWhenParked + 1,
+				revision: revisionWhenSuspended + 1,
 				status: "scheduled",
 			});
 		}));
@@ -1681,7 +1684,7 @@ describe("bulkTransitionToScheduled", () => {
 	test("keeps only the schedule it was given", () =>
 		withHarness(async ({ context, db, repos, publisher }) => {
 			const timeoutAt = 1_000_000 as TimestampMs;
-			const runId = await parkRunOnChildWait(
+			const runId = await suspendRunOnChildWait(
 				{ context, repos, publisher },
 				{ mintedAtMs: Date.now() as TimestampMs, timeoutAt }
 			);
@@ -1727,11 +1730,11 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 				{ namespaceRequestContext: context, repos, publisher },
 				{ options: { pool: "warehouse-eu" } }
 			);
-			const parkedParentRun = await seedAwaitingChildRun({ namespaceRequestContext: context, repos, publisher });
+			const suspendedParentRun = await seedAwaitingChildRun({ namespaceRequestContext: context, repos, publisher });
 
 			const cancelledRows = await repos.workflowRun.bulkTransitionToCancelledInNamespace(context.namespaceId, [
 				pooledRun.runId,
-				parkedParentRun.child.runId,
+				suspendedParentRun.child.runId,
 			]);
 
 			expect([...cancelledRows].sort(orderById)).toEqual(
@@ -1744,11 +1747,11 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 						parentWorkflowRunId: null,
 					},
 					{
-						id: parkedParentRun.child.runId,
-						revision: parkedParentRun.child.revisionWhenClaimed + 1,
-						attempts: parkedParentRun.child.attemptsWhenClaimed,
+						id: suspendedParentRun.child.runId,
+						revision: suspendedParentRun.child.revisionWhenClaimed + 1,
+						attempts: suspendedParentRun.child.attemptsWhenClaimed,
 						options: null,
-						parentWorkflowRunId: parkedParentRun.runId,
+						parentWorkflowRunId: suspendedParentRun.runId,
 					},
 				].sort(orderById)
 			);
@@ -1758,10 +1761,10 @@ describe("bulkTransitionToCancelled and bulkTransitionToCancelledInNamespace", (
 				status: "cancelled",
 			});
 			expect(
-				await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: parkedParentRun.child.runId })
+				await repos.workflowRun.getById({ namespaceId: context.namespaceId, id: suspendedParentRun.child.runId })
 			).toEqual({
-				id: parkedParentRun.child.runId,
-				revision: parkedParentRun.child.revisionWhenClaimed + 1,
+				id: suspendedParentRun.child.runId,
+				revision: suspendedParentRun.child.revisionWhenClaimed + 1,
 				status: "cancelled",
 			});
 		}));

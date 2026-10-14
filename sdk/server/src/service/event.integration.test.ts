@@ -158,8 +158,8 @@ describe("EventService sendEventToWorkflowRun", () => {
 		}));
 });
 
-describe("EventService sendEventToWorkflowRun waking a parked run", () => {
-	test("schedules a run parked on that event name", () =>
+describe("EventService sendEventToWorkflowRun waking a suspended run", () => {
+	test("schedules a run waiting for an event of that name", () =>
 		withHarness(async ({ repos, context, publisher }) => {
 			const { runId } = await seedAwaitingEventRun(
 				{ repos, namespaceRequestContext: context, publisher },
@@ -218,9 +218,9 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 			]);
 		}));
 
-	test("leaves a run parked on a different event name parked", () =>
+	test("leaves a run waiting for a different event name as it was", () =>
 		withHarness(async ({ repos, context, publisher }) => {
-			const { runId, revisionWhenParked } = await seedAwaitingEventRun(
+			const { runId, revisionWhenSuspended } = await seedAwaitingEventRun(
 				{ repos, namespaceRequestContext: context, publisher },
 				{ eventName: "orderShipped" }
 			);
@@ -235,7 +235,7 @@ describe("EventService sendEventToWorkflowRun waking a parked run", () => {
 
 			expect(await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId })).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenParked }),
+					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenSuspended }),
 					state: { status: "awaiting_event", eventName: "orderShipped" },
 				})
 			);
@@ -332,9 +332,9 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			]);
 		}));
 
-	test("wakes the run parked on the event and leaves a sleeping one asleep", () =>
+	test("wakes the run waiting for the event and leaves a sleeping one asleep", () =>
 		withHarness(async ({ repos, context, publisher }) => {
-			const parked = await seedAwaitingEventRun(
+			const awaitingEventRun = await seedAwaitingEventRun(
 				{ repos, namespaceRequestContext: context, publisher },
 				{ eventName: "orderShipped" }
 			);
@@ -344,7 +344,7 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			);
 
 			const result = await createService(repos).multicastEventToWorkflowRuns(context, {
-				runIds: [parked.runId, sleeping.runId] as WorkflowRunId[],
+				runIds: [awaitingEventRun.runId, sleeping.runId] as WorkflowRunId[],
 				eventName: "orderShipped",
 				data: asOpaquePayload({ trackingId: "TRK-1" }),
 				clientCodecApplied: false,
@@ -352,12 +352,14 @@ describe("EventService multicastEventToWorkflowRuns", () => {
 			});
 
 			expect({ sentIds: Array.from(result.sentIds).sort(), failedIds: result.failedIds }).toEqual({
-				sentIds: [parked.runId, sleeping.runId].sort(),
+				sentIds: [awaitingEventRun.runId, sleeping.runId].sort(),
 				failedIds: [],
 			});
 
-			expect(await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: parked.runId })).toEqual(
-				expect.objectContaining({ run: expect.objectContaining({ id: parked.runId, status: "scheduled" }) })
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: awaitingEventRun.runId })
+			).toEqual(
+				expect.objectContaining({ run: expect.objectContaining({ id: awaitingEventRun.runId, status: "scheduled" }) })
 			);
 			expect(
 				await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: sleeping.runId })

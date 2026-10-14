@@ -53,7 +53,7 @@ const aikiWorker = worker({
 
 Both halves share one broker object, so both must live in the same process. That is all it asks for — no external service, nothing to connect to, no configuration.
 
-Delivery is shaped exactly like the Redis subscriber below: a queue per workflow version and pool, ordered by when each run became due with priority breaking ties; a publish wakes any worker parked on the queue; and popping a run removes it, so it reaches exactly one worker.
+Delivery is shaped exactly like the Redis subscriber below: a queue per workflow version and pool, ordered by when each run became due with priority breaking ties; a publish wakes any worker waiting on the queue; and popping a run removes it, so it reaches exactly one worker.
 
 The queues live in the process, so a restart empties them. As with Redis, that costs nothing: the server's database outbox is the source of truth for deliverable work, and anything lost is published again.
 

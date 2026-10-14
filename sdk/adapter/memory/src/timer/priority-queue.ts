@@ -37,7 +37,7 @@ function compareTimerItems(a: TimerHeapItem, b: TimerHeapItem): number {
 export interface InMemoryTimerPriorityQueue extends CreateTimerPriorityQueue {
 	/**
 	 * Drops every queued timer and any wake they left pending. Waiters already
-	 * parked on the queue stay attached and wake on what is added next.
+	 * waiting on the queue stay attached and wake on what is added next.
 	 */
 	clear(): void;
 }

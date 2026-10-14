@@ -214,7 +214,7 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 					expect(await waiter.wait(0.1)).toBeNull();
 				}));
 
-			test("a parked waiter wakes on a qualifying add", () =>
+			test("a blocked waiter wakes on a qualifying add", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
 					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 50 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 50 });
@@ -225,7 +225,7 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 					expect(await waitPromise).toEqual({ rank: 5 });
 				}));
 
-			test("a parked waiter wakes on an add behind the current earliest when the earliest is overdue", () =>
+			test("a blocked waiter wakes on an add behind the current earliest when the earliest is overdue", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
 					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 10 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 10 });
@@ -236,10 +236,10 @@ export function timerPriorityQueueTestSuite(runner: TestRunner, withQueue: WithT
 					expect(await waitPromise).toEqual({ rank: 10 });
 				}));
 
-			test("close resolves a parked wait with null", () =>
+			test("close resolves a blocked wait with null", () =>
 				withQueueAndWaiter(async (queue, waiter) => {
 					// The first wake completes any lazy connection setup, so the second wait
-					// is genuinely parked when close arrives.
+					// is genuinely blocked when close arrives.
 					await queue.add({ timers: [{ type: "sleep", id: "timer-a", rank: 50 }], overdueRank: BELOW_EVERY_RANK });
 					expect(await waiter.wait(0)).toEqual({ rank: 50 });
 

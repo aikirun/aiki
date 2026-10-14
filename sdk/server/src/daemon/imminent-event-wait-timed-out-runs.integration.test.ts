@@ -24,9 +24,9 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 	test("queues a run whose event wait timed out", () =>
 		withHarness(async (deps) => {
 			const { context, repos, publisher } = deps;
-			// Parked at the epoch with a 1ms timeout: the deadline is overdue for any daemon
+			// Suspended at the epoch with a 1ms timeout: the deadline is overdue for any daemon
 			// pass under the real clock.
-			const { runId, revisionWhenParked } = await withFakeClock(EPOCH_MS, () =>
+			const { runId, revisionWhenSuspended } = await withFakeClock(EPOCH_MS, () =>
 				seedAwaitingEventRun(
 					{ daemonContext: context, namespaceRequestContext, repos, publisher },
 					{ eventName: "orderShipped", timeoutInMs: 1 }
@@ -51,7 +51,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "queued", revision: revisionWhenParked + 1 }),
+					run: expect.objectContaining({ id: runId, status: "queued", revision: revisionWhenSuspended + 1 }),
 					state: { status: "queued", reason: "event_wait_timeout" },
 				})
 			);
@@ -217,10 +217,10 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 			).toEqual(expect.objectContaining({ workflowRunId: runId, status: "published" }));
 		}));
 
-	test("leaves a run whose deadline has not passed parked", () =>
+	test("leaves a run whose deadline has not passed suspended", () =>
 		withHarness(async (deps) => {
 			const { context, repos, publisher } = deps;
-			const { runId, revisionWhenParked } = await seedAwaitingEventRun(
+			const { runId, revisionWhenSuspended } = await seedAwaitingEventRun(
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ eventName: "orderShipped", timeoutInMs: ONE_HOUR_MS }
 			);
@@ -243,7 +243,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenParked }),
+					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenSuspended }),
 				})
 			);
 			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([]);
@@ -255,12 +255,12 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 			).toBeNull();
 		}));
 
-	test("never times out a wait parked without a deadline", () =>
+	test("never times out a wait without a deadline", () =>
 		withHarness(async (deps) => {
 			const { context, repos, publisher } = deps;
-			// Parked at the epoch: any deadline this old would be overdue — only the absent
+			// Suspended at the epoch: any deadline this old would be overdue — only the absent
 			// timeout spares the run.
-			const { runId, revisionWhenParked } = await withFakeClock(EPOCH_MS, () =>
+			const { runId, revisionWhenSuspended } = await withFakeClock(EPOCH_MS, () =>
 				seedAwaitingEventRun(
 					{ daemonContext: context, namespaceRequestContext, repos, publisher },
 					{ eventName: "orderShipped" }
@@ -285,7 +285,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenParked }),
+					run: expect.objectContaining({ id: runId, status: "awaiting_event", revision: revisionWhenSuspended }),
 				})
 			);
 			expect(await repos.eventWait.listByWorkflowRunId(runId)).toEqual([]);
@@ -307,8 +307,8 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 				)
 			);
 
-			const parkedAt = Date.now() as TimestampMs;
-			const imminent = await withFakeClock(parkedAt, () =>
+			const suspendedAt = Date.now() as TimestampMs;
+			const imminent = await withFakeClock(suspendedAt, () =>
 				seedAwaitingEventRun(
 					{ daemonContext: context, namespaceRequestContext, repos, publisher },
 					{ eventName: "orderShipped", timeoutInMs: ONE_HOUR_MS }
@@ -316,9 +316,9 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 			);
 
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
-			// Frozen at the park instant: the due wait's deadline is behind now, the imminent
+			// Frozen at the instant the run was suspended: the due wait's deadline is behind now, the imminent
 			// one an hour ahead but inside the two-hour lookahead window.
-			await withFakeClock(parkedAt, () =>
+			await withFakeClock(suspendedAt, () =>
 				processImminentEventWaitTimedOutRuns(
 					context,
 					{ repos, timerPriorityQueue },
@@ -336,7 +336,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 				{
 					type: "event_wait_timeout",
 					id: imminent.runId,
-					rank: computeRank({ dueAt: parkedAt + ONE_HOUR_MS }),
+					rank: computeRank({ dueAt: suspendedAt + ONE_HOUR_MS }),
 				},
 			]);
 
@@ -360,7 +360,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 					run: expect.objectContaining({
 						id: imminent.runId,
 						status: "awaiting_event",
-						revision: imminent.revisionWhenParked,
+						revision: imminent.revisionWhenSuspended,
 					}),
 				})
 			);
@@ -370,7 +370,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 		withHarness(async (deps) => {
 			const { context, repos, publisher } = deps;
 			const seedDeps = { daemonContext: context, namespaceRequestContext, repos, publisher };
-			const parked = await withFakeClock(EPOCH_MS, async () => [
+			const suspendedRuns = await withFakeClock(EPOCH_MS, async () => [
 				await seedAwaitingEventRun(seedDeps, { eventName: "orderShipped", timeoutInMs: 1 }),
 				await seedAwaitingEventRun(seedDeps, { eventName: "orderShipped", timeoutInMs: 1 }),
 				await seedAwaitingEventRun(seedDeps, { eventName: "orderShipped", timeoutInMs: 1 }),
@@ -388,7 +388,7 @@ describe("processImminentEventWaitTimedOutRuns", () => {
 				}
 			);
 
-			for (const { runId } of parked) {
+			for (const { runId } of suspendedRuns) {
 				const run = await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
 					id: runId,
@@ -422,13 +422,13 @@ describe("queueEventWaitTimedOutRuns", () => {
 			const listedA = rankedRuns.find((run) => run.id === runA.runId);
 			const listedB = rankedRuns.find((run) => run.id === runB.runId);
 			if (!listedA || !listedB) {
-				throw new Error("Both parked runs must be listed as due");
+				throw new Error("Both suspended runs must be listed as due");
 			}
 
 			// The first pass queues A, moving it past the listing's revision snapshot.
 			await queueEventWaitTimedOutRuns(context, repos, undefined, republishBackoff, [listedA]);
 
-			// The replayed batch still carries A at its parked revision — the race the
+			// The replayed batch still carries A at the revision it had when suspended — the race the
 			// revision guard settles. A must not get a second row, stamp, or bump.
 			await queueEventWaitTimedOutRuns(context, repos, undefined, republishBackoff, [listedA, listedB]);
 

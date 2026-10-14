@@ -214,7 +214,7 @@ export async function seedAwaitingEventRun(
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
 
 	const services = createServices(repos);
-	const parked = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+	const suspendedRun = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: seeded.runId,
 		state: { status: "awaiting_event", eventName: params.eventName, timeoutInMs: params.timeoutInMs },
@@ -222,7 +222,7 @@ export async function seedAwaitingEventRun(
 		expectedSignalSequence: 0,
 	});
 
-	return { ...seeded, eventName: params.eventName, revisionWhenParked: parked.revision };
+	return { ...seeded, eventName: params.eventName, revisionWhenSuspended: suspendedRun.revision };
 }
 
 export async function seedSleepingRun(
@@ -286,7 +286,7 @@ export async function seedPausedRun(deps: SeedRunDeps & { publisher: FakePublish
 	return { ...seeded, revisionWhenPaused: paused.revision };
 }
 
-/** A run parked as `awaiting_retry` on its own error, due at the authored instant. */
+/** A run suspended in `awaiting_retry` on its own error, due at the authored instant. */
 export async function seedAwaitingRetryRun(
 	deps: SeedRunDeps & { publisher: FakePublisher },
 	params: { nextAttemptAt: number },
@@ -300,7 +300,7 @@ export async function seedAwaitingRetryRun(
 	// The transition takes a relative delay, so a frozen clock turns the authored absolute
 	// due time into that delay. Frozen at 1, not 0: bun's setSystemTime treats the zero
 	// timestamp as a reset to the real clock.
-	const parked = await withFakeClock(1, () =>
+	const suspendedRun = await withFakeClock(1, () =>
 		services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
 			type: "optimistic",
 			id: seeded.runId,
@@ -314,10 +314,10 @@ export async function seedAwaitingRetryRun(
 		})
 	);
 
-	return { ...seeded, nextAttemptAt: params.nextAttemptAt, revisionWhenParked: parked.revision };
+	return { ...seeded, nextAttemptAt: params.nextAttemptAt, revisionWhenSuspended: suspendedRun.revision };
 }
 
-/** A running parent parked on one of its running children. */
+/** A running parent suspended on one of its running children. */
 export async function seedAwaitingChildRun(
 	deps: SeedRunDeps & { publisher: FakePublisher },
 	params?: { timeoutInMs?: number }
@@ -331,7 +331,7 @@ export async function seedAwaitingChildRun(
 	);
 
 	const services = createServices(repos);
-	const parked = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
+	const suspendedParent = await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: parent.runId,
 		state: { status: "awaiting_child_workflow", childWorkflowRunId: child.runId, timeoutInMs: params?.timeoutInMs },
@@ -339,7 +339,7 @@ export async function seedAwaitingChildRun(
 		expectedSignalSequence: 0,
 	});
 
-	return { ...parent, child, revisionWhenParked: parked.revision };
+	return { ...parent, child, revisionWhenSuspended: suspendedParent.revision };
 }
 
 export async function seedCancelledRun(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {

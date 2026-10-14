@@ -53,7 +53,7 @@ describe("processImminentTaskRetryableRuns", () => {
 				workflowRunId: runId,
 			});
 			// computeRank(nextAttemptAt = 1, priority 2) = 1 * 10 + 2 — the rank proves the scan
-			// read the deadline the park stored on the run row.
+			// read the deadline the suspension stored on the run row.
 			expect(row).toEqual(
 				expect.objectContaining({ workflowRunId: runId, status: "pending", rank: 12, nextPublishAttemptRank: 12 })
 			);
@@ -127,7 +127,7 @@ describe("processImminentTaskRetryableRuns", () => {
 	test("a running run with a due awaiting_retry task is not requeued", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			// The task is due, but the run is still running, not awaiting_task_retry — only
-			// parked runs are scanned.
+			// suspended runs are scanned.
 			const { runId } = await seedAwaitingRetryTask(
 				{ namespaceRequestContext, repos, publisher },
 				{ nextAttemptAt: 1 }
@@ -154,7 +154,7 @@ describe("processImminentTaskRetryableRuns", () => {
 					run: expect.objectContaining({ id: runId, status: "running" }),
 				})
 			);
-			// The delivery's claimed outbox row stays with the run until it parks.
+			// The delivery's claimed outbox row stays with the run until it is suspended.
 			expect(
 				await repos.workflowRunOutbox.getByWorkflowRunId({
 					namespaceId: namespaceRequestContext.namespaceId,

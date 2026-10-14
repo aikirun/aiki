@@ -12,7 +12,7 @@ export interface InMemoryQueue {
 
 /**
  * In-process publisher + subscriber sharing a single broker. The broker
- * holds workflow-run queues and a registry of subscribers parked on the queues.
+ * holds workflow-run queues and a registry of subscribers waiting on the queues.
  */
 export function inMemoryQueue(): InMemoryQueue {
 	const broker = createBroker();

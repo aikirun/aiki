@@ -397,7 +397,7 @@ export const childWorkflowRunWait = pgTable(
 		// finish while its parent is executing, so a row can land that the parent's loaded
 		// copy of this table lacks; the value lets the parent fetch just the rows written
 		// after its copy, instead of re-reading everything. A timeout row cannot land that
-		// way — it is written only while the parent is parked, and the parent re-reads
+		// way — it is written only while the parent is suspended, and the parent re-reads
 		// everything when it wakes — so there is nothing to catch up on, and it stays null.
 		signalSequence: integer("signal_sequence"),
 

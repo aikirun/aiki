@@ -25,8 +25,8 @@ const ONE_HOUR_MS = 1 * 60 * 60 * 1000;
 
 const { republishBackoff } = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
-// Creates a running parent, creates a scheduled child under it, and parks the parent on that child.
-async function parkParentOnChild(deps: DaemonHarnessDeps, params?: { timeoutInMs?: number }) {
+// Creates a running parent, creates a scheduled child under it, and suspends the parent on that child.
+async function suspendParentOnChild(deps: DaemonHarnessDeps, params?: { timeoutInMs?: number }) {
 	const { context, repos, publisher } = deps;
 	const parent = await seedClaimedRun({ daemonContext: context, namespaceRequestContext, repos, publisher });
 	const child = await seedScheduledRun(
@@ -35,7 +35,7 @@ async function parkParentOnChild(deps: DaemonHarnessDeps, params?: { timeoutInMs
 	);
 
 	const stateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
-	const parked = await stateMachine.transitionState(namespaceRequestContext, {
+	const suspendedParent = await stateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: parent.runId,
 		state: {
@@ -51,7 +51,7 @@ async function parkParentOnChild(deps: DaemonHarnessDeps, params?: { timeoutInMs
 		parentRunId: parent.runId,
 		childRunId: child.runId,
 		attemptsWhenClaimed: parent.attemptsWhenClaimed,
-		revisionWhenParked: parked.revision,
+		revisionWhenSuspended: suspendedParent.revision,
 		workflowSource: parent.workflowSource,
 		workflowName: parent.workflowName,
 		workflowVersionId: parent.workflowVersionId,
@@ -62,10 +62,10 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 	test("queues a parent whose child wait timed out", () =>
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
-			// Parked at the epoch with a 1ms timeout: the deadline is overdue for any daemon
+			// Suspended at the epoch with a 1ms timeout: the deadline is overdue for any daemon
 			// pass under the real clock.
-			const { parentRunId, revisionWhenParked } = await withFakeClock(EPOCH_MS, () =>
-				parkParentOnChild(deps, { timeoutInMs: 1 })
+			const { parentRunId, revisionWhenSuspended } = await withFakeClock(EPOCH_MS, () =>
+				suspendParentOnChild(deps, { timeoutInMs: 1 })
 			);
 
 			await processImminentChildRunWaitTimedOutRuns(
@@ -86,7 +86,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			});
 			expect(run).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: parentRunId, status: "queued", revision: revisionWhenParked + 1 }),
+					run: expect.objectContaining({ id: parentRunId, status: "queued", revision: revisionWhenSuspended + 1 }),
 					state: { status: "queued", reason: "child_workflow_wait_timeout" },
 				})
 			);
@@ -96,7 +96,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
 			const { parentRunId, childRunId } = await withFakeClock(EPOCH_MS, () =>
-				parkParentOnChild(deps, { timeoutInMs: 1 })
+				suspendParentOnChild(deps, { timeoutInMs: 1 })
 			);
 
 			const timedOutAt = Date.now() as TimestampMs;
@@ -133,7 +133,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
 			const { parentRunId, workflowSource, workflowName, workflowVersionId } = await withFakeClock(EPOCH_MS, () =>
-				parkParentOnChild(deps, { timeoutInMs: 1 })
+				suspendParentOnChild(deps, { timeoutInMs: 1 })
 			);
 
 			expect(
@@ -178,7 +178,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
 			const { parentRunId, attemptsWhenClaimed } = await withFakeClock(EPOCH_MS, () =>
-				parkParentOnChild(deps, { timeoutInMs: 1 })
+				suspendParentOnChild(deps, { timeoutInMs: 1 })
 			);
 
 			await processImminentChildRunWaitTimedOutRuns(
@@ -207,7 +207,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 	test("publishes the fresh outbox row when a publisher is wired", () =>
 		withHarness(async (deps) => {
 			const { context, repos, publisher } = deps;
-			const { parentRunId } = await withFakeClock(EPOCH_MS, () => parkParentOnChild(deps, { timeoutInMs: 1 }));
+			const { parentRunId } = await withFakeClock(EPOCH_MS, () => suspendParentOnChild(deps, { timeoutInMs: 1 }));
 
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
@@ -229,10 +229,10 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			).toEqual(expect.objectContaining({ workflowRunId: parentRunId, status: "published" }));
 		}));
 
-	test("leaves a parent whose deadline has not passed parked", () =>
+	test("leaves a parent whose deadline has not passed suspended", () =>
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
-			const { parentRunId, revisionWhenParked } = await parkParentOnChild(deps, { timeoutInMs: ONE_HOUR_MS });
+			const { parentRunId, revisionWhenSuspended } = await suspendParentOnChild(deps, { timeoutInMs: ONE_HOUR_MS });
 
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
@@ -255,7 +255,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 					run: expect.objectContaining({
 						id: parentRunId,
 						status: "awaiting_child_workflow",
-						revision: revisionWhenParked,
+						revision: revisionWhenSuspended,
 					}),
 				})
 			);
@@ -268,12 +268,12 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 			).toBeNull();
 		}));
 
-	test("never times out a wait parked without a deadline", () =>
+	test("never times out a wait without a deadline", () =>
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
-			// Parked at the epoch: any deadline this old would be overdue — only the absent
+			// Suspended at the epoch: any deadline this old would be overdue — only the absent
 			// timeout spares the parent.
-			const { parentRunId, revisionWhenParked } = await withFakeClock(EPOCH_MS, () => parkParentOnChild(deps));
+			const { parentRunId, revisionWhenSuspended } = await withFakeClock(EPOCH_MS, () => suspendParentOnChild(deps));
 
 			await processImminentChildRunWaitTimedOutRuns(
 				context,
@@ -296,7 +296,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 					run: expect.objectContaining({
 						id: parentRunId,
 						status: "awaiting_child_workflow",
-						revision: revisionWhenParked,
+						revision: revisionWhenSuspended,
 					}),
 				})
 			);
@@ -312,15 +312,15 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 	test("queues the due wait and hands the imminent one to the timer priority queue", () =>
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
-			const due = await withFakeClock(EPOCH_MS, () => parkParentOnChild(deps, { timeoutInMs: 1 }));
+			const due = await withFakeClock(EPOCH_MS, () => suspendParentOnChild(deps, { timeoutInMs: 1 }));
 
-			const parkedAt = Date.now() as TimestampMs;
-			const imminent = await withFakeClock(parkedAt, () => parkParentOnChild(deps, { timeoutInMs: ONE_HOUR_MS }));
+			const suspendedAt = Date.now() as TimestampMs;
+			const imminent = await withFakeClock(suspendedAt, () => suspendParentOnChild(deps, { timeoutInMs: ONE_HOUR_MS }));
 
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
-			// Frozen at the park instant: the due wait's deadline is behind now, the imminent
+			// Frozen at the instant the parent was suspended: the due wait's deadline is behind now, the imminent
 			// one an hour ahead but inside the two-hour lookahead window.
-			await withFakeClock(parkedAt, () =>
+			await withFakeClock(suspendedAt, () =>
 				processImminentChildRunWaitTimedOutRuns(
 					context,
 					{ repos, timerPriorityQueue },
@@ -338,7 +338,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 				{
 					type: "child_wait_timeout",
 					id: imminent.parentRunId,
-					rank: computeRank({ dueAt: parkedAt + ONE_HOUR_MS }),
+					rank: computeRank({ dueAt: suspendedAt + ONE_HOUR_MS }),
 				},
 			]);
 
@@ -362,7 +362,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 					run: expect.objectContaining({
 						id: imminent.parentRunId,
 						status: "awaiting_child_workflow",
-						revision: imminent.revisionWhenParked,
+						revision: imminent.revisionWhenSuspended,
 					}),
 				})
 			);
@@ -371,10 +371,10 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 	test("drains every due wait when they outnumber the limit", () =>
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
-			const parked = await withFakeClock(EPOCH_MS, async () => [
-				await parkParentOnChild(deps, { timeoutInMs: 1 }),
-				await parkParentOnChild(deps, { timeoutInMs: 1 }),
-				await parkParentOnChild(deps, { timeoutInMs: 1 }),
+			const suspendedParents = await withFakeClock(EPOCH_MS, async () => [
+				await suspendParentOnChild(deps, { timeoutInMs: 1 }),
+				await suspendParentOnChild(deps, { timeoutInMs: 1 }),
+				await suspendParentOnChild(deps, { timeoutInMs: 1 }),
 			]);
 
 			await processImminentChildRunWaitTimedOutRuns(
@@ -389,7 +389,7 @@ describe("processImminentChildRunWaitTimedOutRuns", () => {
 				}
 			);
 
-			for (const { parentRunId } of parked) {
+			for (const { parentRunId } of suspendedParents) {
 				const run = await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
 					id: parentRunId,
@@ -405,8 +405,8 @@ describe("queueChildRunWaitTimedOutRuns", () => {
 	test("skips a parent that moved after the listing without holding back the rest of the batch", () =>
 		withHarness(async (deps) => {
 			const { context, repos } = deps;
-			const parentA = await withFakeClock(EPOCH_MS, () => parkParentOnChild(deps, { timeoutInMs: 1 }));
-			const parentB = await withFakeClock(EPOCH_MS, () => parkParentOnChild(deps, { timeoutInMs: 1 }));
+			const parentA = await withFakeClock(EPOCH_MS, () => suspendParentOnChild(deps, { timeoutInMs: 1 }));
+			const parentB = await withFakeClock(EPOCH_MS, () => suspendParentOnChild(deps, { timeoutInMs: 1 }));
 
 			const listedRuns = await repos.workflowRun.listChildRunWaitTimedOutRuns(context, Date.now() as TimestampMs, 100);
 			expect(listedRuns.map((run) => run.id).sort()).toEqual([parentA.parentRunId, parentB.parentRunId].sort());
@@ -415,13 +415,13 @@ describe("queueChildRunWaitTimedOutRuns", () => {
 			const listedA = rankedRuns.find((run) => run.id === parentA.parentRunId);
 			const listedB = rankedRuns.find((run) => run.id === parentB.parentRunId);
 			if (!listedA || !listedB) {
-				throw new Error("Both parked parents must be listed as due");
+				throw new Error("Both suspended parents must be listed as due");
 			}
 
 			// The first pass queues A, moving it past the listing's revision snapshot.
 			await queueChildRunWaitTimedOutRuns(context, repos, undefined, republishBackoff, [listedA]);
 
-			// The replayed batch still carries A at its parked revision — the race the
+			// The replayed batch still carries A at the revision it had when suspended — the race the
 			// revision guard settles.
 			await queueChildRunWaitTimedOutRuns(context, repos, undefined, republishBackoff, [listedA, listedB]);
 
@@ -438,7 +438,7 @@ describe("queueChildRunWaitTimedOutRuns", () => {
 					run: expect.objectContaining({
 						id: parentA.parentRunId,
 						status: "queued",
-						revision: parentA.revisionWhenParked + 1,
+						revision: parentA.revisionWhenSuspended + 1,
 					}),
 				})
 			);
@@ -453,7 +453,7 @@ describe("queueChildRunWaitTimedOutRuns", () => {
 					run: expect.objectContaining({
 						id: parentB.parentRunId,
 						status: "queued",
-						revision: parentB.revisionWhenParked + 1,
+						revision: parentB.revisionWhenSuspended + 1,
 					}),
 					state: { status: "queued", reason: "child_workflow_wait_timeout" },
 				})

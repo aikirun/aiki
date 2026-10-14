@@ -124,7 +124,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 
 When a workflow attempt fails — an unhandled error, or a task that has run out of its own retries — Aiki retries it based on your retry strategy. Between attempts the run sits in `awaiting_retry`.
 
-A task backing off between its own attempts is a different state. The run parks in `awaiting_task_retry` and releases its worker until the task is due, and the workflow's own attempt count is untouched. See [Task States](./tasks.md#task-states).
+A task backing off between its own attempts is a different state. The run is suspended in `awaiting_task_retry` and releases its worker until the task is due, and the workflow's own attempt count is untouched. See [Task States](./tasks.md#task-states).
 
 For detailed guidance on retry strategies, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 

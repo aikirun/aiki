@@ -186,7 +186,7 @@ export async function processDueTimers(
 		} else {
 			const rankById = new Map(timers.map((timer) => [timer.id, timer.rank]));
 			const runStatus = timerTypeToWorkflowRunStatus[timerType];
-			// The queue never drops a timer, so one can pop for a run that has since been parked on a
+			// The queue never drops a timer, so one can pop for a run that has since been suspended on a
 			// later due time. The run's own due time decides.
 			const runs: WorkflowRunMeta[] = await repos.workflowRun.listDueByIdsAndStatus(context, {
 				ids: Array.from(rankById.keys()) as NonEmptyArray<string>,
