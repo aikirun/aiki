@@ -227,11 +227,12 @@ export async function seedAwaitingEventRun(
 
 export async function seedSleepingRun(
 	deps: SeedRunDeps & { publisher: FakePublisher },
-	params: { sleepName: string; durationMs: number }
+	params: { sleepName: string; durationMs: number },
+	overrides?: SeedRunOverrides
 ) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
-	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext }, overrides);
 
 	const services = createServices(repos);
 	const sleepStartedAt = Date.now() as TimestampMs;
