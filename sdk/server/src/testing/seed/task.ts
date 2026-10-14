@@ -4,12 +4,13 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { TaskStatus } from "@aikirun/types/workflow/task";
 
 import { type SeedRunDeps, type SeedRunOverrides, seedClaimedRun } from "./run";
+import { recoverOverdueOutboxEntries } from "../../daemon/recover-overdue-outbox-entries";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
 import { discardStaleTasks } from "../../service/discard-stale-tasks";
 import { createTaskStateMachine } from "../../service/state-machine/task";
 import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { withFakeClock } from "../clock";
-import { namespaceRequestContextFactory } from "../data-factory/middleware/context";
+import { daemonContextFactory, namespaceRequestContextFactory } from "../data-factory/middleware/context";
 
 const seededTask = {
 	name: "reserve-inventory",
@@ -269,6 +270,92 @@ export async function seedAwaitingRetryRunAfterTaskFailure(
 			awaiting_retry: taskToRetry.taskInfo.id,
 			failed: taskToFail.taskInfo.id,
 			completed: taskToComplete.taskInfo.id,
+		} satisfies Record<Exclude<TaskStatus, "discarded">, string>,
+	};
+}
+
+/**
+ * A run put back to `queued` by recovery after its worker's claim went stale, with the tasks that
+ * worker left behind: one each `running`, `awaiting_retry`, `completed` and `failed`.
+ */
+export async function seedRecoveredRun(deps: SeedRunDeps & { publisher: FakePublisher }) {
+	const { repos } = deps;
+	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+
+	const runningTask = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, seeded, {
+		taskName: seededTask.name,
+		input: seededTask.input,
+	});
+	const taskToRetry = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...seeded, latestTaskSequence: runningTask.latestTaskSequence },
+		{ taskName: "charge-payment", input: { invoiceId: "inv-9" } }
+	);
+	const taskToComplete = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...seeded, latestTaskSequence: taskToRetry.latestTaskSequence },
+		{ taskName: "book-courier", input: { parcelId: "pcl-5" } }
+	);
+	const taskToFail = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...seeded, latestTaskSequence: taskToComplete.latestTaskSequence },
+		{ taskName: "send-receipt", input: { receiptId: "rcp-3" } }
+	);
+
+	const taskStateMachine = createTaskStateMachine({ repos });
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToRetry.taskInfo.id,
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		sequence: taskToFail.latestTaskSequence + 1,
+		attempts: 1,
+		state: {
+			status: "awaiting_retry",
+			error: { name: "Error", message: "payment gateway unavailable" },
+			nextAttemptInMs: 60_000,
+		},
+	});
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToComplete.taskInfo.id,
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		sequence: taskToFail.latestTaskSequence + 2,
+		attempts: 1,
+		state: { status: "completed", output: asOpaquePayload({ trackingId: "trk-8" }) },
+	});
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToFail.taskInfo.id,
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		sequence: taskToFail.latestTaskSequence + 3,
+		attempts: 1,
+		state: { status: "failed", error: { name: "Error", message: "mail server rejected the receipt" } },
+	});
+
+	// -1 makes the claim stale by arithmetic, so recovery takes it back without waiting.
+	await recoverOverdueOutboxEntries(
+		daemonContext,
+		{ repos },
+		{ claimIdleTimeoutMs: -1, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
+	);
+	const recoveredRun = await repos.workflowRun.getById({
+		namespaceId: namespaceRequestContext.namespaceId,
+		id: seeded.runId,
+	});
+	if (recoveredRun?.status !== "queued") {
+		throw new Error(`Recovery did not put run ${seeded.runId} back to queued`);
+	}
+
+	return {
+		...seeded,
+		revisionWhenRecovered: recoveredRun.revision,
+		taskIdByStatus: {
+			running: runningTask.taskInfo.id,
+			awaiting_retry: taskToRetry.taskInfo.id,
+			completed: taskToComplete.taskInfo.id,
+			failed: taskToFail.taskInfo.id,
 		} satisfies Record<Exclude<TaskStatus, "discarded">, string>,
 	};
 }

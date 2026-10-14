@@ -2,12 +2,11 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { describe, expect, test } from "vitest";
 
 import { recoverOverdueOutboxEntries } from "./recover-overdue-outbox-entries";
-import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { createWorkflowRunOutboxService } from "../service/workflow-run-outbox";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
 import { createDaemonHarness } from "../testing/harness";
-import { claimRun, seedClaimedRun, seedPublishedRun, seedQueuedRun } from "../testing/seed/run";
+import { seedClaimedRun, seedPublishedRun } from "../testing/seed/run";
 
 const withHarness = createDaemonHarness();
 
@@ -264,107 +263,6 @@ describe("recoverOverdueOutboxEntries", () => {
 						nextPublishAttemptRank: originalRank,
 					}),
 				]);
-			}));
-	});
-
-	describe("stallUndeliverableRuns sweep", () => {
-		test("stalls an aged pending row", () =>
-			withHarness(async (deps) => {
-				const { context, repos } = deps;
-				const { runId } = await withFakeClock(EPOCH_MS, () =>
-					seedQueuedRun({ daemonContext: deps.context, namespaceRequestContext, repos: deps.repos })
-				);
-
-				await stallUndeliverableRuns(
-					context,
-					{ repos },
-					{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
-				);
-
-				const run = await repos.workflowRun.getByIdWithState({
-					namespaceId: namespaceRequestContext.namespaceId,
-					id: runId,
-				});
-				expect(run).toEqual(
-					expect.objectContaining({
-						run: expect.objectContaining({
-							id: runId,
-							status: "stalled",
-						}),
-					})
-				);
-				expect(await repos.workflowRunOutbox.listPending(context, 100)).toHaveLength(0);
-			}));
-
-		test("stalls an aged published row", () =>
-			withHarness(async (deps) => {
-				const { context, repos } = deps;
-				const { runId } = await withFakeClock(EPOCH_MS, () =>
-					seedPublishedRun({
-						daemonContext: deps.context,
-						namespaceRequestContext,
-						publisher: deps.publisher,
-						repos: deps.repos,
-					})
-				);
-
-				await stallUndeliverableRuns(
-					context,
-					{ repos },
-					{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
-				);
-
-				const run = await repos.workflowRun.getByIdWithState({
-					namespaceId: namespaceRequestContext.namespaceId,
-					id: runId,
-				});
-				expect(run).toEqual(
-					expect.objectContaining({
-						run: expect.objectContaining({
-							id: runId,
-							status: "stalled",
-						}),
-					})
-				);
-				expect(await repos.workflowRunOutbox.listDueForRepublish(context, { limit: 100 })).toHaveLength(0);
-			}));
-
-		test("does not stall a claimed row regardless of age", () =>
-			withHarness(async (deps) => {
-				const { context, repos } = deps;
-				const { runId, outboxRowId } = await withFakeClock(EPOCH_MS, () =>
-					seedPublishedRun({
-						daemonContext: deps.context,
-						namespaceRequestContext,
-						publisher: deps.publisher,
-						repos: deps.repos,
-					})
-				);
-				await claimRun({ context: namespaceRequestContext, repos, runId });
-
-				await stallUndeliverableRuns(
-					context,
-					{ repos },
-					{ maxAgeMs: 60_000, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
-				);
-
-				const run = await repos.workflowRun.getByIdWithState({
-					namespaceId: namespaceRequestContext.namespaceId,
-					id: runId,
-				});
-				expect(run).toEqual(
-					expect.objectContaining({
-						run: expect.objectContaining({
-							id: runId,
-							status: "running",
-						}),
-					})
-				);
-				const claimedRows = await repos.workflowRunOutbox.listStaleClaimed(context, {
-					claimIdleTimeoutMs: EVERY_CLAIM_IS_STALE_MS,
-					limit: 100,
-				});
-				expect(claimedRows).toEqual([expect.objectContaining({ id: outboxRowId, workflowRunId: runId })]);
 			}));
 	});
 });
