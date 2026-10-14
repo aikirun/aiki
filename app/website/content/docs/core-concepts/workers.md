@@ -87,6 +87,7 @@ Worker configuration is split between **params** (identity), **config** (tuning)
 | `maxConcurrentWorkflowRuns` | 1 | Max parallel executions |
 | `gracefulShutdownTimeoutMs` | 5,000 | Shutdown wait time (ms) |
 | `workflowRun.claimRefreshIntervalMs` | 30,000 | How often the worker refreshes its run claim (ms) |
+| `workflowRun.maxInlineWaitMs` | 10 | Task retry delays up to this long (ms) are not durable: the worker waits them out in memory, and the failed attempt is not recorded. Set 0 to make every retry delay durable |
 
 **Start options** are set with the `with()` builder before `start()`:
 

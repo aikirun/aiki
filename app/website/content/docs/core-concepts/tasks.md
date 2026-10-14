@@ -165,7 +165,7 @@ A task moves through these states:
 - `failed` - The retry strategy has no attempts left, or the task's output was rejected
 - `discarded` - An unfinished task the run left behind; it no longer takes part in replay
 
-While a task sits in `awaiting_retry`, its run parks in `awaiting_task_retry` and releases its worker; the server re-queues the run when the task is due. Short backoffs are the exception: a delay within `maxInlineWaitMs` (10ms by default) is waited out in place, so the task stays `running` and the run never parks.
+A task's retry delay is durable unless it is short. When the delay is longer than the worker's [`workflowRun.maxInlineWaitMs`](./workers.md#configuration-reference) setting (10ms by default), it is recorded: the task moves to `awaiting_retry`, its run is suspended in `awaiting_task_retry` and releases its worker, and the run is re-queued when the task is due. A shorter delay is not durable: the worker waits it out in memory, the task stays `running`, the run is not suspended, and the failed attempt is not recorded.
 
 A task's attempts are its own, separate from the run's, so a task backing off does not move the run's attempt count. When the task runs out of attempts it goes `failed`, and the workflow attempt fails too, unless the workflow handler [catches the error the task's `start` throws](#handling-a-failed-task). The run then moves to [`awaiting_retry`](./workflows.md#states) if the workflow has attempts left, or to `failed` if it does not, with cause `task` either way.
 
