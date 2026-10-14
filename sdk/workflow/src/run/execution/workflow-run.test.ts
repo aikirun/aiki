@@ -3,7 +3,11 @@ import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory } from "@aikirun/testing/data-factory/workflow/run";
+import {
+	baseWorkflowRunRecordFactory,
+	runningWorkflowRunRecordFactory,
+	workflowRunStateByStatus,
+} from "@aikirun/testing/data-factory/workflow/run";
 import { awaitingRetryTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
@@ -34,7 +38,7 @@ const configProvider = asConfigProvider(() => ({
 }));
 
 function fakeWorkflowVersion(
-	handler: (run: WorkflowRun<unknown, EventsDefinition>, input: unknown) => Promise<void>
+	handler: (run: Omit<WorkflowRun<unknown, EventsDefinition>, "context">, input: unknown) => Promise<void>
 ): AnyWorkflowVersion {
 	return {
 		name: "dummy-workflow" as WorkflowName,
@@ -180,7 +184,7 @@ describe("executeWorkflowRun", () => {
 					tasks: { [address]: [awaitingRetryTaskInfo] },
 				});
 				const workflowVersion = fakeWorkflowVersion(async (run) => {
-					await chargeCard.start(run, input);
+					await chargeCard.start({ ...run, context: null }, input);
 				});
 
 				client.api.workflowRun.transitionStateV1.once(
@@ -361,13 +365,40 @@ describe("executeWorkflowRun", () => {
 	});
 
 	describe("context", () => {
-		test("passes null context when the client has no context factory", () =>
+		test("gives the handler a null context when the client has no context function", () =>
 			withFakeClient(async (client) => {
-				const workflowRun = runningWorkflowRunRecordFactory.build();
-				let capturedContext: unknown = "unset";
-				const workflowVersion = fakeWorkflowVersion(async (run) => {
-					capturedContext = run.context;
+				let contextSeenByHandler: unknown = "unset";
+				const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+					async handler(run) {
+						contextSeenByHandler = run.context;
+						return "recorded";
+					},
 				});
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "running" },
+							expectedRevision: workflowRun.revision,
+						},
+						{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							expectedRevision: workflowRun.revision,
+						},
+						{
+							revision: workflowRun.revision,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							attempts: workflowRun.attempts,
+						}
+					);
 
 				await executeWorkflowRun({
 					client,
@@ -377,16 +408,43 @@ describe("executeWorkflowRun", () => {
 					configProvider,
 				});
 
-				expect(capturedContext).toBeNull();
+				expect(contextSeenByHandler).toBeNull();
 			}));
 
-		test("resolves a synchronous context factory", () =>
+		test("gives the handler the context the client's context function returns", () =>
 			withFakeClient({ context: () => ({ tenantId: "t1" }) }, async (client) => {
-				const workflowRun = runningWorkflowRunRecordFactory.build();
-				let capturedContext: unknown;
-				const workflowVersion = fakeWorkflowVersion(async (run) => {
-					capturedContext = run.context;
+				let contextSeenByHandler: unknown;
+				const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+					async handler(run) {
+						contextSeenByHandler = run.context;
+						return "recorded";
+					},
 				});
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "running" },
+							expectedRevision: workflowRun.revision,
+						},
+						{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							expectedRevision: workflowRun.revision,
+						},
+						{
+							revision: workflowRun.revision,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							attempts: workflowRun.attempts,
+						}
+					);
 
 				await executeWorkflowRun({
 					client,
@@ -396,16 +454,43 @@ describe("executeWorkflowRun", () => {
 					configProvider,
 				});
 
-				expect(capturedContext).toEqual({ tenantId: "t1" });
+				expect(contextSeenByHandler).toEqual({ tenantId: "t1" });
 			}));
 
-		test("awaits an asynchronous context factory", () =>
+		test("gives the handler the context an asynchronous context function resolves to", () =>
 			withFakeClient({ context: async () => ({ tenantId: "t2" }) }, async (client) => {
-				const workflowRun = runningWorkflowRunRecordFactory.build();
-				let capturedContext: unknown;
-				const workflowVersion = fakeWorkflowVersion(async (run) => {
-					capturedContext = run.context;
+				let contextSeenByHandler: unknown;
+				const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+					async handler(run) {
+						contextSeenByHandler = run.context;
+						return "recorded";
+					},
 				});
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "running" },
+							expectedRevision: workflowRun.revision,
+						},
+						{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							expectedRevision: workflowRun.revision,
+						},
+						{
+							revision: workflowRun.revision,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							attempts: workflowRun.attempts,
+						}
+					);
 
 				await executeWorkflowRun({
 					client,
@@ -415,8 +500,228 @@ describe("executeWorkflowRun", () => {
 					configProvider,
 				});
 
-				expect(capturedContext).toEqual({ tenantId: "t2" });
+				expect(contextSeenByHandler).toEqual({ tenantId: "t2" });
 			}));
+
+		test("calls the context function with the run once it is running", () =>
+			withFakeClient({ context: (run) => ({ status: run.state.status, revision: run.revision }) }, async (client) => {
+				let contextSeenByHandler: unknown;
+				const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+					async handler(run) {
+						contextSeenByHandler = run.context;
+						return "recorded";
+					},
+				});
+				const workflowRun = { ...baseWorkflowRunRecordFactory.build(), state: workflowRunStateByStatus.queued };
+				const queuedRevision = workflowRun.revision;
+				const runningRevision = queuedRevision + 1;
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "running" },
+							expectedRevision: queuedRevision,
+						},
+						{ revision: runningRevision, state: { status: "running" }, attempts: workflowRun.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: workflowRun.id,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							expectedRevision: runningRevision,
+						},
+						{
+							revision: runningRevision + 1,
+							state: { status: "completed", output: asOpaquePayload("recorded") },
+							attempts: workflowRun.attempts,
+						}
+					);
+
+				await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(contextSeenByHandler).toEqual({ status: "running", revision: runningRevision });
+			}));
+
+		test("fails the run when the context function throws", () =>
+			withFakeClient(
+				{
+					context: () => {
+						throw new Error("tenant lookup failed");
+					},
+				},
+				async (client) => {
+					const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+						async handler() {
+							return "recorded";
+						},
+					});
+					const workflowRun = runningWorkflowRunRecordFactory.build();
+
+					client.api.workflowRun.transitionStateV1
+						.once(
+							{
+								type: "optimistic",
+								id: workflowRun.id,
+								state: { status: "running" },
+								expectedRevision: workflowRun.revision,
+							},
+							{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+						)
+						.once(
+							{
+								type: "optimistic",
+								id: workflowRun.id,
+								state: {
+									status: "failed",
+									cause: "self",
+									error: expect.objectContaining({ message: "tenant lookup failed", name: "Error" }),
+								},
+								expectedRevision: workflowRun.revision,
+							},
+							{
+								revision: workflowRun.revision,
+								state: { status: "failed", cause: "self", error: { name: "Error", message: "tenant lookup failed" } },
+								attempts: workflowRun.attempts,
+							}
+						);
+
+					const result = await executeWorkflowRun({
+						client,
+						workflowRun,
+						workflowVersion,
+						logger: client.logger,
+						configProvider,
+					});
+
+					expect(result).toBe(true);
+				}
+			));
+
+		test("fails the run when an asynchronous context function rejects", () =>
+			withFakeClient(
+				{
+					context: async () => {
+						throw new Error("tenant lookup failed");
+					},
+				},
+				async (client) => {
+					const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+						async handler() {
+							return "recorded";
+						},
+					});
+					const workflowRun = runningWorkflowRunRecordFactory.build();
+
+					client.api.workflowRun.transitionStateV1
+						.once(
+							{
+								type: "optimistic",
+								id: workflowRun.id,
+								state: { status: "running" },
+								expectedRevision: workflowRun.revision,
+							},
+							{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+						)
+						.once(
+							{
+								type: "optimistic",
+								id: workflowRun.id,
+								state: {
+									status: "failed",
+									cause: "self",
+									error: expect.objectContaining({ message: "tenant lookup failed", name: "Error" }),
+								},
+								expectedRevision: workflowRun.revision,
+							},
+							{
+								revision: workflowRun.revision,
+								state: { status: "failed", cause: "self", error: { name: "Error", message: "tenant lookup failed" } },
+								attempts: workflowRun.attempts,
+							}
+						);
+
+					const result = await executeWorkflowRun({
+						client,
+						workflowRun,
+						workflowVersion,
+						logger: client.logger,
+						configProvider,
+					});
+
+					expect(result).toBe(true);
+				}
+			));
+
+		test("waits for a retry when the context function throws and the run has a retry left", () =>
+			withFakeClient(
+				{
+					context: () => {
+						throw new Error("tenant lookup failed");
+					},
+				},
+				async (client) => {
+					const workflowVersion = workflow({ name: "audit" }).v("1.0.0", {
+						async handler() {
+							return "recorded";
+						},
+						retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+					});
+					const workflowRun = runningWorkflowRunRecordFactory.build();
+
+					client.api.workflowRun.transitionStateV1
+						.once(
+							{
+								type: "optimistic",
+								id: workflowRun.id,
+								state: { status: "running" },
+								expectedRevision: workflowRun.revision,
+							},
+							{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+						)
+						.once(
+							{
+								type: "optimistic",
+								id: workflowRun.id,
+								state: {
+									status: "awaiting_retry",
+									cause: "self",
+									nextAttemptInMs: 1,
+									error: expect.objectContaining({ message: "tenant lookup failed", name: "Error" }),
+								},
+								expectedRevision: workflowRun.revision,
+							},
+							{
+								revision: workflowRun.revision,
+								state: {
+									status: "awaiting_retry",
+									cause: "self",
+									nextAttemptAt: 0,
+									error: { name: "Error", message: "tenant lookup failed" },
+								},
+								attempts: workflowRun.attempts,
+							}
+						);
+
+					const result = await executeWorkflowRun({
+						client,
+						workflowRun,
+						workflowVersion,
+						logger: client.logger,
+						configProvider,
+					});
+
+					expect(result).toBe(true);
+				}
+			));
 	});
 
 	test("invokes the handler with the run input decoded by the client's codec", () =>

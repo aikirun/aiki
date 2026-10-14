@@ -101,7 +101,6 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
-		const context = createContext ? createContext(workflowRun) : null;
 		const codec = handle[INTERNAL].codec;
 
 		// Every hash inside the run must come from the hasher that made the run's own hash.
@@ -135,13 +134,13 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				logger,
 				sleep: createSleeper(handle, logger),
 				events: createEventWaiters(handle, eventsDefinition, logger),
-				context: context instanceof Promise ? await context : context,
 				[INTERNAL]: {
 					handle,
 					replayManifest: createReplayManifest(workflowRun),
 					createTaskExecutionTracker,
 					configProvider,
 					hasher,
+					createContext: () => (createContext ? createContext(handle.run) : null),
 				},
 			},
 			await codec.decode(workflowRun.input)

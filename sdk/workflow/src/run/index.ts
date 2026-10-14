@@ -26,5 +26,6 @@ export interface WorkflowRun<Context, TEvents extends EventsDefinition = EventsD
 		createTaskExecutionTracker: CreateTaskExecutionTracker;
 		configProvider: ConfigProvider<WorkflowExecutionConfig>;
 		hasher: BoundHasher;
+		createContext: () => Context | Promise<Context>;
 	};
 }

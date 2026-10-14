@@ -103,7 +103,7 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 
 	[INTERNAL]: {
 		eventsDefinition: TEvents;
-		handler: (run: WorkflowRun<Context, TEvents>, input: Input) => Promise<void>;
+		handler: (run: Omit<WorkflowRun<Context, TEvents>, "context">, input: Input) => Promise<void>;
 		runOptions: () => WorkflowRunOptions;
 	};
 }
@@ -390,7 +390,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		return workflowRunHandle(client, run as WorkflowRunRecord, this[INTERNAL].eventsDefinition);
 	}
 
-	private async handler(run: WorkflowRun<Context, TEvents>, input: Input): Promise<void> {
+	private async handler(run: Omit<WorkflowRun<Context, TEvents>, "context">, input: Input): Promise<void> {
 		const { logger } = run;
 		const { assertExecutionAllowed, codec, transitionStateOptimistic } = run[INTERNAL].handle[INTERNAL];
 
@@ -409,17 +409,24 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 	private async tryExecuteWorkflow(
 		input: Input,
-		run: WorkflowRun<Context, TEvents>,
+		run: Omit<WorkflowRun<Context, TEvents>, "context">,
 		retryStrategy: RetryStrategy
 	): Promise<Output> {
 		const {
 			logger,
-			[INTERNAL]: { handle },
+			[INTERNAL]: { handle, createContext },
 		} = run;
 
 		while (true) {
 			try {
-				const outputRaw = await this.params.handler(run, input);
+				const context = createContext();
+				const outputRaw = await this.params.handler(
+					{
+						...run,
+						context: context instanceof Promise ? await context : context,
+					},
+					input
+				);
 
 				// The handler may have caught the error that ended the execution and carried on.
 				handle[INTERNAL].assertExecutionAllowed();
