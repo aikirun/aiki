@@ -1,15 +1,26 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { vi } from "vitest";
 
-// Runs fn with the JS clock frozen at seedTimestampMs, restoring the real clock afterwards even on throw.
+// The frozen times of the withFakeClock calls still running, innermost last.
+const frozenTimestamps: number[] = [];
+
+// Runs fn with the JS clock frozen at seedTimestampMs. Afterwards, even on throw, the clock goes back to
+// the time an enclosing withFakeClock froze, or to the real clock when there is none.
 // Only use in integration tests because they are run sequentially.
 export async function withFakeClock<T>(seedTimestampMs: number, fn: () => Promise<T>): Promise<T> {
 	const clock = await systemClock();
+	frozenTimestamps.push(seedTimestampMs);
 	clock.freeze(seedTimestampMs);
 	try {
 		return await fn();
 	} finally {
-		clock.restore();
+		frozenTimestamps.pop();
+		const enclosingTimestampMs = frozenTimestamps.at(-1);
+		if (enclosingTimestampMs === undefined) {
+			clock.restore();
+		} else {
+			clock.freeze(enclosingTimestampMs);
+		}
 	}
 }
 
