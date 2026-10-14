@@ -3,7 +3,7 @@ title: Context
 description: Inject per-execution context — trace IDs, request metadata — into workflow runs, typed end to end.
 ---
 
-Use `Context` for data that should be unique per workflow execution, like trace IDs or request metadata. You supply a `context` function on the client; it is called before each workflow execution — it may be sync/async — and the result is available to the handler as `run.context`.
+Use `Context` for data that should be unique per workflow execution, like trace IDs or request metadata. You supply a `context` function on the client; it is called before each workflow execution — it may be sync/async — and the result is available to the handler as `run.context`. If the `context` function throws, Aiki treats the error like one thrown by the handler: the run waits for a retry if its retry strategy has one left, or fails.
 
 Bind the `Context` type once on `workflow()` and `client()`; `run.context` is then typed automatically.
 
