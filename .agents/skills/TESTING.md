@@ -18,7 +18,7 @@ Before writing any test, study the exemplars for its tier and match their idioms
   seeding, fake clock, assertion shapes.
 - `sdk/workflow/src/run/sleeper.test.ts` — timestamps as authored data.
 - `sdk/workflow/src/task.test.ts` — boundary-value config knobs, file-local helpers.
-- `sdk/server/src/service/workflow-run-state-machine.test.ts` — exhaustive legality matrix driven
+- `sdk/server/src/service/state-machine/workflow-run.test.ts` — exhaustive legality matrix driven
   from a typed case table.
 - `sdk/server/src/infra/db/tests/workflow-run-outbox.integration.test.ts` — provider-contract suite,
   two-connection concurrency choreography.
