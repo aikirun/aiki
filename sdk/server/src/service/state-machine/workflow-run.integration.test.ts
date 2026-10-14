@@ -19,6 +19,7 @@ import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
 import { createServiceHarness, type ServiceHarnessDeps, withRepos } from "../../testing/harness";
 import { allowsConcurrentWriteTransactions } from "../../testing/infra/db/transaction";
+import { NO_DUE_TIMES, readWorkflowRunDueTimes, type WorkflowRunDueTimes } from "../../testing/infra/db/workflow-run";
 import {
 	claimRun,
 	seedClaimedRun,
@@ -26,6 +27,7 @@ import {
 	seedPublishedRun,
 	seedQueuedRun,
 	seedScheduledRun,
+	seedSleepingRun,
 	seedStalledRun,
 } from "../../testing/seed/run";
 import { seedAwaitingRetryTask, seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
@@ -1533,4 +1535,229 @@ describe("WorkflowRunStateMachine outbox row", () => {
 				).toBeNull();
 			}));
 	}
+});
+
+describe("WorkflowRunStateMachine due times", () => {
+	const OneHourMs = 60 * 60 * 1000;
+
+	type DueTimes = Record<keyof WorkflowRunDueTimes, number | null>;
+
+	type SeedRunWithDueTimes = (deps: Pick<ServiceHarnessDeps, "context" | "repos" | "publisher">) => Promise<{
+		runId: string;
+		dueTimesBefore: DueTimes;
+		transitionRun: () => Promise<unknown>;
+		dueTimesAfter: (movedAt: number) => DueTimes;
+	}>;
+
+	// A run reaches `running`, `stalled`, `completed` or `failed` only from `queued` or `running`,
+	// which have no due time, and those statuses set none, so no test can show a due time set or cleared.
+	const seedRunWithDueTimesByDestination = {
+		scheduled: async ({ context, repos, publisher }) => {
+			const { runId, wakeupAt } = await seedSleepingRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ sleepName: "cool-down", durationMs: OneHourMs }
+			);
+			return {
+				runId,
+				dueTimesBefore: { ...NO_DUE_TIMES, wakeupAt },
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "pessimistic",
+						id: runId,
+						state: { status: "scheduled", reason: "wakeup_early", scheduledInMs: 0 },
+					}),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, scheduledAt: movedAt }),
+			};
+		},
+		paused: async ({ context, repos }) => {
+			const createdAt = Date.now();
+			const { runId } = await withFakeClock(createdAt, () =>
+				seedScheduledRun({ namespaceRequestContext: context, repos })
+			);
+			return {
+				runId,
+				dueTimesBefore: { ...NO_DUE_TIMES, scheduledAt: createdAt },
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "pessimistic",
+						id: runId,
+						state: { status: "paused" },
+					}),
+				dueTimesAfter: () => NO_DUE_TIMES,
+			};
+		},
+		sleeping: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				dueTimesBefore: NO_DUE_TIMES,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "sleeping", sleepName: "cool-down", durationMs: OneHourMs },
+						expectedRevision: revisionWhenClaimed,
+					}),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, wakeupAt: movedAt + OneHourMs }),
+			};
+		},
+		awaiting_event: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				dueTimesBefore: NO_DUE_TIMES,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: OneHourMs },
+						expectedRevision: revisionWhenClaimed,
+						expectedSignalSequence: 0,
+					}),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, timeoutAt: movedAt + OneHourMs }),
+			};
+		},
+		awaiting_retry: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				dueTimesBefore: NO_DUE_TIMES,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: {
+							status: "awaiting_retry",
+							cause: "self",
+							error: { name: "Error", message: "inventory service unavailable" },
+							nextAttemptInMs: OneHourMs,
+						},
+						expectedRevision: revisionWhenClaimed,
+					}),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, nextAttemptAt: movedAt + OneHourMs }),
+			};
+		},
+		awaiting_task_retry: async ({ context, repos, publisher }) => {
+			const taskNextAttemptAt = 1_000_000;
+			const { runId, revisionWhenClaimed } = await seedAwaitingRetryTask(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ nextAttemptAt: taskNextAttemptAt }
+			);
+			return {
+				runId,
+				dueTimesBefore: NO_DUE_TIMES,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "awaiting_task_retry" },
+						expectedRevision: revisionWhenClaimed,
+					}),
+				dueTimesAfter: () => ({ ...NO_DUE_TIMES, nextAttemptAt: taskNextAttemptAt }),
+			};
+		},
+		awaiting_child_workflow: async ({ context, repos, publisher }) => {
+			const parentRun = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const childRun = await seedScheduledRun(
+				{ namespaceRequestContext: context, repos },
+				{ parent: { workflowRunId: parentRun.runId, expectedRevision: parentRun.revisionWhenClaimed } }
+			);
+			return {
+				runId: parentRun.runId,
+				dueTimesBefore: NO_DUE_TIMES,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: parentRun.runId,
+						state: {
+							status: "awaiting_child_workflow",
+							childWorkflowRunId: childRun.runId,
+							timeoutInMs: OneHourMs,
+						},
+						expectedRevision: parentRun.revisionWhenClaimed,
+						expectedSignalSequence: 0,
+					}),
+				dueTimesAfter: (movedAt) => ({ ...NO_DUE_TIMES, timeoutAt: movedAt + OneHourMs }),
+			};
+		},
+		cancelled: async ({ context, repos, publisher }) => {
+			const { runId, wakeupAt } = await seedSleepingRun(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ sleepName: "cool-down", durationMs: OneHourMs }
+			);
+			return {
+				runId,
+				dueTimesBefore: { ...NO_DUE_TIMES, wakeupAt },
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "pessimistic",
+						id: runId,
+						state: { status: "cancelled" },
+					}),
+				dueTimesAfter: () => NO_DUE_TIMES,
+			};
+		},
+	} satisfies {
+		[Status in Exclude<
+			WorkflowRunStateRequest["status"],
+			"running" | "stalled" | "completed" | "failed"
+		>]: SeedRunWithDueTimes;
+	};
+
+	for (const [destination, seedRun] of Object.entries(seedRunWithDueTimesByDestination)) {
+		test(`a move to ${destination} sets the due times that status uses and clears the rest`, () =>
+			withHarness(async ({ context, db, repos, publisher }) => {
+				const { runId, dueTimesBefore, transitionRun, dueTimesAfter } = await seedRun({ context, repos, publisher });
+				expect(await readWorkflowRunDueTimes(db, runId)).toEqual(dueTimesBefore);
+
+				const movedAt = Date.now();
+				await withFakeClock(movedAt, transitionRun);
+
+				expect(await readWorkflowRunDueTimes(db, runId)).toEqual(dueTimesAfter(movedAt));
+			}));
+	}
+
+	test("a wait that loses to an event leaves the run with only a scheduled time", () =>
+		withHarness(async ({ context, db, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			await createEventService({ repos, workflowRunStateMachine: stateMachine }).sendEventToWorkflowRun(context, {
+				runId: runId as WorkflowRunId,
+				eventName: "paymentReceived",
+				data: asOpaquePayload({ amount: 25 }),
+				clientCodecApplied: false,
+				reference: undefined,
+			});
+
+			const movedAt = Date.now();
+			await withFakeClock(movedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "awaiting_event", eventName: "paymentReceived", timeoutInMs: OneHourMs },
+					expectedRevision: revisionWhenClaimed,
+					// The sequence the worker read before the event landed.
+					expectedSignalSequence: 0,
+				})
+			);
+
+			expect(await readWorkflowRunDueTimes(db, runId)).toEqual({ ...NO_DUE_TIMES, scheduledAt: movedAt });
+		}));
 });

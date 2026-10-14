@@ -8,6 +8,13 @@ export interface WorkflowRunDueTimes {
 	nextAttemptAt: TimestampMs | null;
 }
 
+export const NO_DUE_TIMES: WorkflowRunDueTimes = {
+	scheduledAt: null,
+	wakeupAt: null,
+	timeoutAt: null,
+	nextAttemptAt: null,
+};
+
 export async function readWorkflowRunDueTimes(db: Database, runId: string): Promise<WorkflowRunDueTimes | null> {
 	switch (db.provider) {
 		case "sqlite": {

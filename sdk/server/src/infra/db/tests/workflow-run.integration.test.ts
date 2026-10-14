@@ -22,7 +22,7 @@ import { END_OF_TIME, withFakeClock } from "../../../testing/clock";
 import { referencedWorkflowRunRowFactory } from "../../../testing/data-factory/infra/workflow-run";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../../../testing/data-factory/middleware/context";
 import { createServiceHarness, withRepos } from "../../../testing/harness";
-import { readWorkflowRunDueTimes } from "../../../testing/infra/db/workflow-run";
+import { NO_DUE_TIMES, readWorkflowRunDueTimes } from "../../../testing/infra/db/workflow-run";
 import {
 	type SeedRunDeps,
 	seedAwaitingChildRun,
@@ -74,8 +74,6 @@ async function suspendRunOnChildWait(
 
 	return runId;
 }
-
-const NO_DUE_TIMES = { scheduledAt: null, wakeupAt: null, timeoutAt: null, nextAttemptAt: null };
 
 function orderById<T extends { id: string }>(a: T, b: T): number {
 	return a.id < b.id ? -1 : 1;
