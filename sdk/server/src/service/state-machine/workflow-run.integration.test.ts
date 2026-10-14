@@ -4,7 +4,7 @@ import { NotFoundError } from "@aikirun/lib/error";
 import { noopLogger } from "@aikirun/lib/logger";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
-import type { WorkflowRunTransitionStateRequestV1 } from "@aikirun/types/api/workflow-run";
+import type { WorkflowRunStateRequest, WorkflowRunTransitionStateRequestV1 } from "@aikirun/types/api/workflow-run";
 import type { TerminalWorkflowRunStatus, WorkflowRunId } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
@@ -17,9 +17,17 @@ import { createImminentTimerQueue, type ImminentTimerQueue } from "../../infra/t
 import { computeRank } from "../../lib/rank";
 import { withFakeClock } from "../../testing/clock";
 import { daemonContextFactory } from "../../testing/data-factory/middleware/context";
-import { createServiceHarness, withRepos } from "../../testing/harness";
+import { createServiceHarness, type ServiceHarnessDeps, withRepos } from "../../testing/harness";
 import { allowsConcurrentWriteTransactions } from "../../testing/infra/db/transaction";
-import { claimRun, seedClaimedRun, seedCompletedRun, seedScheduledRun, seedStalledRun } from "../../testing/seed/run";
+import {
+	claimRun,
+	seedClaimedRun,
+	seedCompletedRun,
+	seedPublishedRun,
+	seedQueuedRun,
+	seedScheduledRun,
+	seedStalledRun,
+} from "../../testing/seed/run";
 import { seedAwaitingRetryTask, seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
 import { createChildRunCanceller } from "../cancel-child-runs";
 import { createEventService } from "../event";
@@ -1313,4 +1321,216 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				{ type: "task_retry", id: runId, rank: computeRank({ dueAt: 1 }) },
 			]);
 		}));
+});
+
+describe("WorkflowRunStateMachine outbox row", () => {
+	test("claiming a queued run marks its outbox row claimed at the claim time", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenQueued, outboxRowId } = await seedPublishedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const claimedAt = Date.now();
+			await withFakeClock(claimedAt, () =>
+				stateMachine.transitionState(context, {
+					type: "optimistic",
+					id: runId,
+					state: { status: "running" },
+					expectedRevision: revisionWhenQueued,
+				})
+			);
+
+			expect(
+				await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+			).toEqual(expect.objectContaining({ id: outboxRowId, workflowRunId: runId, status: "claimed", claimedAt }));
+		}));
+
+	type SeedRunWithOutboxRow = (
+		deps: Pick<ServiceHarnessDeps, "context" | "repos" | "publisher">
+	) => Promise<{ runId: string; transitionRun: () => Promise<unknown> }>;
+
+	// A run reaches `scheduled` only from a status that has no outbox row, so no test can show the
+	// row being deleted. A move to `running` keeps the row: the test above covers it.
+	const seedRunWithOutboxRowByDestination = {
+		paused: async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "pessimistic",
+						id: runId,
+						state: { status: "paused" },
+					}),
+			};
+		},
+		sleeping: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "sleeping", sleepName: "cool-down", durationMs: 60_000 },
+						expectedRevision: revisionWhenClaimed,
+					}),
+			};
+		},
+		awaiting_event: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "awaiting_event", eventName: "paymentReceived" },
+						expectedRevision: revisionWhenClaimed,
+						expectedSignalSequence: 0,
+					}),
+			};
+		},
+		awaiting_retry: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: {
+							status: "awaiting_retry",
+							cause: "self",
+							error: { name: "Error", message: "inventory service unavailable" },
+							nextAttemptInMs: 60_000,
+						},
+						expectedRevision: revisionWhenClaimed,
+					}),
+			};
+		},
+		awaiting_task_retry: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedAwaitingRetryTask(
+				{ namespaceRequestContext: context, repos, publisher },
+				{ nextAttemptAt: 1 }
+			);
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "awaiting_task_retry" },
+						expectedRevision: revisionWhenClaimed,
+					}),
+			};
+		},
+		awaiting_child_workflow: async ({ context, repos, publisher }) => {
+			const parentRun = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			const childRun = await seedScheduledRun(
+				{ namespaceRequestContext: context, repos },
+				{ parent: { workflowRunId: parentRun.runId, expectedRevision: parentRun.revisionWhenClaimed } }
+			);
+			return {
+				runId: parentRun.runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: parentRun.runId,
+						state: { status: "awaiting_child_workflow", childWorkflowRunId: childRun.runId },
+						expectedRevision: parentRun.revisionWhenClaimed,
+						expectedSignalSequence: 0,
+					}),
+			};
+		},
+		cancelled: async ({ context, repos, publisher }) => {
+			const { runId } = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "pessimistic",
+						id: runId,
+						state: { status: "cancelled" },
+					}),
+			};
+		},
+		completed: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+						expectedRevision: revisionWhenClaimed,
+					}),
+			};
+		},
+		failed: async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "optimistic",
+						id: runId,
+						state: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
+						expectedRevision: revisionWhenClaimed,
+					}),
+			};
+		},
+		stalled: async ({ context, repos }) => {
+			const { runId } = await seedQueuedRun({ namespaceRequestContext: context, repos });
+			return {
+				runId,
+				transitionRun: () =>
+					createStateMachine(repos).transitionState(context, {
+						type: "pessimistic",
+						id: runId,
+						state: { status: "stalled" },
+					}),
+			};
+		},
+	} satisfies { [Status in Exclude<WorkflowRunStateRequest["status"], "running" | "scheduled">]: SeedRunWithOutboxRow };
+
+	for (const [destination, seedRun] of Object.entries(seedRunWithOutboxRowByDestination)) {
+		test(`moving a run to ${destination} deletes its outbox row`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const { runId, transitionRun } = await seedRun({ context, repos, publisher });
+				expect(
+					await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+				).toEqual(expect.objectContaining({ workflowRunId: runId }));
+
+				await transitionRun();
+
+				expect(
+					await repos.workflowRunOutbox.getByWorkflowRunId({ namespaceId: context.namespaceId, workflowRunId: runId })
+				).toBeNull();
+			}));
+	}
 });
