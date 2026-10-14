@@ -2,8 +2,8 @@
 
 Two tiers: `*.test.ts` are hermetic unit tests (`bun run test:unit`, no database);
 `*.integration.test.ts` run against a live database, SQLite or Postgres (`bun run test:integration`;
-`.env.test` selects it — see DB.md). A run only tests that one database, so if you change the SQL
-in a repository, run the tests once with SQLite and once with Postgres.
+`.env.test` selects it — see DB.md). A local run only tests that one database; CI runs the
+integration tests on both.
 
 Both tiers run on Bun and on Node. `bun run test:unit` and `bun run test:integration` use Bun's
 test runner; `bun run test:unit:node` and `bun run test:integration:node` run the same files on
