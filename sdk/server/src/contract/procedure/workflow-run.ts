@@ -53,11 +53,9 @@ import {
 	workflowRunStateFailedSchema,
 	workflowRunStatePausedSchema,
 	workflowRunStateRunningSchema,
-	workflowRunStateScheduledRequestOptimisticSchema,
 	workflowRunStateScheduledRequestPessimisticSchema,
 	workflowRunStateSchema,
 	workflowRunStateSleepingSchema,
-	workflowRunStateStalledSchema,
 	workflowRunStatusSchema,
 	workflowStartOptionsSchema,
 } from "../schema/workflow-run";
@@ -183,8 +181,7 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 			})
 				.and(
 					type({
-						state: workflowRunStateScheduledRequestOptimisticSchema
-							.or(workflowRunStateRunningSchema)
+						state: workflowRunStateRunningSchema
 							.or(
 								workflowRunStateSleepingSchema
 									.omit("wakeupAt")
@@ -214,7 +211,6 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 						id: "string > 0",
 						state: workflowRunStateScheduledRequestPessimisticSchema
 							.or(workflowRunStatePausedSchema)
-							.or(workflowRunStateStalledSchema)
 							.or(workflowRunStateCancelledSchema),
 					})
 				)

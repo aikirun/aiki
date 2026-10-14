@@ -197,12 +197,8 @@ const workflowRunStateScheduledRequestSchema = workflowRunStateScheduledSchema
 	.and({ scheduledInMs: "number.integer >= 0" });
 
 export const workflowRunStateScheduledRequestPessimisticSchema = workflowRunStateScheduledRequestSchema.extract({
-	reason: "'new' | 'wakeup_early' | 'resumption' | 'redelivery'",
+	reason: "'wakeup_early' | 'resumption' | 'redelivery'",
 });
-
-export const workflowRunStateScheduledRequestOptimisticSchema = workflowRunStateScheduledRequestSchema.exclude(
-	workflowRunStateScheduledRequestPessimisticSchema
-);
 
 export const listChildRunsRequestSchema = type({
 	id: "string > 0",

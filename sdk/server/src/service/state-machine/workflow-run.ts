@@ -3,6 +3,7 @@ import { propsRequiredNonNull } from "@aikirun/lib/object";
 import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
 import type {
 	WorkflowRunStateRequest,
+	WorkflowRunStateScheduledRequest,
 	WorkflowRunTransitionStateRequestV1,
 	WorkflowRunTransitionStateResponseV1,
 } from "@aikirun/types/api/workflow-run";
@@ -11,6 +12,7 @@ import type {
 	WaitingForSignalWorkflowRunStatus,
 	WorkflowRunId,
 	WorkflowRunState,
+	WorkflowRunStateStalled,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
@@ -25,6 +27,17 @@ import { deliverTerminatedSignalToParentRun } from "../deliver-terminated-signal
 import { discardStaleTasks } from "../discard-stale-tasks";
 
 type TransitionedWorkflowRunState = Exclude<WorkflowRunState, { status: "queued" }>;
+
+/** The moves the API accepts, plus the ones only the server's own code may make. */
+type WorkflowRunTransitionStateRequest =
+	| WorkflowRunTransitionStateRequestV1
+	| {
+			type: "optimistic";
+			id: string;
+			expectedRevision: number;
+			state: Extract<WorkflowRunStateScheduledRequest, { reason: "event" | "child_workflow" }>;
+	  }
+	| { type: "pessimistic"; id: string; state: WorkflowRunStateStalled };
 
 type StateTransitionValidation<Status extends WorkflowRunStateRequest["status"]> =
 	Extract<WorkflowRunStateRequest, { status: Status }> extends { reason: `${infer Reason}` }
@@ -132,7 +145,7 @@ export const createWorkflowRunStateMachine = ({
 }: WorkflowRunStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
-		request: WorkflowRunTransitionStateRequestV1,
+		request: WorkflowRunTransitionStateRequest,
 		txRepos?: TxRepositories
 	): Promise<WorkflowRunTransitionStateResponseV1> {
 		const response = txRepos
@@ -153,7 +166,7 @@ export type WorkflowRunStateMachine = ReturnType<typeof createWorkflowRunStateMa
 
 async function transitionStateInTx(
 	context: NamespaceRequestContext,
-	request: WorkflowRunTransitionStateRequestV1,
+	request: WorkflowRunTransitionStateRequest,
 	childRunCanceller: ChildRunCanceller,
 	txRepos: TxRepositories,
 	imminentTimerQueue?: ImminentTimerQueue
@@ -279,7 +292,7 @@ async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: Timesta
 async function updateWorkflowRun(
 	context: NamespaceRequestContext,
 	runId: WorkflowRunId,
-	request: WorkflowRunTransitionStateRequestV1,
+	request: WorkflowRunTransitionStateRequest,
 	toState: TransitionedWorkflowRunState,
 	stateTransitionId: string,
 	now: TimestampMs,

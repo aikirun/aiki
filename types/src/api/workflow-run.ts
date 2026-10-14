@@ -16,7 +16,6 @@ import type {
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateSleeping,
-	WorkflowRunStateStalled,
 	WorkflowRunStatus,
 	WorkflowStartOptions,
 } from "../workflow/run";
@@ -155,12 +154,14 @@ export type WorkflowRunStateRequest =
 	| WorkflowRunStateAwaitingTaskRetryRequest
 	| WorkflowRunStateAwaitingChildWorkflowRequest;
 
-type WorkflowRunStateRequestOptimistic = Exclude<WorkflowRunStateRequest, WorkflowRunStateRequestPessimistic>;
+type WorkflowRunStateRequestOptimistic = Exclude<
+	WorkflowRunStateRequest,
+	{ status: "scheduled" | "paused" | "stalled" | "cancelled" }
+>;
 
 type WorkflowRunStateRequestPessimistic =
-	| Extract<WorkflowRunStateScheduledRequest, { reason: "new" | "wakeup_early" | "resumption" | "redelivery" }>
+	| Extract<WorkflowRunStateScheduledRequest, { reason: "wakeup_early" | "resumption" | "redelivery" }>
 	| WorkflowRunStatePaused
-	| WorkflowRunStateStalled
 	| WorkflowRunStateCancelled;
 
 export type WorkflowRunTransitionStateRequestOptimistic = {
