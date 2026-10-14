@@ -1,6 +1,7 @@
 import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
+import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
 import { processImminentRetryableRuns, queueRetryableRuns } from "./imminent-retryable-runs";
@@ -42,11 +43,9 @@ describe("processImminentRetryableRuns", () => {
 				}
 			);
 
-			const run = await repos.workflowRun.getByIdWithState({
-				namespaceId: namespaceRequestContext.namespaceId,
-				id: runId,
-			});
-			expect(run).toEqual(
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
+			).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({ id: runId, status: "queued", revision: revisionWhenSuspended + 1 }),
 					state: { status: "queued", reason: "retry" },
@@ -74,11 +73,9 @@ describe("processImminentRetryableRuns", () => {
 				}
 			);
 
-			const run = await repos.workflowRun.getByIdWithState({
-				namespaceId: namespaceRequestContext.namespaceId,
-				id: runId,
-			});
-			expect(run).toEqual(
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
+			).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({ id: runId, status: "queued", attempts: attemptsWhenClaimed + 1 }),
 				})
@@ -120,14 +117,19 @@ describe("processImminentRetryableRuns", () => {
 				}
 			);
 
-			const rank = computeRank({ dueAt: EPOCH_MS, priority: 2 });
+			const retryRank = computeRank({ dueAt: EPOCH_MS, priority: 2 });
 			expect(
 				await repos.workflowRunOutbox.getByWorkflowRunId({
 					namespaceId: namespaceRequestContext.namespaceId,
 					workflowRunId: runId,
 				})
 			).toEqual(
-				expect.objectContaining({ workflowRunId: runId, status: "pending", rank, nextPublishAttemptRank: rank })
+				expect.objectContaining({
+					workflowRunId: runId,
+					status: "pending",
+					rank: retryRank,
+					nextPublishAttemptRank: retryRank,
+				})
 			);
 		}));
 
@@ -211,11 +213,9 @@ describe("processImminentRetryableRuns", () => {
 				)
 			);
 
-			const run = await repos.workflowRun.getByIdWithState({
-				namespaceId: namespaceRequestContext.namespaceId,
-				id: runId,
-			});
-			expect(run).toEqual(
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
+			).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({
 						id: runId,
@@ -304,8 +304,9 @@ describe("processImminentRetryableRuns", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			const waiter = timerPriorityQueue.createWaiter();
 			// Due 30ms before the scan's clock, which is exactly the overshoot, so it sits at the overdue cutoff.
+			const frontRunId = ulid();
 			const frontRank = computeRank({ dueAt: 999_970 });
-			await timerPriorityQueue.add({ timers: [{ type: "sleep", id: "run-front", rank: frontRank }], overdueRank: 0 });
+			await timerPriorityQueue.add({ timers: [{ type: "sleep", id: frontRunId, rank: frontRank }], overdueRank: 0 });
 			expect(await waiter.wait(0)).toEqual({ rank: frontRank });
 
 			await withFakeClock(1_000_000, () =>
@@ -349,11 +350,9 @@ describe("processImminentRetryableRuns", () => {
 			);
 
 			for (const { runId } of suspendedRuns) {
-				const run = await repos.workflowRun.getByIdWithState({
-					namespaceId: namespaceRequestContext.namespaceId,
-					id: runId,
-				});
-				expect(run).toEqual(expect.objectContaining({ run: expect.objectContaining({ id: runId, status: "queued" }) }));
+				expect(
+					await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
+				).toEqual(expect.objectContaining({ run: expect.objectContaining({ id: runId, status: "queued" }) }));
 			}
 		}));
 });
@@ -398,11 +397,9 @@ describe("queueRetryableRuns", () => {
 			// revision guard settles. A must not be charged or queued a second time.
 			await queueRetryableRuns(context, repos, undefined, republishBackoff, [listedA, listedB]);
 
-			const rowA = await repos.workflowRun.getByIdWithState({
-				namespaceId: namespaceRequestContext.namespaceId,
-				id: runA.runId,
-			});
-			expect(rowA).toEqual(
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runA.runId })
+			).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({
 						id: runA.runId,
@@ -413,11 +410,9 @@ describe("queueRetryableRuns", () => {
 				})
 			);
 
-			const rowB = await repos.workflowRun.getByIdWithState({
-				namespaceId: namespaceRequestContext.namespaceId,
-				id: runB.runId,
-			});
-			expect(rowB).toEqual(
+			expect(
+				await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runB.runId })
+			).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({
 						id: runB.runId,
