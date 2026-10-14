@@ -50,7 +50,7 @@ export function server(params: ServerParams): Server {
 	const logger = params.logger ?? consoleLogger();
 
 	let handler: Server["handler"] | undefined;
-	let createHandlerPromise: Promise<Server["handler"]> | undefined;
+	let createHandlerPromise: Promise<Server["handler"] | undefined> | undefined;
 
 	return {
 		handler: (request) => {
@@ -59,22 +59,30 @@ export function server(params: ServerParams): Server {
 			}
 			return (async () => {
 				createHandlerPromise ??= (async () => {
-					const db = await params.db();
+					try {
+						const db = await params.db();
 
-					const { reportPendingMigrations } = await import("./pending-migrations");
-					reportPendingMigrations(db, logger);
+						const { reportPendingMigrations } = await import("./pending-migrations");
+						reportPendingMigrations(db, logger);
 
-					const { createHandler } = await import("./handler");
-					return createHandler({
-						db,
-						logger,
-						iam: params.handler?.iam,
-						cache: params.handler?.cache,
-						timerPriorityQueue: params.timerPriorityQueue,
-						config: params.handler?.config,
-					});
+						const { createHandler } = await import("./handler");
+						return await createHandler({
+							db,
+							logger,
+							iam: params.handler?.iam,
+							cache: params.handler?.cache,
+							timerPriorityQueue: params.timerPriorityQueue,
+							config: params.handler?.config,
+						});
+					} catch (err) {
+						logger.error("Server handler creation failed", { err });
+						return undefined;
+					}
 				})();
 				handler = await createHandlerPromise;
+				if (!handler) {
+					return new Response("Internal Server Error", { status: 500 });
+				}
 				return handler(request);
 			})();
 		},
