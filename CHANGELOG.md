@@ -2,6 +2,18 @@
 
 All notable changes to Aiki packages are documented here. All `@aikirun/*` packages share the same version number and are released together.
 
+## 0.45.1
+
+The server refuses any config setting that cannot work, not only a NaN. A context function that throws now fails its run like an error from the workflow handler.
+
+### Improvements
+
+- **The server refuses any config setting that cannot work.** 0.45.0 refused only a NaN. A negative, infinite or fractional value is now refused too, and so is zero, except in the few settings where zero has a meaning. The error names the setting and what was found: `Invalid config: daemons.recoverOverdueOutboxEntries.claimIdleTimeoutMs must be positive (was -5000)`.
+
+### Bug Fixes
+
+- **A context function that throws fails its run like an error from the workflow handler.** An error from the client's `context` function was only logged, and the run was delivered again and again without end. That error is now handled like an error from the workflow handler: the run waits for a retry if it has one left, or fails with cause `self`. The context function now sees the run as `running`.
+
 ## 0.45.0
 
 A workflow can keep its payloads out of the client's codec with the new `clientCodecPolicy` run option. A workflow that catches the error the SDK stopped it with now stays stopped, and a task handler that uses `run` fails its task and its run. An invalid sleep duration fails the run at once, and a retry delay that ends after the year 9999 fails the run or task instead of leaving it running. The server refuses a NaN in its config, and pretty logs carry no color codes.
