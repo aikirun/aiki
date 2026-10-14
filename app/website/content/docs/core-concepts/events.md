@@ -53,7 +53,7 @@ const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
 });
 ```
 
-The sender validates event data against the schema before sending it, so malformed data is rejected at its source rather than reaching the workflow.
+The sender validates event data against the schema before sending it, so malformed data is rejected at its source rather than reaching the workflow. The check happens in the Aiki SDK, so an event sent without the SDK is not checked.
 
 ## Waiting for Events
 
