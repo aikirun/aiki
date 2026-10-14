@@ -1,6 +1,7 @@
 import { hashInput } from "@aikirun/lib/crypto";
 import type { FakePublisher } from "@aikirun/testing/infra/queue";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import type { TaskStatus } from "@aikirun/types/workflow/task";
 
 import { type SeedRunDeps, type SeedRunOverrides, seedClaimedRun } from "./run";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
@@ -174,6 +175,102 @@ export async function seedAwaitingTaskRetryRun(
 	});
 
 	return { ...seeded, revisionWhenSuspended: suspendedRun.revision };
+}
+
+/**
+ * A run in `awaiting_retry` because one of its tasks failed, with a sibling task left in each other
+ * status an attempt can leave behind: `running`, `awaiting_retry` and `completed`.
+ */
+export async function seedAwaitingRetryRunAfterTaskFailure(
+	deps: SeedRunDeps & { publisher: FakePublisher },
+	params: { nextAttemptAt: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
+
+	const runningTask = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, seeded, {
+		taskName: seededTask.name,
+		input: seededTask.input,
+	});
+	const taskToRetry = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...seeded, latestTaskSequence: runningTask.latestTaskSequence },
+		{ taskName: "charge-payment", input: { invoiceId: "inv-9" } }
+	);
+	const taskToFail = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...seeded, latestTaskSequence: taskToRetry.latestTaskSequence },
+		{ taskName: "send-receipt", input: { receiptId: "rcp-3" } }
+	);
+	const taskToComplete = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...seeded, latestTaskSequence: taskToFail.latestTaskSequence },
+		{ taskName: "book-courier", input: { parcelId: "pcl-5" } }
+	);
+
+	const taskStateMachine = createTaskStateMachine({ repos });
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToRetry.taskInfo.id,
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		sequence: taskToComplete.latestTaskSequence + 1,
+		attempts: 1,
+		state: {
+			status: "awaiting_retry",
+			error: { name: "Error", message: "payment gateway unavailable" },
+			nextAttemptInMs: 60_000,
+		},
+	});
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToFail.taskInfo.id,
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		sequence: taskToComplete.latestTaskSequence + 2,
+		attempts: 1,
+		state: { status: "failed", error: { name: "Error", message: "mail server rejected the receipt" } },
+	});
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToComplete.taskInfo.id,
+		workflowRunId: seeded.runId,
+		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
+		sequence: taskToComplete.latestTaskSequence + 3,
+		attempts: 1,
+		state: { status: "completed", output: asOpaquePayload({ trackingId: "trk-8" }) },
+	});
+
+	const workflowRunStateMachine = createWorkflowRunStateMachine({
+		repos,
+		childRunCanceller: createChildRunCanceller(),
+	});
+	// The transition takes a relative delay, so a frozen clock turns the authored absolute
+	// due time into that delay. Frozen at 1, not 0: bun's setSystemTime treats the zero
+	// timestamp as a reset to the real clock.
+	const suspendedRun = await withFakeClock(1, () =>
+		workflowRunStateMachine.transitionState(namespaceRequestContext, {
+			type: "optimistic",
+			id: seeded.runId,
+			state: {
+				status: "awaiting_retry",
+				cause: "task",
+				taskId: taskToFail.taskInfo.id,
+				nextAttemptInMs: params.nextAttemptAt - 1,
+			},
+			expectedRevision: seeded.revisionWhenClaimed,
+		})
+	);
+
+	return {
+		...seeded,
+		nextAttemptAt: params.nextAttemptAt,
+		revisionWhenSuspended: suspendedRun.revision,
+		taskIdByStatus: {
+			running: runningTask.taskInfo.id,
+			awaiting_retry: taskToRetry.taskInfo.id,
+			failed: taskToFail.taskInfo.id,
+			completed: taskToComplete.taskInfo.id,
+		} satisfies Record<Exclude<TaskStatus, "discarded">, string>,
+	};
 }
 
 export async function seedCompletedTask(

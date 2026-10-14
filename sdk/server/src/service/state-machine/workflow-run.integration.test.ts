@@ -192,8 +192,8 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					// A running run may only be re-queued for a task_retry reason.
-					state: { status: "queued", reason: "wakeup" },
+					// Only a run waiting for an event is scheduled by one.
+					state: { status: "scheduled", reason: "event", scheduledInMs: 0 },
 					// The revision is correct: the transition itself is the only fault.
 					expectedRevision: revisionWhenClaimed,
 				})
@@ -258,125 +258,6 @@ describe("WorkflowRunStateMachine attempt counting", () => {
 						revision: result.revision,
 						attempts: result.attempts,
 					}),
-				})
-			);
-		}));
-
-	test("re-queueing a retry from awaiting_retry charges exactly one attempt", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
-				namespaceRequestContext: context,
-				repos,
-				publisher,
-			});
-
-			const stateMachine = createStateMachine(repos);
-			const awaitingRetryRun = await stateMachine.transitionState(context, {
-				type: "optimistic",
-				id: runId,
-				state: {
-					status: "awaiting_retry",
-					cause: "self",
-					error: { name: "Error", message: "boom" },
-					nextAttemptInMs: 0,
-				},
-				expectedRevision: revisionWhenClaimed,
-			});
-
-			const result = await stateMachine.transitionState(context, {
-				type: "optimistic",
-				id: runId,
-				state: { status: "queued", reason: "retry" },
-				expectedRevision: awaitingRetryRun.revision,
-			});
-
-			expect(result).toEqual({
-				revision: awaitingRetryRun.revision + 1,
-				state: { status: "queued", reason: "retry" },
-				attempts: attemptsWhenClaimed + 1,
-			});
-
-			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
-			expect(run).toEqual(
-				expect.objectContaining({
-					run: expect.objectContaining({
-						id: runId,
-						status: "queued",
-						revision: result.revision,
-						attempts: result.attempts,
-					}),
-					state: { status: "queued", reason: "retry" },
-				})
-			);
-		}));
-
-	test("a task_retry re-queue charges no attempt", () =>
-		withHarness(async ({ context, repos, publisher }) => {
-			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
-				namespaceRequestContext: context,
-				repos,
-				publisher,
-			});
-
-			const stateMachine = createStateMachine(repos);
-			const result = await stateMachine.transitionState(context, {
-				type: "optimistic",
-				id: runId,
-				state: { status: "queued", reason: "task_retry" },
-				expectedRevision: revisionWhenClaimed,
-			});
-
-			expect(result).toEqual({
-				revision: revisionWhenClaimed + 1,
-				state: { status: "queued", reason: "task_retry" },
-				attempts: attemptsWhenClaimed,
-			});
-
-			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
-			expect(run).toEqual(
-				expect.objectContaining({
-					run: expect.objectContaining({
-						id: runId,
-						status: "queued",
-						revision: result.revision,
-						attempts: result.attempts,
-					}),
-					state: { status: "queued", reason: "task_retry" },
-				})
-			);
-		}));
-
-	test("a non-retry promotion from scheduled charges no attempt", () =>
-		withHarness(async ({ context, repos }) => {
-			const { runId, revisionWhenScheduled, attemptsWhenScheduled } = await seedScheduledRun({
-				namespaceRequestContext: context,
-				repos,
-			});
-
-			const stateMachine = createStateMachine(repos);
-			const result = await stateMachine.transitionState(context, {
-				type: "optimistic",
-				id: runId,
-				state: { status: "queued", reason: "new" },
-				expectedRevision: revisionWhenScheduled,
-			});
-
-			expect(result).toEqual({
-				revision: revisionWhenScheduled + 1,
-				state: { status: "queued", reason: "new" },
-				attempts: attemptsWhenScheduled,
-			});
-
-			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
-			expect(run).toEqual(
-				expect.objectContaining({
-					run: expect.objectContaining({
-						id: runId,
-						status: "queued",
-						revision: result.revision,
-						attempts: result.attempts,
-					}),
-					state: { status: "queued", reason: "new" },
 				})
 			);
 		}));

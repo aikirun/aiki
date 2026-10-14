@@ -52,7 +52,6 @@ import {
 	workflowRunStateCompletedSchema,
 	workflowRunStateFailedSchema,
 	workflowRunStatePausedSchema,
-	workflowRunStateQueuedSchema,
 	workflowRunStateRunningSchema,
 	workflowRunStateScheduledRequestOptimisticSchema,
 	workflowRunStateScheduledRequestPessimisticSchema,
@@ -185,7 +184,6 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 				.and(
 					type({
 						state: workflowRunStateScheduledRequestOptimisticSchema
-							.or(workflowRunStateQueuedSchema)
 							.or(workflowRunStateRunningSchema)
 							.or(
 								workflowRunStateSleepingSchema

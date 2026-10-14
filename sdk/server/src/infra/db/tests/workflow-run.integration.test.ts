@@ -66,7 +66,6 @@ async function suspendRunOnChildWait(
 			signalSequence: 0,
 		},
 		updates: {
-			attempts: 1,
 			latestStateTransitionId: ulid(),
 			onSignalSequenceMatch: { status: "awaiting_child_workflow", timeoutAt: params.timeoutAt },
 			onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
@@ -279,7 +278,6 @@ describe("update", () => {
 							signalSequence: 0,
 						},
 						updates: {
-							attempts: 1,
 							latestStateTransitionId: ulid(),
 							onSignalSequenceMatch: { status, timeoutAt: null },
 							onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
@@ -312,7 +310,6 @@ describe("update", () => {
 							signalSequence: 0,
 						},
 						updates: {
-							attempts: 1,
 							latestStateTransitionId: ulid(),
 							onSignalSequenceMatch: { status, timeoutAt },
 							onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
@@ -342,7 +339,6 @@ describe("update", () => {
 							signalSequence: 0,
 						},
 						updates: {
-							attempts: 1,
 							latestStateTransitionId: ulid(),
 							onSignalSequenceMatch: { status, timeoutAt: null },
 							onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
@@ -381,7 +377,6 @@ describe("update", () => {
 						signalSequence: 0,
 					},
 					updates: {
-						attempts: 1,
 						latestStateTransitionId: ulid(),
 						onSignalSequenceMatch: { status: "awaiting_event", timeoutAt: null },
 						onSignalSequenceMismatch: { status: "scheduled", scheduledAt },
@@ -419,7 +414,6 @@ describe("update", () => {
 						signalSequence: 0,
 					},
 					updates: {
-						attempts: 1,
 						latestStateTransitionId: ulid(),
 						onSignalSequenceMatch: { status: "awaiting_event", timeoutAt: null },
 						onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
@@ -451,7 +445,6 @@ describe("update", () => {
 						signalSequence: 0,
 					},
 					updates: {
-						attempts: 1,
 						latestStateTransitionId: ulid(),
 						onSignalSequenceMatch: { status: "awaiting_event", timeoutAt: null },
 						onSignalSequenceMismatch: { status: "scheduled", scheduledAt: Date.now() as TimestampMs },
@@ -484,7 +477,6 @@ describe("update", () => {
 						signalSequence: 0,
 					},
 					updates: {
-						attempts: 1,
 						latestStateTransitionId: ulid(),
 						onSignalSequenceMatch: { status: "awaiting_event", timeoutAt },
 						onSignalSequenceMismatch: { status: "scheduled", scheduledAt: 2_000_000 as TimestampMs },
@@ -516,7 +508,6 @@ describe("update", () => {
 						signalSequence: 0,
 					},
 					updates: {
-						attempts: 1,
 						latestStateTransitionId: ulid(),
 						onSignalSequenceMatch: { status: "awaiting_event", timeoutAt: 1_000_000 as TimestampMs },
 						onSignalSequenceMismatch: { status: "scheduled", scheduledAt },
@@ -539,7 +530,7 @@ describe("update", () => {
 				const result = await repos.workflowRun.update({
 					waitForSignal: false,
 					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenSuspended },
-					updates: { status: "scheduled", attempts: 1, latestStateTransitionId: ulid(), scheduledAt },
+					updates: { status: "scheduled", latestStateTransitionId: ulid(), scheduledAt },
 				});
 
 				expect(result).toEqual({ revision: revisionWhenSuspended + 1, signalSequence: 0 });
@@ -566,7 +557,7 @@ describe("update", () => {
 				const result = await repos.workflowRun.update({
 					waitForSignal: false,
 					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenClaimed },
-					updates: { status: "sleeping", attempts: 1, latestStateTransitionId: ulid(), wakeupAt },
+					updates: { status: "sleeping", latestStateTransitionId: ulid(), wakeupAt },
 				});
 
 				expect(result).toEqual({ revision: revisionWhenClaimed + 1, signalSequence: 0 });
@@ -593,7 +584,7 @@ describe("update", () => {
 				const result = await repos.workflowRun.update({
 					waitForSignal: false,
 					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenClaimed },
-					updates: { status: "awaiting_retry", attempts: 1, latestStateTransitionId: ulid(), nextAttemptAt },
+					updates: { status: "awaiting_retry", latestStateTransitionId: ulid(), nextAttemptAt },
 				});
 
 				expect(result).toEqual({ revision: revisionWhenClaimed + 1, signalSequence: 0 });
@@ -619,7 +610,7 @@ describe("update", () => {
 				const result = await repos.workflowRun.update({
 					waitForSignal: false,
 					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId },
-					updates: { status: "paused", attempts: 1, latestStateTransitionId: ulid() },
+					updates: { status: "paused", latestStateTransitionId: ulid() },
 				});
 
 				expect(result).toEqual({ revision: revisionWhenClaimed + 1, signalSequence: 0 });
@@ -642,7 +633,7 @@ describe("update", () => {
 				await repos.workflowRun.update({
 					waitForSignal: false,
 					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenAsleep },
-					updates: { status: "awaiting_retry", attempts: 1, latestStateTransitionId: ulid(), nextAttemptAt },
+					updates: { status: "awaiting_retry", latestStateTransitionId: ulid(), nextAttemptAt },
 				});
 
 				expect(await readWorkflowRunDueTimes(db, runId)).toEqual({ ...NO_DUE_TIMES, nextAttemptAt });
@@ -659,7 +650,7 @@ describe("update", () => {
 				await repos.workflowRun.update({
 					waitForSignal: false,
 					filter: { namespaceId: context.namespaceId, id: runId as WorkflowRunId, revision: revisionWhenAsleep },
-					updates: { status: "paused", attempts: 1, latestStateTransitionId: ulid() },
+					updates: { status: "paused", latestStateTransitionId: ulid() },
 				});
 
 				expect(await readWorkflowRunDueTimes(db, runId)).toEqual(NO_DUE_TIMES);
