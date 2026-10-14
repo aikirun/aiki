@@ -130,6 +130,31 @@ const processPayment = task({
 
 For available strategies and best practices, see the **[Retry Strategies Guide](../guides/retry-strategies.md)**.
 
+## Handling a Failed Task
+
+When a task runs out of attempts, the task's `start` throws a `TaskFailedError` in the workflow handler. Left uncaught, the error fails the workflow attempt, as described in [Task States](#task-states). Catch it to react to the failure, for example to undo work done earlier in the run:
+
+```typescript
+import { TaskFailedError } from "@aikirun/workflow";
+
+const orderWorkflowV1 = orderWorkflow.v("1.0.0", {
+	async handler(run, input: { orderId: string; paymentId: string; amount: number }) {
+		await reserveInventory.start(run, { orderId: input.orderId });
+
+		try {
+			await processPayment.start(run, { paymentId: input.paymentId, amount: input.amount });
+		} catch (err) {
+			if (err instanceof TaskFailedError) {
+				await releaseInventory.start(run, { orderId: input.orderId });
+			}
+			throw err;
+		}
+	},
+});
+```
+
+Rethrowing, as here, still fails the attempt once the inventory is released. Leave out the `throw` and the workflow carries on.
+
 ## Task States
 
 A task moves through these states:
@@ -142,7 +167,7 @@ A task moves through these states:
 
 While a task sits in `awaiting_retry`, its run parks in `awaiting_task_retry` and releases its worker; the server re-queues the run when the task is due. Short backoffs are the exception: a delay within `maxInlineWaitMs` (10ms by default) is waited out in place, so the task stays `running` and the run never parks.
 
-A task's attempts are its own, separate from the run's, so a task backing off does not move the run's attempt count. When the task runs out of attempts it goes `failed`, and that failure becomes the workflow attempt's failure: the run moves to [`awaiting_retry`](./workflows.md#states) if the workflow has attempts left, or to `failed` if it does not, with cause `task` either way.
+A task's attempts are its own, separate from the run's, so a task backing off does not move the run's attempt count. When the task runs out of attempts it goes `failed`, and the workflow attempt fails too, unless the workflow handler [catches the error the task's `start` throws](#handling-a-failed-task). The run then moves to [`awaiting_retry`](./workflows.md#states) if the workflow has attempts left, or to `failed` if it does not, with cause `task` either way.
 
 A task whose output fails its [output schema](#schema-validation), or cannot be stored as JSON, is not retried: it goes `failed` at once, and the run goes `failed` with cause `task` without a workflow retry.
 
