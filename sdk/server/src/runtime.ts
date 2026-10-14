@@ -3,7 +3,6 @@ import {
 	type ConfigProvider,
 	type CreateConfigProvider,
 	validatedConfigProvider,
-	validateNoNaN,
 } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import { merge } from "@aikirun/lib/object";
@@ -12,6 +11,7 @@ import type { CreatePublisher } from "@aikirun/types/infra/queue/publisher";
 import type { CreateTimerPriorityQueue } from "@aikirun/types/infra/timer";
 
 import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./config";
+import { validateServerRuntimeConfig } from "./config/runtime/schema";
 import { startDaemons } from "./daemon";
 import { createRepos } from "./infra/db/repo";
 import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
@@ -43,7 +43,7 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		const config = merge(defaultServerRuntimeConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
-	configProvider = validatedConfigProvider({ provider: configProvider, validate: validateNoNaN, logger });
+	configProvider = validatedConfigProvider({ provider: configProvider, validate: validateServerRuntimeConfig, logger });
 
 	const timerPriorityQueue = params.timerPriorityQueue?.({
 		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),

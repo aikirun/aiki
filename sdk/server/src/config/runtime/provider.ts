@@ -1,7 +1,8 @@
 import { asConfigProvider, type CreateConfigProvider, dynamicConfigProvider } from "@aikirun/lib/config";
 import { merge } from "@aikirun/lib/object";
 
-import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntimeConfigOverrides } from "./runtime";
+import { defaultServerRuntimeConfig } from "./defaults";
+import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./schema";
 
 /**
  * Config fixed at startup. Pass `overrides` to change any setting; omit them for

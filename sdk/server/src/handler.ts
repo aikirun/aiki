@@ -3,7 +3,6 @@ import {
 	type ConfigProvider,
 	type CreatePassiveConfigProvider,
 	validatedConfigProvider,
-	validateNoNaN,
 } from "@aikirun/lib/config";
 import { asAikiError } from "@aikirun/lib/error";
 import { SENTINEL_ULID } from "@aikirun/lib/id";
@@ -19,6 +18,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 
 import type { Capabilities } from "./capabilities";
 import { defaultServerHandlerConfig, type ServerHandlerConfig, type ServerHandlerConfigOverrides } from "./config";
+import { validateServerHandlerConfig } from "./config/handler/schema";
 import { createRepos } from "./infra/db/repo";
 import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
@@ -56,7 +56,7 @@ export async function createHandler(params: CreateHandlerParams) {
 		const config = merge(defaultServerHandlerConfig, configParam);
 		configProvider = asConfigProvider(() => config);
 	}
-	configProvider = validatedConfigProvider({ provider: configProvider, validate: validateNoNaN, logger });
+	configProvider = validatedConfigProvider({ provider: configProvider, validate: validateServerHandlerConfig, logger });
 
 	const timerPriorityQueue = params.timerPriorityQueue?.({
 		logger: logger.child({ "aiki.subComponent": "timer-priority-queue" }),

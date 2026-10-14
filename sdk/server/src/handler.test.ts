@@ -53,14 +53,14 @@ describe("handler API authorization", () => {
 });
 
 describe("handler config", () => {
-	test("does not create the handler when the config holds a NaN", async () => {
+	test("does not create the handler when a setting is invalid", async () => {
 		const creating = createHandler({
 			db: {} as Database,
 			logger: noopLogger,
-			config: { imminentRuns: { lookaheadWindowMs: Number.NaN } },
+			config: { imminentRuns: { lookaheadWindowMs: -30_000 } },
 		});
 
-		await expect(creating).rejects.toThrow("imminentRuns.lookaheadWindowMs is NaN");
+		await expect(creating).rejects.toThrow(/^Invalid config: imminentRuns\.lookaheadWindowMs [^;]+$/);
 	});
 });
 

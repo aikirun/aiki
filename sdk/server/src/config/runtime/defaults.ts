@@ -1,56 +1,6 @@
-import type { DeepPartial } from "@aikirun/lib/object";
 import { DEFAULT_CLAIM_IDLE_TIMEOUT_MS } from "@aikirun/types/workflow/run";
 
-export interface PageProcessingConfig {
-	pageSize: number;
-	chunk: {
-		size: number;
-		maxConcurrency: number;
-	};
-}
-
-interface PollingDaemonConfig extends PageProcessingConfig {
-	intervalMs: number;
-}
-
-interface ImminentPollingDaemonConfig extends PollingDaemonConfig {
-	lookaheadWindowMs: number;
-}
-
-export interface ServerRuntimeConfig {
-	daemons: {
-		imminentScheduledRuns: ImminentPollingDaemonConfig;
-		imminentSleepElapsedRuns: ImminentPollingDaemonConfig;
-		imminentRetryableRuns: ImminentPollingDaemonConfig;
-		imminentTaskRetryableRuns: ImminentPollingDaemonConfig;
-		imminentEventWaitTimedOutRuns: ImminentPollingDaemonConfig;
-		imminentChildRunWaitTimedOutRuns: ImminentPollingDaemonConfig;
-		imminentRecurringRuns: ImminentPollingDaemonConfig & {
-			maxOccurrencesPerSchedule: number;
-		};
-		publishPendingOutboxEntries: PollingDaemonConfig & {
-			leaseDurationMs: number;
-			republishBackoff: {
-				baseDelayMs: number;
-				maxDelayMs: number;
-				declinedBackoffMs: number;
-			};
-		};
-		recoverOverdueOutboxEntries: PollingDaemonConfig & {
-			claimIdleTimeoutMs: number;
-		};
-		stallUndeliverableRuns: PollingDaemonConfig & {
-			maxAgeMs: number;
-		};
-		dueTimersConsumer: {
-			pageSize: number;
-			overshootMs: number;
-		};
-	};
-	gracefulShutdownTimeoutMs: number;
-}
-
-export type ServerRuntimeConfigOverrides = DeepPartial<ServerRuntimeConfig>;
+import type { ServerRuntimeConfig } from "./schema";
 
 export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 	daemons: {
