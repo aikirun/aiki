@@ -30,7 +30,6 @@ export type UpdateWorkflowRunParams =
 			waitForSignal: true;
 			filter: { namespaceId: NamespaceId; id: WorkflowRunId; revision: number; signalSequence: number };
 			updates: {
-				attempts: number;
 				latestStateTransitionId: string;
 				onSignalSequenceMatch: { status: WaitingForSignalWorkflowRunStatus; timeoutAt: TimestampMs | null };
 				onSignalSequenceMismatch: { status: "scheduled"; scheduledAt: TimestampMs };
@@ -41,7 +40,6 @@ export type UpdateWorkflowRunParams =
 			filter: { namespaceId: NamespaceId; id: WorkflowRunId; revision?: number };
 			updates: {
 				status: Exclude<WorkflowRunStatus, WaitingForSignalWorkflowRunStatus>;
-				attempts: number;
 				latestStateTransitionId: string;
 			} & AtMostOneProp<{ scheduledAt: TimestampMs; wakeupAt: TimestampMs; nextAttemptAt: TimestampMs }>;
 	  };
@@ -136,7 +134,6 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 				.update(workflowRun)
 				.set({
 					revision: sql`${workflowRun.revision} + 1`,
-					attempts: updates.attempts,
 					latestStateTransitionId: updates.latestStateTransitionId,
 					status: sql`CASE WHEN ${signalSequenceMatches} THEN ${onSignalSequenceMatch.status}::workflow_run_status ELSE ${onSignalSequenceMismatch.status}::workflow_run_status END`,
 					timeoutAt: sql`CASE WHEN ${signalSequenceMatches} THEN ${timeoutAtIso}::timestamptz ELSE NULL END`,
@@ -156,7 +153,6 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.set({
 				revision: sql`${workflowRun.revision} + 1`,
 				status: updates.status,
-				attempts: updates.attempts,
 				latestStateTransitionId: updates.latestStateTransitionId,
 				timeoutAt: null,
 				scheduledAt: "scheduledAt" in updates ? updates.scheduledAt : null,

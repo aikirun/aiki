@@ -10,6 +10,7 @@ import {
 	WORKFLOW_RUN_SCHEDULED_REASONS,
 	WORKFLOW_RUN_STATUSES,
 	type WorkflowRunId,
+	type WorkflowRunState,
 	type WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
@@ -30,14 +31,9 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 		WorkflowRunStatus,
 		Partial<Record<WorkflowRunStatus, { reasons?: NonEmptyArray<string> }>>
 	> = {
-		scheduled: {
-			queued: { reasons: ["new", "wakeup_early", "resumption", "event", "child_workflow", "redelivery"] },
-			paused: {},
-			cancelled: {},
-		},
+		scheduled: { paused: {}, cancelled: {} },
 		queued: { running: {}, paused: {}, cancelled: {}, failed: {}, stalled: {} },
 		running: {
-			queued: { reasons: ["task_retry"] },
 			running: {},
 			paused: {},
 			sleeping: {},
@@ -50,22 +46,23 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 			failed: {},
 		},
 		paused: { scheduled: { reasons: ["resumption"] }, cancelled: {} },
-		sleeping: { scheduled: { reasons: ["wakeup_early"] }, queued: { reasons: ["wakeup"] }, cancelled: {} },
-		awaiting_event: { scheduled: { reasons: ["event"] }, queued: { reasons: ["event_wait_timeout"] }, cancelled: {} },
-		awaiting_retry: { queued: { reasons: ["retry"] }, cancelled: {} },
-		awaiting_task_retry: { queued: { reasons: ["task_retry"] }, cancelled: {} },
-		awaiting_child_workflow: {
-			scheduled: { reasons: ["child_workflow"] },
-			queued: { reasons: ["child_workflow_wait_timeout"] },
-			cancelled: {},
-		},
+		sleeping: { scheduled: { reasons: ["wakeup_early"] }, cancelled: {} },
+		awaiting_event: { scheduled: { reasons: ["event"] }, cancelled: {} },
+		awaiting_retry: { cancelled: {} },
+		awaiting_task_retry: { cancelled: {} },
+		awaiting_child_workflow: { scheduled: { reasons: ["child_workflow"] }, cancelled: {} },
 		stalled: { scheduled: { reasons: ["redelivery"] }, cancelled: {} },
 		cancelled: {},
 		completed: {},
 		failed: {},
 	};
 
-	const possibleReasons = Array.from(new Set([...WORKFLOW_RUN_SCHEDULED_REASONS, ...WORKFLOW_RUN_QUEUED_REASON]));
+	const reasonsByDestination = {
+		scheduled: WORKFLOW_RUN_SCHEDULED_REASONS,
+		queued: WORKFLOW_RUN_QUEUED_REASON,
+	} satisfies Record<Extract<WorkflowRunState, { reason: string }>["status"], readonly string[]>;
+
+	const possibleReasons = Array.from(new Set(Object.values(reasonsByDestination).flat()));
 
 	for (const fromStatus of WORKFLOW_RUN_STATUSES) {
 		describe(`from ${fromStatus}`, () => {
@@ -80,6 +77,15 @@ describe("assertIsValidWorkflowRunStateTransition", () => {
 							InvalidWorkflowRunStateTransitionError
 						);
 					});
+					if (toStatus in reasonsByDestination) {
+						for (const reason of possibleReasons) {
+							test(`declines to ${toStatus} (${reason})`, () => {
+								expect(() => attemptTransition(fromStatus, { status: toStatus, reason })).toThrow(
+									InvalidWorkflowRunStateTransitionError
+								);
+							});
+						}
+					}
 					continue;
 				}
 
@@ -219,14 +225,13 @@ describe("convertDurationToTimestamp", () => {
 	});
 
 	Object.entries({
-		queued: { status: "queued", reason: "new" },
 		running: { status: "running" },
 		paused: { status: "paused" },
 		stalled: { status: "stalled" },
 		cancelled: { status: "cancelled" },
 		failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
 	} satisfies {
-		[Status in Exclude<WorkflowRunStatus, TimedWorkflowRunStatus | "completed">]: Extract<
+		[Status in Exclude<WorkflowRunStateRequest["status"], TimedWorkflowRunStatus | "completed">]: Extract<
 			WorkflowRunStateRequest,
 			{ status: Status }
 		>;

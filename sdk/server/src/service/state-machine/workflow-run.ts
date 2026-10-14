@@ -13,7 +13,7 @@ import type {
 	WorkflowRunState,
 	WorkflowRunStatus,
 } from "@aikirun/types/workflow/run";
-import { isTerminalWorkflowRunStatus, WORKFLOW_RUN_SCHEDULED_REASONS } from "@aikirun/types/workflow/run";
+import { isTerminalWorkflowRunStatus } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
 import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictError } from "../../errors";
@@ -24,17 +24,18 @@ import type { ChildRunCanceller } from "../cancel-child-runs";
 import { deliverTerminatedSignalToParentRun } from "../deliver-terminated-signals";
 import { discardStaleTasks } from "../discard-stale-tasks";
 
-type StateTransitionValidation<Status extends WorkflowRunStatus> =
+type TransitionedWorkflowRunState = Exclude<WorkflowRunState, { status: "queued" }>;
+
+type StateTransitionValidation<Status extends WorkflowRunStateRequest["status"]> =
 	Extract<WorkflowRunStateRequest, { status: Status }> extends { reason: `${infer Reason}` }
 		? { reason: Reason | ReadonlySet<Reason> }
 		: true;
 
 const workflowRunStateTransitionValidator: Record<
 	WorkflowRunStatus,
-	Partial<{ [ToStatus in WorkflowRunStatus]: StateTransitionValidation<ToStatus> }>
+	Partial<{ [ToStatus in WorkflowRunStateRequest["status"]]: StateTransitionValidation<ToStatus> }>
 > = {
 	scheduled: {
-		queued: { reason: new Set(WORKFLOW_RUN_SCHEDULED_REASONS) },
 		paused: true,
 		cancelled: true,
 	},
@@ -46,7 +47,6 @@ const workflowRunStateTransitionValidator: Record<
 		stalled: true,
 	},
 	running: {
-		queued: { reason: "task_retry" },
 		running: true,
 		paused: true,
 		sleeping: true,
@@ -64,25 +64,20 @@ const workflowRunStateTransitionValidator: Record<
 	},
 	sleeping: {
 		scheduled: { reason: "wakeup_early" },
-		queued: { reason: "wakeup" },
 		cancelled: true,
 	},
 	awaiting_event: {
 		scheduled: { reason: "event" },
-		queued: { reason: "event_wait_timeout" },
 		cancelled: true,
 	},
 	awaiting_retry: {
-		queued: { reason: "retry" },
 		cancelled: true,
 	},
 	awaiting_task_retry: {
-		queued: { reason: "task_retry" },
 		cancelled: true,
 	},
 	awaiting_child_workflow: {
 		scheduled: { reason: "child_workflow" },
-		queued: { reason: "child_workflow_wait_timeout" },
 		cancelled: true,
 	},
 	stalled: {
@@ -182,7 +177,7 @@ async function transitionStateInTx(
 	assertIsValidWorkflowRunStateTransition(runId, fromState, request.state);
 
 	const now = Date.now() as TimestampMs;
-	let toState: WorkflowRunState;
+	let toState: TransitionedWorkflowRunState;
 	if (request.state.status === "awaiting_task_retry") {
 		const nextAttemptAt = await txRepos.task.getEarliestNextAttemptAt(runId);
 		if (nextAttemptAt === null) {
@@ -212,53 +207,22 @@ async function transitionStateInTx(
 		});
 	}
 
-	let attempts = run.attempts;
-	if (toState.status === "scheduled" || toState.status === "queued") {
-		switch (toState.reason) {
-			case "retry":
-				attempts++;
-				break;
-			default:
-				toState.reason satisfies
-					| "new"
-					| "task_retry"
-					| "wakeup"
-					| "wakeup_early"
-					| "resumption"
-					| "event"
-					| "event_wait_timeout"
-					| "child_workflow"
-					| "child_workflow_wait_timeout"
-					| "recovery"
-					| "redelivery";
-		}
-	}
-
 	if (toState.status === "running") {
 		await txRepos.workflowRunOutbox.markClaimed(namespaceId, runId);
-	} else if (toState.status !== "queued") {
+	} else {
 		await txRepos.workflowRunOutbox.deleteByWorkflowRunId({ namespaceId, workflowRunId: runId });
 	}
 
 	const stateTransitionId = ulid();
 
-	const updatedRun = await updateWorkflowRun(
-		context,
-		runId,
-		request,
-		toState,
-		stateTransitionId,
-		attempts,
-		now,
-		txRepos
-	);
+	const updatedRun = await updateWorkflowRun(context, runId, request, toState, stateTransitionId, now, txRepos);
 	toState = updatedRun.state;
 
 	await txRepos.stateTransition.append({
 		id: stateTransitionId,
 		workflowRunId: runId,
 		type: "workflow_run",
-		attempt: attempts,
+		attempt: run.attempts,
 		revision: updatedRun.revision,
 		state: toState,
 	});
@@ -297,7 +261,7 @@ async function transitionStateInTx(
 		);
 	}
 
-	return { revision: updatedRun.revision, state: toState, attempts };
+	return { revision: updatedRun.revision, state: toState, attempts: run.attempts };
 }
 
 async function cancelSleep(runId: WorkflowRunId, sleepName: string, now: TimestampMs, txRepos: TxRepositories) {
@@ -316,12 +280,11 @@ async function updateWorkflowRun(
 	context: NamespaceRequestContext,
 	runId: WorkflowRunId,
 	request: WorkflowRunTransitionStateRequestV1,
-	toState: WorkflowRunState,
+	toState: TransitionedWorkflowRunState,
 	stateTransitionId: string,
-	attempts: number,
 	now: TimestampMs,
 	txRepos: TxRepositories
-): Promise<{ revision: number; state: WorkflowRunState }> {
+): Promise<{ revision: number; state: TransitionedWorkflowRunState }> {
 	const { namespaceId } = context;
 
 	if (toState.status === "awaiting_event" || toState.status === "awaiting_child_workflow") {
@@ -339,7 +302,6 @@ async function updateWorkflowRun(
 				signalSequence: request.expectedSignalSequence,
 			},
 			updates: {
-				attempts,
 				latestStateTransitionId: stateTransitionId,
 				onSignalSequenceMatch: {
 					status: toState.status,
@@ -377,7 +339,6 @@ async function updateWorkflowRun(
 
 	const updates = {
 		status: toState.status,
-		attempts,
 		latestStateTransitionId: stateTransitionId,
 		...extractDueTimestamp(toState),
 	};
@@ -464,7 +425,7 @@ function extractTimer(state: WorkflowRunState): { type: TimerType; dueAt: number
 export function convertDurationToTimestamp(
 	request: Exclude<WorkflowRunStateRequest, { status: "awaiting_task_retry" }>,
 	now: TimestampMs
-): WorkflowRunState {
+): TransitionedWorkflowRunState {
 	if (request.status === "scheduled") {
 		const scheduledAt = now + request.scheduledInMs;
 		assertIsValidTimestamp(scheduledAt);

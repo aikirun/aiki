@@ -147,7 +147,7 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunState
 };
 
 export type WorkflowRunStateRequest =
-	| Exclude<WorkflowRunState, { status: TimedWorkflowRunStatus }>
+	| Exclude<WorkflowRunState, { status: TimedWorkflowRunStatus | "queued" }>
 	| WorkflowRunStateScheduledRequest
 	| WorkflowRunStateSleepingRequest
 	| WorkflowRunStateAwaitingEventRequest

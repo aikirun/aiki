@@ -60,7 +60,6 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 				.update(workflowRun)
 				.set({
 					revision: sql`${workflowRun.revision} + 1`,
-					attempts: updates.attempts,
 					latestStateTransitionId: updates.latestStateTransitionId,
 					status: sql`CASE WHEN ${signalSequenceMatches} THEN ${onSignalSequenceMatch.status} ELSE ${onSignalSequenceMismatch.status} END`,
 					timeoutAt: sql`CASE WHEN ${signalSequenceMatches} THEN ${onSignalSequenceMatch.timeoutAt} ELSE NULL END`,
@@ -80,7 +79,6 @@ export const createWorkflowRunRepository = (db: SqliteDb): WorkflowRunRepository
 			.set({
 				revision: sql`${workflowRun.revision} + 1`,
 				status: updates.status,
-				attempts: updates.attempts,
 				latestStateTransitionId: updates.latestStateTransitionId,
 				timeoutAt: null,
 				scheduledAt: "scheduledAt" in updates ? updates.scheduledAt : null,

@@ -2,7 +2,8 @@
 
 Two tiers: `*.test.ts` are hermetic unit tests (`bun run test:unit`, no database);
 `*.integration.test.ts` run against a live database, SQLite or Postgres (`bun run test:integration`;
-`.env.test` selects it — see DB.md).
+`.env.test` selects it — see DB.md). A run only tests that one database, so if you change the SQL
+in a repository, run the tests once with SQLite and once with Postgres.
 
 Both tiers run on Bun and on Node. `bun run test:unit` and `bun run test:integration` use Bun's
 test runner; `bun run test:unit:node` and `bun run test:integration:node` run the same files on
@@ -16,6 +17,9 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - `sdk/server/src/daemon/publish-pending-outbox-entries.integration.test.ts` — minimal integration shape.
 - `sdk/server/src/daemon/recover-overdue-outbox-entries.integration.test.ts` — service-path
   seeding, fake clock, assertion shapes.
+- `sdk/server/src/daemon/imminent-retryable-runs.integration.test.ts` — a daemon that looks for
+  due runs: a run that is due, one that is not, one handed to the timer queue, more due runs than
+  one page holds, and a run that changed after the daemon listed it.
 - `sdk/workflow/src/run/sleeper.test.ts` — timestamps as authored data.
 - `sdk/workflow/src/task.test.ts` — boundary-value config knobs, file-local helpers.
 - `sdk/server/src/service/state-machine/workflow-run.test.ts` — exhaustive legality matrix driven
@@ -27,6 +31,10 @@ Before writing any test, study the exemplars for its tier and match their idioms
 - `testing/src/infra/timer.ts` — infra contract suite, wake and absence checks;
   runner-injected so implementers can run it too, with each adapter binding it in its own
   package (`sdk/adapter/*/src/timer/`).
+
+Older test files, including the ones above, can break rules that were added to this file later.
+When an existing test and this file disagree, follow this file. Copying a neighbouring test also
+copies its mistakes.
 
 ## Determinism
 
@@ -162,13 +170,6 @@ Before writing any test, study the exemplars for its tier and match their idioms
   ordering only against reads whose own query carries the `ORDER BY`.
 - Merge related equality fields into one `objectContaining` (include ids). An ordered comparison
   (`toBeGreaterThan`) gets its own assertion line — no asymmetric ordering matcher exists.
-- Review step: grep every new or edited test file for `[0]`. Each hit is either inside an
-  `expect` (rewrite as a whole-array matcher compare with an independently-sourced expected
-  value) or a capture (precede with `toHaveLength`). Run it over every file a subagent
-  delivered, not just the largest one. After a structural edit, `grep -n '^describe('` shows
-  what moved (a cut by text markers once nested a whole describe inside its neighbour and every
-  test still passed); after a rename, read the test titles, because a regex rename that does
-  not exclude string literals rewrites them too ("matches only an unreferencedSchedule schedule").
 - Timestamps in expectations are exact values, never `expect.any(Number)`. Presence-only
   survives a dropped duration or a seconds/ms mix-up. Capture an instant, freeze the clock
   around the one mutating call, and assert the arithmetic
@@ -269,6 +270,11 @@ Before writing any test, study the exemplars for its tier and match their idioms
   `=== undefined` complement of the legality table.
 - Exhaustiveness extends to secondary axes. For each guarded destination, loop the full reason
   union and assert every non-valid reason is declined — not one representative wrong reason.
+  Only the `scheduled` and `queued` states have a reason, so only moves into those two statuses
+  can depend on one. Loop the reasons for those destinations only: a reason sent with a move to
+  `running` tests nothing, because the code never reads it. Keep the statuses that have a reason
+  in a `Record` keyed by status, so that giving another state a reason breaks the build until
+  the test lists it.
 - When the code under test reads only a couple of fields, feed it a minimal typed literal with
   one cast at the seam (`attemptTransition(from, { status, reason? })`). A per-case request
   builder that has to know every variant is the sign that the test is following the
