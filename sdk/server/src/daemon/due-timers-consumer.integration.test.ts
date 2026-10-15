@@ -4,6 +4,8 @@ import { noopLogger } from "@aikirun/lib/logger";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { inMemoryTimerPriorityQueue } from "@aikirun/memory";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import type { DueTimer, TimerType } from "@aikirun/types/infra/timer";
+import type { WorkflowRunQueuedReason } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
 
 import { processDueTimers } from "./due-timers-consumer";
@@ -13,8 +15,15 @@ import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createScheduleService } from "../service/schedule";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
-import { createDaemonHarness } from "../testing/harness";
-import { seedAwaitingEventRun, seedScheduledRun } from "../testing/seed/run";
+import { createDaemonHarness, type DaemonHarnessDeps } from "../testing/harness";
+import {
+	seedAwaitingChildRun,
+	seedAwaitingEventRun,
+	seedAwaitingRetryRun,
+	seedScheduledRun,
+	seedSleepingRun,
+} from "../testing/seed/run";
+import { seedAwaitingTaskRetryRun } from "../testing/seed/task";
 
 const withHarness = createDaemonHarness();
 
@@ -260,5 +269,168 @@ describe("processDueTimers", () => {
 					workflowRunId: runId,
 				})
 			).toBeNull();
+		}));
+
+	type SeedDueRunByTimerType = {
+		[Type in Exclude<TimerType, "recurring">]: (
+			deps: Pick<DaemonHarnessDeps, "context" | "repos" | "publisher">
+		) => Promise<{
+			runId: string;
+			dueTimer: DueTimer & { type: Type };
+			queuedReason: WorkflowRunQueuedReason;
+		}>;
+	};
+
+	// Each run is already due, so the timer reaching the right daemon is the only thing left to decide.
+	const seedDueRunByTimerType: SeedDueRunByTimerType = {
+		scheduled: async ({ repos }) => {
+			const { runId } = await withFakeClock(EPOCH_MS, () => seedScheduledRun({ repos, namespaceRequestContext }));
+			return {
+				runId,
+				dueTimer: { type: "scheduled", id: runId, rank: computeRank({ dueAt: EPOCH_MS }) },
+				queuedReason: "new",
+			};
+		},
+		sleep: async ({ context, repos, publisher }) => {
+			const { runId } = await withFakeClock(EPOCH_MS, () =>
+				seedSleepingRun(
+					{ daemonContext: context, namespaceRequestContext, repos, publisher },
+					{ sleepName: "cool-down", durationMs: 1 }
+				)
+			);
+			return {
+				runId,
+				dueTimer: { type: "sleep", id: runId, rank: computeRank({ dueAt: EPOCH_MS }) },
+				queuedReason: "wakeup",
+			};
+		},
+		retry: async ({ context, repos, publisher }) => {
+			const { runId } = await seedAwaitingRetryRun(
+				{ daemonContext: context, namespaceRequestContext, repos, publisher },
+				{ nextAttemptAt: EPOCH_MS }
+			);
+			return {
+				runId,
+				dueTimer: { type: "retry", id: runId, rank: computeRank({ dueAt: EPOCH_MS }) },
+				queuedReason: "retry",
+			};
+		},
+		task_retry: async ({ context, repos, publisher }) => {
+			const { runId } = await seedAwaitingTaskRetryRun(
+				{ daemonContext: context, namespaceRequestContext, repos, publisher },
+				{ nextAttemptAt: EPOCH_MS }
+			);
+			return {
+				runId,
+				dueTimer: { type: "task_retry", id: runId, rank: computeRank({ dueAt: EPOCH_MS }) },
+				queuedReason: "task_retry",
+			};
+		},
+		event_wait_timeout: async ({ context, repos, publisher }) => {
+			const { runId } = await withFakeClock(EPOCH_MS, () =>
+				seedAwaitingEventRun(
+					{ daemonContext: context, namespaceRequestContext, repos, publisher },
+					{ eventName: "orderShipped", timeoutInMs: 1 }
+				)
+			);
+			return {
+				runId,
+				dueTimer: { type: "event_wait_timeout", id: runId, rank: computeRank({ dueAt: EPOCH_MS }) },
+				queuedReason: "event_wait_timeout",
+			};
+		},
+		child_wait_timeout: async ({ context, repos, publisher }) => {
+			const { runId } = await withFakeClock(EPOCH_MS, () =>
+				seedAwaitingChildRun({ daemonContext: context, namespaceRequestContext, repos, publisher }, { timeoutInMs: 1 })
+			);
+			return {
+				runId,
+				dueTimer: { type: "child_wait_timeout", id: runId, rank: computeRank({ dueAt: EPOCH_MS }) },
+				queuedReason: "child_workflow_wait_timeout",
+			};
+		},
+	};
+
+	for (const [timerType, seedRun] of Object.entries(seedDueRunByTimerType)) {
+		test(`hands a due ${timerType} timer to the daemon that queues its run`, () =>
+			withHarness(async ({ context, repos, publisher }) => {
+				const { runId, dueTimer, queuedReason } = await seedRun({ context, repos, publisher });
+
+				await processDueTimers(
+					context,
+					{
+						repos,
+						signal: new AbortController().signal,
+						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
+						childRunCanceller: createChildRunCanceller(),
+						configProvider: asConfigProvider(() => ({
+							pageSize: 100,
+							overshootMs: 0,
+							republishBackoff,
+							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
+							chunkByTimerType: chunkConfigByTimerType,
+						})),
+					},
+					[dueTimer]
+				);
+
+				expect(
+					await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
+				).toEqual(
+					expect.objectContaining({
+						run: expect.objectContaining({ id: runId, status: "queued" }),
+						state: { status: "queued", reason: queuedReason },
+					})
+				);
+			}));
+	}
+
+	test("queues the runs of two timer types popped in one batch", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const sleepingRun = await seedDueRunByTimerType.sleep({ context, repos, publisher });
+			const awaitingRetryRun = await seedDueRunByTimerType.retry({ context, repos, publisher });
+
+			await processDueTimers(
+				context,
+				{
+					repos,
+					signal: new AbortController().signal,
+					timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
+					childRunCanceller: createChildRunCanceller(),
+					configProvider: asConfigProvider(() => ({
+						pageSize: 100,
+						overshootMs: 0,
+						republishBackoff,
+						maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+						lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
+						chunkByTimerType: chunkConfigByTimerType,
+					})),
+				},
+				[sleepingRun.dueTimer, awaitingRetryRun.dueTimer]
+			);
+
+			expect(
+				await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: sleepingRun.runId,
+				})
+			).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: sleepingRun.runId, status: "queued" }),
+					state: { status: "queued", reason: "wakeup" },
+				})
+			);
+			expect(
+				await repos.workflowRun.getByIdWithState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					id: awaitingRetryRun.runId,
+				})
+			).toEqual(
+				expect.objectContaining({
+					run: expect.objectContaining({ id: awaitingRetryRun.runId, status: "queued" }),
+					state: { status: "queued", reason: "retry" },
+				})
+			);
 		}));
 });
