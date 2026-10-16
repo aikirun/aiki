@@ -227,7 +227,7 @@ export const createScheduleService = ({ repos, imminentTimerQueue }: ScheduleSer
 
 	async pauseSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
 		await repos.transaction((txRepos) =>
-			transitionScheduleInTx(txRepos, { namespaceId, id, state: { status: "paused" } })
+			transitionScheduleInTx(txRepos, { namespaceId, id, state: { status: "paused" } }, imminentTimerQueue)
 		);
 	},
 
@@ -247,7 +247,7 @@ export const createScheduleService = ({ repos, imminentTimerQueue }: ScheduleSer
 
 	async deactivateSchedule(namespaceId: NamespaceId, id: string): Promise<void> {
 		await repos.transaction((txRepos) =>
-			transitionScheduleInTx(txRepos, { namespaceId, id, state: { status: "inactive" } })
+			transitionScheduleInTx(txRepos, { namespaceId, id, state: { status: "inactive" } }, imminentTimerQueue)
 		);
 	},
 });
@@ -289,7 +289,7 @@ async function activateScheduleInTx(
 	request: ScheduleActivateRequestV1,
 	definitionHashes: Hash,
 	txRepos: TxRepositories,
-	imminentTimerQueue?: ImminentTimerQueue
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ) {
 	const { workflowName, workflowVersionId, workflowRunOptions, spec, options } = request;
 	const currentDefinitionHash = definitionHashes.value;

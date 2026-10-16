@@ -164,7 +164,7 @@ async function transitionStateInTx(
 	context: NamespaceRequestContext,
 	request: WorkflowRunTransitionStateRequest,
 	txRepos: TxRepositories,
-	imminentTimerQueue?: ImminentTimerQueue
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<WorkflowRunTransitionStateResponseV1> {
 	const namespaceId = context.namespaceId;
 	const runId = request.id as WorkflowRunId;

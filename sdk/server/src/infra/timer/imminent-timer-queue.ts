@@ -2,16 +2,10 @@ import { fireAndForget } from "@aikirun/lib/async";
 import { isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
-import type { TimerEntry, TimerPriorityQueue, TimerType } from "@aikirun/types/infra/timer";
+import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
+import type { Timer } from "./types";
 import { computeMaxRank, computeRank } from "../../lib/rank";
-
-export interface Timer {
-	type: TimerType;
-	id: string;
-	dueAt: number;
-	priority: number | undefined;
-}
 
 export interface ImminentTimerQueueDeps {
 	timerPriorityQueue: TimerPriorityQueue;

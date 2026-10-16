@@ -48,7 +48,7 @@ export async function writeScheduleStateInTx(
 			| "nextRunAt"
 		>;
 	},
-	imminentTimerQueue?: ImminentTimerQueue
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<ScheduleRow> {
 	const transitionId = ulid();
 	const row = await txRepos.schedule.update(
@@ -85,7 +85,7 @@ export async function writeScheduleStateInTx(
 export async function transitionScheduleInTx(
 	txRepos: TxRepositories,
 	params: { namespaceId: NamespaceId; id: string; state: ScheduleState },
-	imminentTimerQueue?: ImminentTimerQueue
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<void> {
 	const { namespaceId, id, state } = params;
 	const existing = await txRepos.schedule.get(namespaceId, { id }, { lock: "update" });

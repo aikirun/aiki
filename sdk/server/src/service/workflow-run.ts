@@ -314,7 +314,7 @@ async function createWorkflowRunInTx(
 	context: NamespaceRequestContext,
 	request: WorkflowRunCreateRequestV1,
 	txRepos: TxRepositories,
-	imminentTimerQueue?: ImminentTimerQueue
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ): Promise<WorkflowRunId> {
 	const { namespaceId, logger } = context;
 	const name = request.name as WorkflowName;
@@ -454,7 +454,7 @@ async function cancelByIdsInTx(
 	context: NamespaceRequestContext,
 	ids: NonEmptyArray<string>,
 	txRepos: TxRepositories,
-	imminentTimerQueue?: ImminentTimerQueue
+	imminentTimerQueue: ImminentTimerQueue | undefined
 ) {
 	const { namespaceId, logger } = context;
 	const cancelledRuns = await txRepos.workflowRun.bulkTransitionToCancelledInNamespace(namespaceId, ids);

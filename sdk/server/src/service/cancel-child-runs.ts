@@ -18,7 +18,7 @@ import type { TxRepositories } from "../infra/db/types";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowIdentity } from "../infra/db/types/workflow";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
-import type { Timer } from "../infra/timer/imminent-timer-queue";
+import type { Timer } from "../infra/timer/types";
 
 export interface CancelledRunMeta {
 	namespaceId: NamespaceId;

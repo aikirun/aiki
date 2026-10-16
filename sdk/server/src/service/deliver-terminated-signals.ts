@@ -12,7 +12,7 @@ import { ulid } from "ulidx";
 
 import type { TxRepositories } from "../infra/db/types";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
-import type { Timer } from "../infra/timer/imminent-timer-queue";
+import type { Timer } from "../infra/timer/types";
 
 export interface TerminatedChildRun {
 	namespaceId: NamespaceId;

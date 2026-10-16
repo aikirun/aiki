@@ -16,11 +16,15 @@ describe("transitionScheduleInTx", () => {
 		withHarness(async ({ context, repos }) => {
 			await expect(
 				repos.transaction((txRepos) =>
-					transitionScheduleInTx(txRepos, {
-						namespaceId: context.namespaceId,
-						id: "schedule-missing",
-						state: { status: "paused" },
-					})
+					transitionScheduleInTx(
+						txRepos,
+						{
+							namespaceId: context.namespaceId,
+							id: "schedule-missing",
+							state: { status: "paused" },
+						},
+						undefined
+					)
 				)
 			).rejects.toThrow(NotFoundError);
 		}));
@@ -33,11 +37,15 @@ describe("transitionScheduleInTx", () => {
 
 			await expect(
 				repos.transaction((txRepos) =>
-					transitionScheduleInTx(txRepos, {
-						namespaceId: "other-namespace" as NamespaceId,
-						id: schedule.id,
-						state: { status: "paused" },
-					})
+					transitionScheduleInTx(
+						txRepos,
+						{
+							namespaceId: "other-namespace" as NamespaceId,
+							id: schedule.id,
+							state: { status: "paused" },
+						},
+						undefined
+					)
 				)
 			).rejects.toThrow(NotFoundError);
 
@@ -50,11 +58,15 @@ describe("transitionScheduleInTx", () => {
 			const { schedule } = await seedActiveSchedule({ repos, namespaceRequestContext: context });
 
 			await repos.transaction((txRepos) =>
-				transitionScheduleInTx(txRepos, {
-					namespaceId: context.namespaceId,
-					id: schedule.id,
-					state: { status: "paused" },
-				})
+				transitionScheduleInTx(
+					txRepos,
+					{
+						namespaceId: context.namespaceId,
+						id: schedule.id,
+						state: { status: "paused" },
+					},
+					undefined
+				)
 			);
 
 			const row = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -98,11 +110,15 @@ describe("transitionScheduleInTx", () => {
 				const historyBefore = await repos.stateTransition.listByScheduleId(schedule.id);
 
 				await repos.transaction((txRepos) =>
-					transitionScheduleInTx(txRepos, {
-						namespaceId: context.namespaceId,
-						id: schedule.id,
-						state,
-					})
+					transitionScheduleInTx(
+						txRepos,
+						{
+							namespaceId: context.namespaceId,
+							id: schedule.id,
+							state,
+						},
+						undefined
+					)
 				);
 
 				expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(before);
@@ -119,11 +135,15 @@ describe("transitionScheduleInTx", () => {
 
 			await expect(
 				repos.transaction((txRepos) =>
-					transitionScheduleInTx(txRepos, {
-						namespaceId: context.namespaceId,
-						id: schedule.id,
-						state: { status: "active", reason: "reactivated" },
-					})
+					transitionScheduleInTx(
+						txRepos,
+						{
+							namespaceId: context.namespaceId,
+							id: schedule.id,
+							state: { status: "active", reason: "reactivated" },
+						},
+						undefined
+					)
 				)
 			).rejects.toThrow(InvalidScheduleStateTransitionError);
 
@@ -149,7 +169,8 @@ describe("transitionScheduleInTx", () => {
 								},
 							},
 						},
-						{ namespaceId: context.namespaceId, id: schedule.id, state: { status: "paused" } }
+						{ namespaceId: context.namespaceId, id: schedule.id, state: { status: "paused" } },
+						undefined
 					)
 				)
 			).rejects.toThrow("history unavailable");

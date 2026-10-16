@@ -21,7 +21,7 @@ import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
-import type { Timer } from "../infra/timer/imminent-timer-queue";
+import type { Timer } from "../infra/timer/types";
 import { runConcurrently } from "../lib/concurrency";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeMaxRank, computeRank } from "../lib/rank";
