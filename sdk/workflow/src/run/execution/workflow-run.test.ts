@@ -8,12 +8,18 @@ import {
 	runningWorkflowRunRecordFactory,
 	workflowRunStateByStatus,
 } from "@aikirun/testing/data-factory/workflow/run";
-import { awaitingRetryTaskInfoFactory, runningTaskInfoFactory } from "@aikirun/testing/data-factory/workflow/task";
+import {
+	awaitingRetryTaskInfoFactory,
+	completedTaskInfoFactory,
+	runningTaskInfoFactory,
+} from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecDecodeFailedError,
+	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
@@ -49,11 +55,15 @@ function fakeWorkflowVersion(
 
 describe("executeWorkflowRun", () => {
 	describe("error classification", () => {
-		// ClientCodecMissingError and WorkflowRunStateUnknownError return false, and have their own tests below.
+		// ClientCodecMissingError, ClientCodecEncodeFailedError, ClientCodecDecodeFailedError and
+		// WorkflowRunStateUnknownError return false, and have their own tests below.
 		const createControlFlowErrorByName: {
 			[Member in Exclude<
 				ControlFlowError,
-				ClientCodecMissingError | WorkflowRunStateUnknownError
+				| ClientCodecMissingError
+				| ClientCodecEncodeFailedError
+				| ClientCodecDecodeFailedError
+				| WorkflowRunStateUnknownError
 			> as Member["name"]]: () => Member;
 		} = {
 			WorkflowRunNotExecutableError: () => new WorkflowRunNotExecutableError("run-1" as WorkflowRunId, "paused"),
@@ -89,6 +99,42 @@ describe("executeWorkflowRun", () => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
 					throw new ClientCodecMissingError(workflowRun.id as WorkflowRunId);
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("returns false when the handler throws ClientCodecEncodeFailedError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new ClientCodecEncodeFailedError(new Error("Key 2025-06 not found"));
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("returns false when the handler throws ClientCodecDecodeFailedError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new ClientCodecDecodeFailedError(new Error("No codec named aes-v1"));
 				});
 
 				const result = await executeWorkflowRun({
@@ -361,6 +407,105 @@ describe("executeWorkflowRun", () => {
 				});
 
 				expect(result).toBe(true);
+			}));
+
+		test("does not start the second task when the client's codec cannot decode the first task's output, and leaves the run to be redelivered", () =>
+			withFakeClient(async (client) => {
+				// The charge's output was written by aes-v1, which the client's codec no longer has.
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (encoded) => {
+						if (encoded === "aes-v1:charged") {
+							throw new Error("No codec named aes-v1");
+						}
+						return encoded;
+					},
+				};
+				const chargeCard = task({ name: "charge-card", handler: async () => "charged" });
+				const refundCard = task({ name: "refund-card", handler: async () => "refunded" });
+				const workflowVersion = workflow({ name: "checkout" }).v("1.0.0", {
+					async handler(run) {
+						try {
+							await chargeCard.start(run);
+						} catch {
+							await refundCard.start(run);
+						}
+					},
+				});
+				const chargeCardAddress = getCompositeId({ name: chargeCard.name, referenceId: await hashInput(undefined) });
+				const workflowRun = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
+					tasks: {
+						[chargeCardAddress]: [
+							completedTaskInfoFactory.build({
+								name: chargeCard.name,
+								state: { output: asOpaquePayload("aes-v1:charged") },
+							}),
+						],
+					},
+				});
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "running" },
+						expectedRevision: workflowRun.revision,
+					},
+					{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+				);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("does not start the second task when the client's codec cannot encode the first task's input, and leaves the run to be redelivered", () =>
+			withFakeClient(async (client) => {
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("Key 2025-06 not found");
+					},
+					decode: async (encoded) => encoded,
+				};
+				const chargeCard = task({ name: "charge-card", handler: async () => "charged" });
+				const refundCard = task({ name: "refund-card", handler: async () => "refunded" });
+				const workflowVersion = workflow({ name: "checkout" }).v("1.0.0", {
+					async handler(run) {
+						try {
+							await chargeCard.start(run);
+						} catch {
+							await refundCard.start(run);
+						}
+					},
+				});
+				const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "running" },
+						expectedRevision: workflowRun.revision,
+					},
+					{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+				);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
 			}));
 	});
 
@@ -755,6 +900,35 @@ describe("executeWorkflowRun", () => {
 	test("returns false when the run was recorded with the client codec applied but the client has none", () =>
 		withFakeClient(async (client) => {
 			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the client's codec cannot decode the run's input", () =>
+		withFakeClient(async (client) => {
+			client[INTERNAL].codec = {
+				encode: async (payload) => payload,
+				decode: async () => {
+					throw new Error("No codec named aes-v1");
+				},
+			};
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				input: asOpaquePayload("aes-v1:order-1"),
+				clientCodecApplied: true,
+			});
 			let handlerCalled = false;
 			const workflowVersion = fakeWorkflowVersion(async () => {
 				handlerCalled = true;

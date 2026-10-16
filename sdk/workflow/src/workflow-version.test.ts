@@ -17,6 +17,8 @@ import { SchemaValidationError } from "@aikirun/types/validator";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	ClientCodecDecodeFailedError,
+	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
@@ -646,6 +648,8 @@ describe("workflow version execution", () => {
 			NonDeterminismError: (id, attempts) =>
 				new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
+			ClientCodecEncodeFailedError: () => new ClientCodecEncodeFailedError(new Error("Key 2025-06 not found")),
+			ClientCodecDecodeFailedError: () => new ClientCodecDecodeFailedError(new Error("No codec named aes-v1")),
 		};
 
 		for (const [name, createControlFlowError] of Object.entries(createControlFlowErrorByName)) {
@@ -1187,7 +1191,7 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(childRunRecord.id);
 			}));
 
-		test("passes on a failure to encode the child input as it is", () =>
+		test("reports a failure to encode the child input as ClientCodecEncodeFailedError, caused by the codec's error", () =>
 			withFakeClient(async (client) => {
 				const encodeError = new Error("cannot encode");
 				client[INTERNAL].codec = {
@@ -1204,7 +1208,9 @@ describe("creating a workflow run", () => {
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const parentRun = createTestWorkflowRun(client, parentRunRecord);
 
-				await expect(childWorkflow.startAsChild(parentRun, "payload")).rejects.toBe(encodeError);
+				const starting = childWorkflow.startAsChild(parentRun, "payload");
+				await expect(starting).rejects.toThrow(ClientCodecEncodeFailedError);
+				await expect(starting).rejects.toMatchObject({ cause: encodeError });
 			}));
 
 		test("fails the parent when skipping the client codec on the child while the parent applied it", () =>
