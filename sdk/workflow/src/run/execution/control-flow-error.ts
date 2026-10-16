@@ -1,4 +1,6 @@
 import {
+	ClientCodecDecodeFailedError,
+	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
@@ -20,7 +22,9 @@ export function isControlFlowError(err: unknown) {
 		err instanceof WorkflowRunFailedError ||
 		err instanceof WorkflowRunNotExecutableError ||
 		err instanceof NonDeterminismError ||
-		err instanceof ClientCodecMissingError
+		err instanceof ClientCodecMissingError ||
+		err instanceof ClientCodecEncodeFailedError ||
+		err instanceof ClientCodecDecodeFailedError
 	);
 }
 
