@@ -8,16 +8,17 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
 	ClientCodecMissingError,
-	NonDeterminismError,
-	WorkflowRunFailedError,
+	type NonDeterminismError,
+	type WorkflowRunFailedError,
 	type WorkflowRunId,
-	WorkflowRunNotExecutableError,
+	type WorkflowRunNotExecutableError,
 	type WorkflowRunRecord,
-	WorkflowRunRevisionConflictError,
+	type WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
-	WorkflowRunSuspendedError,
+	type WorkflowRunSuspendedError,
 } from "@aikirun/types/workflow/run";
 
+import { isControlFlowError } from "./control-flow-error";
 import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
@@ -148,23 +149,23 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 		return true;
 	} catch (err) {
-		if (err instanceof ClientCodecMissingError) {
-			logger.error("The workflow run  expects a client codec, but none present", { err });
-			return false;
-		}
+		if (isControlFlowError(err)) {
+			if (err instanceof ClientCodecMissingError) {
+				logger.error("The workflow run  expects a client codec, but none present", { err });
+				return false;
+			}
 
-		if (err instanceof WorkflowRunStateUnknownError) {
-			logger.warn("Workflow run state unknown, leaving it for recovery", { err });
-			return false;
-		}
+			if (err instanceof WorkflowRunStateUnknownError) {
+				logger.warn("Workflow run state unknown, leaving it for recovery", { err });
+				return false;
+			}
 
-		if (
-			err instanceof WorkflowRunNotExecutableError ||
-			err instanceof WorkflowRunSuspendedError ||
-			err instanceof WorkflowRunFailedError ||
-			err instanceof WorkflowRunRevisionConflictError ||
-			err instanceof NonDeterminismError
-		) {
+			err satisfies
+				| WorkflowRunNotExecutableError
+				| WorkflowRunSuspendedError
+				| WorkflowRunFailedError
+				| WorkflowRunRevisionConflictError
+				| NonDeterminismError;
 			return true;
 		}
 
