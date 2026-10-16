@@ -4,8 +4,9 @@ import type { ConfigProvider } from "@aikirun/lib/config";
 import type { Logger } from "@aikirun/lib/logger";
 import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
 
+import { addTimers } from "./add-timers";
 import type { Timer } from "./types";
-import { computeMaxRank, computeRank } from "../../lib/rank";
+import { computeRank } from "../../lib/rank";
 
 export interface ImminentTimerQueueDeps {
 	timerPriorityQueue: TimerPriorityQueue;
@@ -34,15 +35,8 @@ export const createImminentTimerQueue = ({ timerPriorityQueue, configProvider, l
 			return;
 		}
 
-		fireAndForget(
-			timerPriorityQueue
-				.add({ timers: imminentTimers, overdueRank: computeMaxRank({ dueBy: now - overshootMs }) })
-				.then((result) => {
-					if (result.status === "failed") {
-						logger.debug("Failed to add imminent timers", { "aiki.count": imminentTimers.length });
-					}
-				}),
-			(err) => logger.debug("Failed to add imminent timers", { err, "aiki.count": imminentTimers.length })
+		fireAndForget(addTimers(timerPriorityQueue, { timers: imminentTimers, overshootMs }, logger), (err) =>
+			logger.debug("Failed to add timers to priority queue", { err, "aiki.count": imminentTimers.length })
 		);
 	},
 });

@@ -1,7 +1,7 @@
 import { asNonEmptyArray, chunkLazy, isNonEmptyArray, type NonEmptyArray } from "@aikirun/lib/collection/array";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { Publisher } from "@aikirun/types/infra/queue";
-import type { TimerEntry, TimerPriorityQueue } from "@aikirun/types/infra/timer";
+import type { TimerPriorityQueue } from "@aikirun/types/infra/timer";
 import type { WorkflowRunStateQueued } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 
@@ -12,8 +12,9 @@ import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/stat
 import type { WorkflowRow } from "../infra/db/types/workflow";
 import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
+import { addTimers } from "../infra/timer/add-timers";
 import { runConcurrently } from "../lib/concurrency";
-import { computeMaxRank, type Ranked } from "../lib/rank";
+import type { Ranked } from "../lib/rank";
 import { streamTimers } from "../lib/timer-stream";
 import type { DaemonContext } from "../middleware/context";
 
@@ -40,18 +41,10 @@ export async function processImminentSleepElapsedRuns(
 		}
 
 		if (timerPriorityQueue && isNonEmptyArray(runsDueSoon)) {
-			const timers: TimerEntry[] = runsDueSoon.map((run) => ({
-				type: "sleep",
-				id: run.id,
-				rank: run.rank,
-			}));
-			const result = await timerPriorityQueue.add({
-				timers: asNonEmptyArray(timers),
-				overdueRank: computeMaxRank({ dueBy: Date.now() - overshootMs }),
-			});
-			if (result.status === "failed") {
-				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
-			}
+			const timers = asNonEmptyArray(
+				runsDueSoon.map((run) => ({ type: "sleep" as const, id: run.id, rank: run.rank }))
+			);
+			await addTimers(timerPriorityQueue, { timers, overshootMs }, context.logger);
 		}
 	}
 }

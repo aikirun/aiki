@@ -21,10 +21,11 @@ import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
+import { addTimers } from "../infra/timer/add-timers";
 import type { Timer } from "../infra/timer/types";
 import { runConcurrently } from "../lib/concurrency";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
-import { computeMaxRank, computeRank } from "../lib/rank";
+import { computeRank } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import { type CancelledRunMeta, cancelChildRuns } from "../service/cancel-child-runs";
 import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
@@ -94,18 +95,14 @@ export async function processImminentRecurringRuns(
 
 		const { timerPriorityQueue } = deps;
 		if (timerPriorityQueue && isNonEmptyArray(schedulesDueSoon)) {
-			const timers: TimerEntry[] = schedulesDueSoon.map((schedule) => ({
-				type: "recurring",
-				id: schedule.id,
-				rank: computeRank({ dueAt: schedule.nextRunAt, priority: schedule.workflowRunOptions?.priority }),
-			}));
-			const result = await timerPriorityQueue.add({
-				timers: asNonEmptyArray(timers),
-				overdueRank: computeMaxRank({ dueBy: Date.now() - overshootMs }),
-			});
-			if (result.status === "failed") {
-				context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
-			}
+			const timers = asNonEmptyArray(
+				schedulesDueSoon.map((schedule) => ({
+					type: "recurring" as const,
+					id: schedule.id,
+					rank: computeRank({ dueAt: schedule.nextRunAt, priority: schedule.workflowRunOptions?.priority }),
+				}))
+			);
+			await addTimers(timerPriorityQueue, { timers, overshootMs }, context.logger);
 		}
 	}
 }
@@ -783,14 +780,7 @@ function queueTimers(
 	timers: NonEmptyArray<TimerEntry>,
 	overshootMs: number
 ): void {
-	fireAndForget(
-		timerPriorityQueue
-			.add({ timers, overdueRank: computeMaxRank({ dueBy: Date.now() - overshootMs }) })
-			.then((result) => {
-				if (result.status === "failed") {
-					context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
-				}
-			}),
-		(err) => context.logger.debug("Failed to add timers to priority queue", { err, "aiki.count": timers.length })
+	fireAndForget(addTimers(timerPriorityQueue, { timers, overshootMs }, context.logger), (err) =>
+		context.logger.debug("Failed to add timers to priority queue", { err, "aiki.count": timers.length })
 	);
 }
