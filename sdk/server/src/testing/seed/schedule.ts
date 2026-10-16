@@ -1,9 +1,13 @@
 import { hashInput } from "@aikirun/lib/crypto";
+import type { FakePublisher } from "@aikirun/testing/infra/queue";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import type { Schedule, ScheduleSpec } from "@aikirun/types/schedule";
+import type { WorkflowRunOptions } from "@aikirun/types/workflow/run";
 
+import { claimRun } from "./run";
 import { defaultServerRuntimeConfig } from "../../config/runtime";
 import { processImminentRecurringRuns } from "../../daemon/imminent-recurring-runs";
+import { publishPendingOutboxEntries } from "../../daemon/publish-pending-outbox-entries";
 import type { Repositories } from "../../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
 import { createChildRunCanceller } from "../../service/cancel-child-runs";
@@ -18,7 +22,8 @@ const seededSchedule = {
 	spec: { type: "interval", everyMs: 60_000 },
 } as const;
 
-const { republishBackoff } = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
+const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
+const { republishBackoff } = publishPendingOutboxEntriesDaemonConfig;
 
 export interface SeedScheduleDeps {
 	repos: Repositories;
@@ -30,6 +35,7 @@ export interface SeedScheduleOverrides {
 	workflowVersionId?: string;
 	spec?: ScheduleSpec;
 	referenceId?: string;
+	workflowRunOptions?: WorkflowRunOptions;
 }
 
 export async function seedActiveSchedule(deps: SeedScheduleDeps, overrides?: SeedScheduleOverrides) {
@@ -47,6 +53,7 @@ export async function seedActiveSchedule(deps: SeedScheduleDeps, overrides?: See
 		clientHasherApplied: false,
 		clientCodecApplied: false,
 		options: overrides?.referenceId === undefined ? undefined : { reference: { id: overrides.referenceId } },
+		workflowRunOptions: overrides?.workflowRunOptions,
 	});
 
 	return { schedule };
@@ -110,4 +117,25 @@ export async function seedRunFromSchedule(
 	}
 
 	return { runId: run.id };
+}
+
+/** The run the schedule's next occurrence creates, published and claimed by a worker. */
+export async function seedClaimedRunFromSchedule(
+	deps: {
+		repos: Repositories;
+		publisher: FakePublisher;
+		daemonContext?: DaemonContext;
+		namespaceRequestContext?: NamespaceRequestContext;
+	},
+	params: { schedule: Schedule }
+) {
+	const { repos, publisher } = deps;
+	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+	const { runId } = await seedRunFromSchedule({ repos, daemonContext, namespaceRequestContext }, params);
+
+	await publishPendingOutboxEntries(daemonContext, { repos, publisher }, publishPendingOutboxEntriesDaemonConfig);
+
+	const claim = await claimRun({ context: namespaceRequestContext, repos, runId });
+	return { runId, ...claim };
 }

@@ -352,7 +352,7 @@ describe("processDueTimers", () => {
 	};
 
 	for (const [timerType, seedRun] of Object.entries(seedDueRunByTimerType)) {
-		test(`hands a due ${timerType} timer to the daemon that queues its run`, () =>
+		test(`queues the run of a due ${timerType} timer`, () =>
 			withHarness(async ({ context, repos, publisher }) => {
 				const { runId, dueTimer, queuedReason } = await seedRun({ context, repos, publisher });
 

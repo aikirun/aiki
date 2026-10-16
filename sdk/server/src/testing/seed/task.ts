@@ -45,6 +45,78 @@ export async function seedRunningTaskOnRun(
 	return { taskInfo, taskInput: params.input, latestTaskSequence: taskSequence };
 }
 
+/**
+ * Creates one task in each status an attempt can leave behind, `running`, `awaiting_retry`, `completed` and
+ * `failed`, on a run that is already claimed.
+ */
+export async function seedTaskInEachStatusOnRun(
+	deps: Pick<SeedRunDeps, "repos" | "namespaceRequestContext">,
+	run: { runId: string; revisionWhenClaimed: number }
+) {
+	const { repos } = deps;
+	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
+
+	const runningTask = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, run, {
+		taskName: seededTask.name,
+		input: seededTask.input,
+	});
+	const taskToRetry = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...run, latestTaskSequence: runningTask.latestTaskSequence },
+		{ taskName: "charge-payment", input: { invoiceId: "inv-9" } }
+	);
+	const taskToComplete = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...run, latestTaskSequence: taskToRetry.latestTaskSequence },
+		{ taskName: "book-courier", input: { parcelId: "pcl-5" } }
+	);
+	const taskToFail = await seedRunningTaskOnRun(
+		{ repos, namespaceRequestContext },
+		{ ...run, latestTaskSequence: taskToComplete.latestTaskSequence },
+		{ taskName: "send-receipt", input: { receiptId: "rcp-3" } }
+	);
+
+	const taskStateMachine = createTaskStateMachine({ repos });
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToRetry.taskInfo.id,
+		workflowRunId: run.runId,
+		expectedWorkflowRunRevision: run.revisionWhenClaimed,
+		sequence: taskToFail.latestTaskSequence + 1,
+		attempts: 1,
+		state: {
+			status: "awaiting_retry",
+			error: { name: "Error", message: "payment gateway unavailable" },
+			nextAttemptInMs: 60_000,
+		},
+	});
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToComplete.taskInfo.id,
+		workflowRunId: run.runId,
+		expectedWorkflowRunRevision: run.revisionWhenClaimed,
+		sequence: taskToFail.latestTaskSequence + 2,
+		attempts: 1,
+		state: { status: "completed", output: asOpaquePayload({ trackingId: "trk-8" }) },
+	});
+	await taskStateMachine.transitionState(namespaceRequestContext, {
+		id: taskToFail.taskInfo.id,
+		workflowRunId: run.runId,
+		expectedWorkflowRunRevision: run.revisionWhenClaimed,
+		sequence: taskToFail.latestTaskSequence + 3,
+		attempts: 1,
+		state: { status: "failed", error: { name: "Error", message: "mail server rejected the receipt" } },
+	});
+
+	return {
+		latestTaskSequence: taskToFail.latestTaskSequence + 3,
+		taskIdByStatus: {
+			running: runningTask.taskInfo.id,
+			awaiting_retry: taskToRetry.taskInfo.id,
+			completed: taskToComplete.taskInfo.id,
+			failed: taskToFail.taskInfo.id,
+		} satisfies Record<Exclude<TaskStatus, "discarded">, string>,
+	};
+}
+
 export async function seedRunningTask(deps: SeedRunDeps & { publisher: FakePublisher }, overrides?: SeedRunOverrides) {
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
@@ -189,56 +261,7 @@ export async function seedAwaitingRetryRunAfterTaskFailure(
 	const { repos } = deps;
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
-
-	const runningTask = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, seeded, {
-		taskName: seededTask.name,
-		input: seededTask.input,
-	});
-	const taskToRetry = await seedRunningTaskOnRun(
-		{ repos, namespaceRequestContext },
-		{ ...seeded, latestTaskSequence: runningTask.latestTaskSequence },
-		{ taskName: "charge-payment", input: { invoiceId: "inv-9" } }
-	);
-	const taskToFail = await seedRunningTaskOnRun(
-		{ repos, namespaceRequestContext },
-		{ ...seeded, latestTaskSequence: taskToRetry.latestTaskSequence },
-		{ taskName: "send-receipt", input: { receiptId: "rcp-3" } }
-	);
-	const taskToComplete = await seedRunningTaskOnRun(
-		{ repos, namespaceRequestContext },
-		{ ...seeded, latestTaskSequence: taskToFail.latestTaskSequence },
-		{ taskName: "book-courier", input: { parcelId: "pcl-5" } }
-	);
-
-	const taskStateMachine = createTaskStateMachine({ repos });
-	await taskStateMachine.transitionState(namespaceRequestContext, {
-		id: taskToRetry.taskInfo.id,
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		sequence: taskToComplete.latestTaskSequence + 1,
-		attempts: 1,
-		state: {
-			status: "awaiting_retry",
-			error: { name: "Error", message: "payment gateway unavailable" },
-			nextAttemptInMs: 60_000,
-		},
-	});
-	await taskStateMachine.transitionState(namespaceRequestContext, {
-		id: taskToFail.taskInfo.id,
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		sequence: taskToComplete.latestTaskSequence + 2,
-		attempts: 1,
-		state: { status: "failed", error: { name: "Error", message: "mail server rejected the receipt" } },
-	});
-	await taskStateMachine.transitionState(namespaceRequestContext, {
-		id: taskToComplete.taskInfo.id,
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		sequence: taskToComplete.latestTaskSequence + 3,
-		attempts: 1,
-		state: { status: "completed", output: asOpaquePayload({ trackingId: "trk-8" }) },
-	});
+	const { taskIdByStatus } = await seedTaskInEachStatusOnRun({ repos, namespaceRequestContext }, seeded);
 
 	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
@@ -254,7 +277,7 @@ export async function seedAwaitingRetryRunAfterTaskFailure(
 			state: {
 				status: "awaiting_retry",
 				cause: "task",
-				taskId: taskToFail.taskInfo.id,
+				taskId: taskIdByStatus.failed,
 				nextAttemptInMs: params.nextAttemptAt - 1,
 			},
 			expectedRevision: seeded.revisionWhenClaimed,
@@ -265,12 +288,7 @@ export async function seedAwaitingRetryRunAfterTaskFailure(
 		...seeded,
 		nextAttemptAt: params.nextAttemptAt,
 		revisionWhenSuspended: suspendedRun.revision,
-		taskIdByStatus: {
-			running: runningTask.taskInfo.id,
-			awaiting_retry: taskToRetry.taskInfo.id,
-			failed: taskToFail.taskInfo.id,
-			completed: taskToComplete.taskInfo.id,
-		} satisfies Record<Exclude<TaskStatus, "discarded">, string>,
+		taskIdByStatus,
 	};
 }
 
@@ -283,56 +301,7 @@ export async function seedRecoveredRun(deps: SeedRunDeps & { publisher: FakePubl
 	const daemonContext = deps.daemonContext ?? daemonContextFactory.build();
 	const namespaceRequestContext = deps.namespaceRequestContext ?? namespaceRequestContextFactory.build();
 	const seeded = await seedClaimedRun({ ...deps, namespaceRequestContext });
-
-	const runningTask = await seedRunningTaskOnRun({ repos, namespaceRequestContext }, seeded, {
-		taskName: seededTask.name,
-		input: seededTask.input,
-	});
-	const taskToRetry = await seedRunningTaskOnRun(
-		{ repos, namespaceRequestContext },
-		{ ...seeded, latestTaskSequence: runningTask.latestTaskSequence },
-		{ taskName: "charge-payment", input: { invoiceId: "inv-9" } }
-	);
-	const taskToComplete = await seedRunningTaskOnRun(
-		{ repos, namespaceRequestContext },
-		{ ...seeded, latestTaskSequence: taskToRetry.latestTaskSequence },
-		{ taskName: "book-courier", input: { parcelId: "pcl-5" } }
-	);
-	const taskToFail = await seedRunningTaskOnRun(
-		{ repos, namespaceRequestContext },
-		{ ...seeded, latestTaskSequence: taskToComplete.latestTaskSequence },
-		{ taskName: "send-receipt", input: { receiptId: "rcp-3" } }
-	);
-
-	const taskStateMachine = createTaskStateMachine({ repos });
-	await taskStateMachine.transitionState(namespaceRequestContext, {
-		id: taskToRetry.taskInfo.id,
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		sequence: taskToFail.latestTaskSequence + 1,
-		attempts: 1,
-		state: {
-			status: "awaiting_retry",
-			error: { name: "Error", message: "payment gateway unavailable" },
-			nextAttemptInMs: 60_000,
-		},
-	});
-	await taskStateMachine.transitionState(namespaceRequestContext, {
-		id: taskToComplete.taskInfo.id,
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		sequence: taskToFail.latestTaskSequence + 2,
-		attempts: 1,
-		state: { status: "completed", output: asOpaquePayload({ trackingId: "trk-8" }) },
-	});
-	await taskStateMachine.transitionState(namespaceRequestContext, {
-		id: taskToFail.taskInfo.id,
-		workflowRunId: seeded.runId,
-		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
-		sequence: taskToFail.latestTaskSequence + 3,
-		attempts: 1,
-		state: { status: "failed", error: { name: "Error", message: "mail server rejected the receipt" } },
-	});
+	const { taskIdByStatus } = await seedTaskInEachStatusOnRun({ repos, namespaceRequestContext }, seeded);
 
 	// -1 makes the claim stale by arithmetic, so recovery takes it back without waiting.
 	await recoverOverdueOutboxEntries(
@@ -351,12 +320,7 @@ export async function seedRecoveredRun(deps: SeedRunDeps & { publisher: FakePubl
 	return {
 		...seeded,
 		revisionWhenRecovered: recoveredRun.revision,
-		taskIdByStatus: {
-			running: runningTask.taskInfo.id,
-			awaiting_retry: taskToRetry.taskInfo.id,
-			completed: taskToComplete.taskInfo.id,
-			failed: taskToFail.taskInfo.id,
-		} satisfies Record<Exclude<TaskStatus, "discarded">, string>,
+		taskIdByStatus,
 	};
 }
 

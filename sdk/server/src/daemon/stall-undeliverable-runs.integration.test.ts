@@ -194,7 +194,7 @@ describe("stallUndeliverableRuns", () => {
 		withHarness(async (deps) => {
 			const { context, repos, publisher } = deps;
 			const seedDeps = { daemonContext: context, namespaceRequestContext, repos, publisher };
-			const claimedAfterListingRun = await withFakeClock(EPOCH_MS, () => seedPublishedRun(seedDeps));
+			const runToClaimAfterListing = await withFakeClock(EPOCH_MS, () => seedPublishedRun(seedDeps));
 			const undeliveredRun = await withFakeClock(EPOCH_MS, () => seedPublishedRun(seedDeps));
 
 			let listedRunIds: string[] = [];
@@ -205,7 +205,7 @@ describe("stallUndeliverableRuns", () => {
 					listUndeliverable: async (...args) => {
 						const undeliverableRows = await repos.workflowRunOutbox.listUndeliverable(...args);
 						listedRunIds = undeliverableRows.map((row) => row.workflowRunId);
-						await claimRun({ context: namespaceRequestContext, repos, runId: claimedAfterListingRun.runId });
+						await claimRun({ context: namespaceRequestContext, repos, runId: runToClaimAfterListing.runId });
 						return undeliverableRows;
 					},
 				},
@@ -217,24 +217,24 @@ describe("stallUndeliverableRuns", () => {
 				{ repos: reposClaimingAfterListing },
 				{ maxAgeMs: ONE_MINUTE_MS, pageSize: 100, chunk: { size: 100, maxConcurrency: 10 } }
 			);
-			expect(listedRunIds.sort()).toEqual([claimedAfterListingRun.runId, undeliveredRun.runId].sort());
+			expect(listedRunIds.sort()).toEqual([runToClaimAfterListing.runId, undeliveredRun.runId].sort());
 
 			expect(
 				await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
-					id: claimedAfterListingRun.runId,
+					id: runToClaimAfterListing.runId,
 				})
 			).toEqual(
 				expect.objectContaining({
-					run: expect.objectContaining({ id: claimedAfterListingRun.runId, status: "running" }),
+					run: expect.objectContaining({ id: runToClaimAfterListing.runId, status: "running" }),
 				})
 			);
 			expect(
 				await repos.workflowRunOutbox.getByWorkflowRunId({
 					namespaceId: namespaceRequestContext.namespaceId,
-					workflowRunId: claimedAfterListingRun.runId,
+					workflowRunId: runToClaimAfterListing.runId,
 				})
-			).toEqual(expect.objectContaining({ id: claimedAfterListingRun.outboxRowId, status: "claimed" }));
+			).toEqual(expect.objectContaining({ id: runToClaimAfterListing.outboxRowId, status: "claimed" }));
 			expect(
 				await repos.workflowRun.getByIdWithState({
 					namespaceId: namespaceRequestContext.namespaceId,
