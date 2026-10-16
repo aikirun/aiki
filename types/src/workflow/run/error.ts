@@ -95,6 +95,32 @@ export class ClientCodecMissingError extends Error {
 }
 
 /**
+ * The client's codec threw while encoding a payload. The codec's error is the `cause`. In a
+ * workflow, this error ends the execution even when the workflow code catches it, and the run is
+ * left for a worker whose codec can encode the payload.
+ */
+export class ClientCodecEncodeFailedError extends Error {
+	public override readonly name = "ClientCodecEncodeFailedError";
+
+	constructor(cause: unknown) {
+		super("The client codec failed to encode a payload", { cause });
+	}
+}
+
+/**
+ * The client's codec threw while decoding a payload. The codec's error is the `cause`. In a
+ * workflow, this error ends the execution even when the workflow code catches it, and the run is
+ * left for a worker whose codec can decode the payload.
+ */
+export class ClientCodecDecodeFailedError extends Error {
+	public override readonly name = "ClientCodecDecodeFailedError";
+
+	constructor(cause: unknown) {
+		super("The client codec failed to decode a payload", { cause });
+	}
+}
+
+/**
  * Indicates that a child start asked to skip the client codec while its parent run already applied one.
  * Children of an encoded parent must keep the same declaration.
  */

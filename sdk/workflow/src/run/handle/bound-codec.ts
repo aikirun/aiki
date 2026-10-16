@@ -2,7 +2,13 @@ import type { Client } from "@aikirun/types/client";
 import type { Codec } from "@aikirun/types/infra/codec";
 import type { OpaquePayload } from "@aikirun/types/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
-import { ClientCodecMissingError, type ClientCodecPolicy, type WorkflowRunId } from "@aikirun/types/workflow/run";
+import {
+	ClientCodecDecodeFailedError,
+	ClientCodecEncodeFailedError,
+	ClientCodecMissingError,
+	type ClientCodecPolicy,
+	type WorkflowRunId,
+} from "@aikirun/types/workflow/run";
 
 export interface BoundCodec {
 	encode(payload: unknown): Promise<OpaquePayload>;
@@ -14,9 +20,25 @@ export const noopCodec: BoundCodec = {
 	decode: async (encoded) => encoded,
 };
 
+/**
+ * A codec can throw anything, so its errors are wrapped in `ClientCodecEncodeFailedError` and
+ * `ClientCodecDecodeFailedError` for the SDK to recognise, with the codec's error as the cause.
+ */
 export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
-	encode: async (payload) => (await codec.encode(payload)) as OpaquePayload,
-	decode: (encoded) => codec.decode(encoded),
+	encode: async (payload) => {
+		try {
+			return (await codec.encode(payload)) as OpaquePayload;
+		} catch (err) {
+			throw new ClientCodecEncodeFailedError(err);
+		}
+	},
+	decode: async (encoded) => {
+		try {
+			return await codec.decode(encoded);
+		} catch (err) {
+			throw new ClientCodecDecodeFailedError(err);
+		}
+	},
 });
 
 /**
