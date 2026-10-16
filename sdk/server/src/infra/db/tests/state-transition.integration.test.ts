@@ -2,7 +2,6 @@ import type { NamespaceId } from "@aikirun/types/namespace";
 import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
-import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createScheduleService } from "../../../service/schedule";
 import { createWorkflowRunStateMachine } from "../../../service/state-machine/workflow-run";
 import { createServiceHarness } from "../../../testing/harness";
@@ -319,7 +318,6 @@ describe("state transition repository listByRunId", () => {
 			const { runId, taskInfo } = await seedRunningTask({ namespaceRequestContext: context, repos, publisher });
 			const workflowRunStateMachine = createWorkflowRunStateMachine({
 				repos,
-				childRunCanceller: createChildRunCanceller(),
 			});
 			await workflowRunStateMachine.transitionState(context, {
 				type: "pessimistic",

@@ -10,7 +10,6 @@ import { processImminentRecurringRuns } from "../../daemon/imminent-recurring-ru
 import { publishPendingOutboxEntries } from "../../daemon/publish-pending-outbox-entries";
 import type { Repositories } from "../../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
-import { createChildRunCanceller } from "../../service/cancel-child-runs";
 import { createScheduleService } from "../../service/schedule";
 import { withFakeClock } from "../clock";
 import { daemonContextFactory, namespaceRequestContextFactory } from "../data-factory/middleware/context";
@@ -93,7 +92,7 @@ export async function seedRunFromSchedule(
 	await withFakeClock(params.schedule.nextRunAt, () =>
 		processImminentRecurringRuns(
 			daemonContext,
-			{ repos, childRunCanceller: createChildRunCanceller() },
+			{ repos },
 			{
 				pageSize: 100,
 				lookaheadWindowMs: 0,

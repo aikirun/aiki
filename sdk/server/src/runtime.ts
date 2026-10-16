@@ -14,8 +14,6 @@ import { defaultServerRuntimeConfig, type ServerRuntimeConfig, type ServerRuntim
 import { validateServerRuntimeConfig } from "./config/runtime/schema";
 import { startDaemons } from "./daemon";
 import { createRepos } from "./infra/db/repo";
-import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
-import { createChildRunCanceller } from "./service/cancel-child-runs";
 
 export interface StartRuntimeParams {
 	db: Database;
@@ -54,18 +52,6 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 		logger.warn("No timer priority queue configured, runs may wake seconds later than expected.");
 	}
 
-	const childRunCanceller = createChildRunCanceller(
-		timerPriorityQueue &&
-			createImminentTimerQueue({
-				timerPriorityQueue,
-				configProvider: asConfigProvider(() => ({
-					lookaheadWindowMs: configProvider.config.daemons.imminentScheduledRuns.lookaheadWindowMs,
-					overshootMs: configProvider.config.daemons.dueTimersConsumer.overshootMs,
-				})),
-				logger,
-			})
-	);
-
 	const repos = await createRepos(params.db);
 
 	const daemonsPromise = startDaemons(logger, {
@@ -77,7 +63,6 @@ export async function startRuntime(params: StartRuntimeParams): Promise<StartedR
 			signal,
 		}),
 		timerPriorityQueue,
-		childRunCanceller,
 	});
 
 	return { configProvider, daemonsPromise };

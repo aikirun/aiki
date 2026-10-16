@@ -53,17 +53,16 @@ import type {
 import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { candidateHashes } from "../lib/hash";
 import type { NamespaceRequestContext } from "../middleware/context";
-import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
+import { type CancelledRunMeta, cancelChildRuns } from "../service/cancel-child-runs";
 import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 
 export interface WorkflowRunServiceDeps {
 	repos: Repositories;
-	childRunCanceller: ChildRunCanceller;
 	imminentTimerQueue?: ImminentTimerQueue;
 }
 
-export const createWorkflowRunService = ({ repos, childRunCanceller, imminentTimerQueue }: WorkflowRunServiceDeps) => ({
+export const createWorkflowRunService = ({ repos, imminentTimerQueue }: WorkflowRunServiceDeps) => ({
 	async createWorkflowRun(
 		context: NamespaceRequestContext,
 		request: WorkflowRunCreateRequestV1
@@ -297,9 +296,7 @@ export const createWorkflowRunService = ({ repos, childRunCanceller, imminentTim
 			return { cancelledIds: [] };
 		}
 
-		return repos.transaction(async (txRepos) =>
-			cancelByIdsInTx(context, ids, txRepos, childRunCanceller, imminentTimerQueue)
-		);
+		return repos.transaction(async (txRepos) => cancelByIdsInTx(context, ids, txRepos, imminentTimerQueue));
 	},
 
 	async hasTerminated(context: NamespaceRequestContext, runId: string) {
@@ -457,7 +454,6 @@ async function cancelByIdsInTx(
 	context: NamespaceRequestContext,
 	ids: NonEmptyArray<string>,
 	txRepos: TxRepositories,
-	childRunCanceller: ChildRunCanceller,
 	imminentTimerQueue?: ImminentTimerQueue
 ) {
 	const { namespaceId, logger } = context;
@@ -514,11 +510,17 @@ async function cancelByIdsInTx(
 	}
 
 	if (isNonEmptyArray(cancelledRunsHavingParent)) {
-		await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger, imminentTimerQueue);
+		const parentWakeTimers = await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, logger);
+		if (imminentTimerQueue && isNonEmptyArray(parentWakeTimers)) {
+			txRepos.onCommit(() => imminentTimerQueue.add(parentWakeTimers));
+		}
 	}
 
 	if (isNonEmptyArray(cancelledRunsMeta)) {
-		await childRunCanceller.cancel(cancelledRunsMeta, txRepos, logger);
+		const childCancellationTimers = await cancelChildRuns(cancelledRunsMeta, txRepos, logger);
+		if (imminentTimerQueue && isNonEmptyArray(childCancellationTimers)) {
+			txRepos.onCommit(() => imminentTimerQueue.add(childCancellationTimers));
+		}
 	}
 
 	return { cancelledIds: cancelledRunIds };

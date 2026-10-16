@@ -6,7 +6,7 @@ import type { TimerEntry, TimerPriorityQueue, TimerType } from "@aikirun/types/i
 
 import { computeMaxRank, computeRank } from "../../lib/rank";
 
-interface Timer {
+export interface Timer {
 	type: TimerType;
 	id: string;
 	dueAt: number;

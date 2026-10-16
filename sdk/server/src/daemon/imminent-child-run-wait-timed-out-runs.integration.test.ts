@@ -9,7 +9,6 @@ import {
 } from "./imminent-child-run-wait-timed-out-runs";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createWorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
@@ -34,7 +33,7 @@ async function suspendParentOnChild(deps: DaemonHarnessDeps, params?: { timeoutI
 		{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
 	);
 
-	const stateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
+	const stateMachine = createWorkflowRunStateMachine({ repos });
 	const suspendedParent = await stateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: parent.runId,

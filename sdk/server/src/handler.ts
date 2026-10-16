@@ -23,7 +23,6 @@ import { createRepos } from "./infra/db/repo";
 import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
 import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
-import { createChildRunCanceller } from "./service/cancel-child-runs";
 import { createEventService } from "./service/event";
 import { createScheduleService } from "./service/schedule";
 import { createTaskStateMachine } from "./service/state-machine/task";
@@ -69,22 +68,12 @@ export async function createHandler(params: CreateHandlerParams) {
 			logger,
 		});
 
-	const childRunCanceller = createChildRunCanceller(imminentTimerQueue);
-
 	const apiAuthorizer = (iam?.api ?? noopApiAuthorizer)({ logger });
 	const dashboardIam = iam?.dashboard?.({ logger });
 
-	const workflowRunStateMachine = createWorkflowRunStateMachine({
-		repos,
-		childRunCanceller,
-		imminentTimerQueue,
-	});
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, imminentTimerQueue });
 	const taskStateMachine = createTaskStateMachine({ repos });
-	const workflowRunService = createWorkflowRunService({
-		repos,
-		childRunCanceller,
-		imminentTimerQueue,
-	});
+	const workflowRunService = createWorkflowRunService({ repos, imminentTimerQueue });
 	const workflowService = createWorkflowService({ repos });
 	const scheduleService = createScheduleService({ repos, imminentTimerQueue });
 	const taskService = createTaskService({ repos });

@@ -32,7 +32,6 @@ import {
 	seedStalledRun,
 } from "../../testing/seed/run";
 import { seedAwaitingRetryTask, seedRunningTask, seedSiblingAwaitingRetryTasks } from "../../testing/seed/task";
-import { createChildRunCanceller } from "../cancel-child-runs";
 import { createEventService } from "../event";
 
 const withHarness = createServiceHarness();
@@ -42,7 +41,7 @@ const daemonContext = daemonContextFactory.build();
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function createStateMachine(repos: Repositories, imminentTimerQueue?: ImminentTimerQueue) {
-	return createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller(), imminentTimerQueue });
+	return createWorkflowRunStateMachine({ repos, imminentTimerQueue });
 }
 
 describe("WorkflowRunStateMachine transition preconditions", () => {
@@ -1130,6 +1129,41 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 			]);
 		}));
 
+	test("cancelling a parent with a live child adds the cancellation run's timer to the priority queue", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const parent = await seedClaimedRun({ namespaceRequestContext: context, repos, publisher });
+			await seedQueuedRun(
+				{ namespaceRequestContext: context, repos },
+				{ parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed } }
+			);
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const stateMachine = createStateMachine(
+				repos,
+				createImminentTimerQueue({
+					timerPriorityQueue,
+					configProvider: asConfigProvider(() => ({ lookaheadWindowMs: 30_000, overshootMs: 0 })),
+					logger: noopLogger,
+				})
+			);
+
+			const cancelledAtMs = Date.now();
+			await withFakeClock(cancelledAtMs, () =>
+				stateMachine.transitionState(context, { type: "pessimistic", id: parent.runId, state: { status: "cancelled" } })
+			);
+
+			const { rows: scheduledRuns } = await repos.workflowRun.listByFilters(
+				{ namespaceId: context.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{ order: "asc" }
+			);
+			expect(scheduledRuns).toEqual([expect.objectContaining({ name: "cancel-child-runs" })]);
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual(
+				scheduledRuns.map(({ id }) => ({ type: "scheduled", id, rank: computeRank({ dueAt: cancelledAtMs }) }))
+			);
+		}));
+
 	test("a transition into sleeping adds the run's wakeup timer to the priority queue", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed } = await seedClaimedRun({
@@ -1835,7 +1869,7 @@ describe("WorkflowRunStateMachine failed transitions", () => {
 			expect(await repos.sleep.listByWorkflowRunId(runId)).toEqual([]);
 		}));
 
-	test("a cancel that fails after its child canceller ran leaves the run, its task and the namespace's runs as they were", () =>
+	test("a cancel that fails after inserting the run that cancels its child leaves the run, its task and the namespace's runs as they were", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, taskInfo } = await seedRunningTask({
 				namespaceRequestContext: context,
@@ -1847,28 +1881,30 @@ describe("WorkflowRunStateMachine failed transitions", () => {
 				{ parent: { workflowRunId: runId, expectedRevision: revisionWhenClaimed } }
 			);
 
-			const childRunCanceller = createChildRunCanceller();
 			let writtenBeforeFailure: unknown;
-			const stateMachine = createWorkflowRunStateMachine({
-				repos,
-				childRunCanceller: {
-					cancel: async (runs, txRepos, logger) => {
-						await childRunCanceller.cancel(runs, txRepos, logger);
-						writtenBeforeFailure = {
-							run: await txRepos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId }),
-							discardedTasks: await txRepos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"]),
-							runCount: (
-								await txRepos.workflowRun.listByFilters({ namespaceId: context.namespaceId }, 10, 0, { order: "asc" })
-							).total,
-						};
-						throw new Error("child cancel failed");
+			const stateMachine = createStateMachine(
+				reposWithWrappedTxRepos(repos, (txRepos) => ({
+					...txRepos,
+					workflowRun: {
+						...txRepos.workflowRun,
+						insert: async (input) => {
+							await txRepos.workflowRun.insert(input);
+							writtenBeforeFailure = {
+								run: await txRepos.workflowRun.getById({ namespaceId: context.namespaceId, id: runId }),
+								discardedTasks: await txRepos.task.listByWorkflowRunIdsAndStatuses(runId, ["discarded"]),
+								runCount: (
+									await txRepos.workflowRun.listByFilters({ namespaceId: context.namespaceId }, 10, 0, { order: "asc" })
+								).total,
+							};
+							throw new Error("child cancellation failed");
+						},
 					},
-				},
-			});
+				}))
+			);
 			await expect(
 				stateMachine.transitionState(context, { type: "pessimistic", id: runId, state: { status: "cancelled" } })
-			).rejects.toThrow("child cancel failed");
-			// The third run is the one the canceller created to cancel the child.
+			).rejects.toThrow("child cancellation failed");
+			// The third run is the one inserted to cancel the child.
 			expect(writtenBeforeFailure).toEqual({
 				run: { id: runId, status: "cancelled", revision: revisionWhenClaimed + 1 },
 				discardedTasks: [expect.objectContaining({ id: taskInfo.id })],

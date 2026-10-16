@@ -10,7 +10,6 @@ import { pollingDaemon, startDaemons } from "./index";
 import { defaultServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext } from "../middleware/context";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 
 describe("pollingDaemon", () => {
 	interface TestDaemonConfig {
@@ -192,7 +191,6 @@ describe("startDaemons", () => {
 			configProvider: asConfigProvider(() => defaultServerRuntimeConfig),
 			publisher: deps?.publisher,
 			timerPriorityQueue: deps?.timerPriorityQueue,
-			childRunCanceller: createChildRunCanceller(),
 		});
 	}
 

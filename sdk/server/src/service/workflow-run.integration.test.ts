@@ -20,7 +20,6 @@ import type { Repositories } from "../infra/db/types";
 import { createImminentTimerQueue, type ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
 import { computeRank } from "../lib/rank";
 import type { NamespaceRequestContext } from "../middleware/context";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createEventService } from "../service/event";
 import { createWorkflowRunService } from "../service/workflow-run";
 import { withFakeClock } from "../testing/clock";
@@ -32,18 +31,9 @@ import { seedCompletedTask, seedRunningTask } from "../testing/seed/task";
 const withHarness = createServiceHarness();
 
 function createService(repos: Repositories, imminentTimerQueue?: ImminentTimerQueue) {
-	const childRunCanceller = createChildRunCanceller(imminentTimerQueue);
-	const workflowRunStateMachine = createWorkflowRunStateMachine({
-		repos,
-		childRunCanceller,
-		imminentTimerQueue,
-	});
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, imminentTimerQueue });
 	return {
-		service: createWorkflowRunService({
-			repos,
-			childRunCanceller,
-			imminentTimerQueue,
-		}),
+		service: createWorkflowRunService({ repos, imminentTimerQueue }),
 		stateMachine: workflowRunStateMachine,
 	};
 }

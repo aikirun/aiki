@@ -23,7 +23,6 @@ import type { WorkflowRunMeta } from "../infra/db/types/workflow-run";
 import { computeMaxRank, extractRankDueAtMs, type Ranked } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
-import type { ChildRunCanceller } from "../service/cancel-child-runs";
 import { scheduleRowToDomain } from "../service/schedule";
 
 interface DueTimerConsumerConfig {
@@ -39,7 +38,6 @@ export interface DueTimersConsumerDeps {
 	repos: Repositories;
 	signal: AbortSignal;
 	timerPriorityQueue: TimerPriorityQueue;
-	childRunCanceller: ChildRunCanceller;
 	publisher?: Publisher;
 	configProvider: ConfigProvider<DueTimerConsumerConfig>;
 }

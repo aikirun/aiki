@@ -15,7 +15,6 @@ import { stallUndeliverableRuns } from "./stall-undeliverable-runs";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import type { Repositories } from "../infra/db/types";
 import { computeMaxRank, computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createScheduleService, getReferenceId } from "../service/schedule";
 import { createTaskStateMachine } from "../service/state-machine/task";
 import { createWorkflowRunStateMachine } from "../service/state-machine/workflow-run";
@@ -62,9 +61,7 @@ describe("processImminentRecurringRuns", () => {
 			});
 			const occurrence = schedule.nextRunAt + 60_000;
 
-			await withFakeClock(occurrence, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(occurrence, () => processImminentRecurringRuns(context, { repos }, config));
 
 			// computeRank(occurrence, priority 2) = occurrence * 10 + 2.
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -92,9 +89,7 @@ describe("processImminentRecurringRuns", () => {
 			});
 			const occurrence = schedule.nextRunAt;
 
-			await withFakeClock(occurrence, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(occurrence, () => processImminentRecurringRuns(context, { repos }, config));
 
 			expect(
 				await repos.workflowRun.getByReferenceWithWorkflowAndState({
@@ -122,9 +117,7 @@ describe("processImminentRecurringRuns", () => {
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
 			});
 
-			await withFakeClock(schedule.nextRunAt + 120_000, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(schedule.nextRunAt + 120_000, () => processImminentRecurringRuns(context, { repos }, config));
 
 			// computeRank(occurrence, default priority) = occurrence * 10 + 5.
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -151,11 +144,7 @@ describe("processImminentRecurringRuns", () => {
 
 			// Three occurrences are due under a cap of two.
 			await withFakeClock(schedule.nextRunAt + 120_000, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller() },
-					{ ...config, maxOccurrencesPerSchedule: 2 }
-				)
+				processImminentRecurringRuns(context, { repos }, { ...config, maxOccurrencesPerSchedule: 2 })
 			);
 
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -188,16 +177,8 @@ describe("processImminentRecurringRuns", () => {
 			// Three occurrences are due under a cap of two, so the second pass owes one.
 			await withFakeClock(schedule.nextRunAt + 120_000, async () => {
 				const cappedConfig = { ...config, maxOccurrencesPerSchedule: 2 };
-				await processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller() },
-					cappedConfig
-				);
-				await processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller() },
-					cappedConfig
-				);
+				await processImminentRecurringRuns(context, { repos }, cappedConfig);
+				await processImminentRecurringRuns(context, { repos }, cappedConfig);
 			});
 
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -232,11 +213,7 @@ describe("processImminentRecurringRuns", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			// The next run lands one period on, exactly at the edge of the lookahead.
 			await withFakeClock(schedule.nextRunAt, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller(), timerPriorityQueue },
-					{ ...config, lookaheadWindowMs: 60_000 }
-				)
+				processImminentRecurringRuns(context, { repos, timerPriorityQueue }, { ...config, lookaheadWindowMs: 60_000 })
 			);
 
 			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([
@@ -269,7 +246,7 @@ describe("processImminentRecurringRuns", () => {
 			await withFakeClock(schedule.nextRunAt, () =>
 				processImminentRecurringRuns(
 					context,
-					{ repos, childRunCanceller: createChildRunCanceller(), timerPriorityQueue },
+					{ repos, timerPriorityQueue },
 					{ ...config, lookaheadWindowMs: 60_000, overshootMs: 30 }
 				)
 			);
@@ -296,11 +273,7 @@ describe("processImminentRecurringRuns", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			// The next run lands one period on, one millisecond past the lookahead.
 			await withFakeClock(schedule.nextRunAt, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller(), timerPriorityQueue },
-					{ ...config, lookaheadWindowMs: 59_999 }
-				)
+				processImminentRecurringRuns(context, { repos, timerPriorityQueue }, { ...config, lookaheadWindowMs: 59_999 })
 			);
 
 			expect(await timerPriorityQueue.peekNext()).toBeNull();
@@ -327,7 +300,7 @@ describe("processImminentRecurringRuns", () => {
 			await withFakeClock(now, () =>
 				processImminentRecurringRuns(
 					context,
-					{ repos, childRunCanceller: createChildRunCanceller(), timerPriorityQueue },
+					{ repos, timerPriorityQueue },
 					{ ...config, maxOccurrencesPerSchedule: 2, lookaheadWindowMs: 0 }
 				)
 			);
@@ -354,7 +327,6 @@ describe("processImminentRecurringRuns", () => {
 			);
 			const workflowRunStateMachine = createWorkflowRunStateMachine({
 				repos,
-				childRunCanceller: createChildRunCanceller(),
 			});
 			await workflowRunStateMachine.transitionState(namespaceRequestContext, {
 				type: "pessimistic",
@@ -377,10 +349,11 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{ type: "pessimistic", id: runId, state: { status: "paused" } }
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "pessimistic",
+				id: runId,
+				state: { status: "paused" },
+			});
 			return { runId };
 		},
 		sleeping: async ({ context, repos, publisher }, schedule) => {
@@ -388,15 +361,12 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: runId,
-					state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
-					expectedRevision: revisionWhenClaimed,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
+				expectedRevision: revisionWhenClaimed,
+			});
 			return { runId };
 		},
 		awaiting_event: async ({ context, repos, publisher }, schedule) => {
@@ -404,16 +374,13 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: runId,
-					state: { status: "awaiting_event", eventName: "paymentReceived" },
-					expectedRevision: revisionWhenClaimed,
-					expectedSignalSequence: 0,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "awaiting_event", eventName: "paymentReceived" },
+				expectedRevision: revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
 			return { runId };
 		},
 		awaiting_retry: async ({ context, repos, publisher }, schedule) => {
@@ -421,20 +388,17 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: runId,
-					state: {
-						status: "awaiting_retry",
-						cause: "self",
-						error: { name: "Error", message: "invoice service unavailable" },
-						nextAttemptInMs: ONE_HOUR_MS,
-					},
-					expectedRevision: revisionWhenClaimed,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: runId,
+				state: {
+					status: "awaiting_retry",
+					cause: "self",
+					error: { name: "Error", message: "invoice service unavailable" },
+					nextAttemptInMs: ONE_HOUR_MS,
+				},
+				expectedRevision: revisionWhenClaimed,
+			});
 			return { runId };
 		},
 		awaiting_task_retry: async ({ context, repos, publisher }, schedule) => {
@@ -459,15 +423,12 @@ describe("processImminentRecurringRuns", () => {
 					nextAttemptInMs: ONE_HOUR_MS,
 				},
 			});
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: claimedRun.runId,
-					state: { status: "awaiting_task_retry" },
-					expectedRevision: claimedRun.revisionWhenClaimed,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: claimedRun.runId,
+				state: { status: "awaiting_task_retry" },
+				expectedRevision: claimedRun.revisionWhenClaimed,
+			});
 			return { runId: claimedRun.runId };
 		},
 		awaiting_child_workflow: async ({ context, repos, publisher }, schedule) => {
@@ -479,16 +440,13 @@ describe("processImminentRecurringRuns", () => {
 				{ repos, namespaceRequestContext },
 				{ parent: { workflowRunId: runId, expectedRevision: revisionWhenClaimed } }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: runId,
-					state: { status: "awaiting_child_workflow", childWorkflowRunId: childRun.runId },
-					expectedRevision: revisionWhenClaimed,
-					expectedSignalSequence: 0,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "awaiting_child_workflow", childWorkflowRunId: childRun.runId },
+				expectedRevision: revisionWhenClaimed,
+				expectedSignalSequence: 0,
+			});
 			return { runId };
 		},
 		stalled: async ({ context, repos }, schedule) => {
@@ -514,10 +472,11 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{ type: "pessimistic", id: runId, state: { status: "cancelled" } }
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "pessimistic",
+				id: runId,
+				state: { status: "cancelled" },
+			});
 			return { runId };
 		},
 		completed: async ({ context, repos, publisher }, schedule) => {
@@ -533,15 +492,12 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: runId,
-					state: { status: "failed", cause: "self", error: { name: "Error", message: "invoice service unavailable" } },
-					expectedRevision: revisionWhenClaimed,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "failed", cause: "self", error: { name: "Error", message: "invoice service unavailable" } },
+				expectedRevision: revisionWhenClaimed,
+			});
 			return { runId };
 		},
 	} satisfies Record<TerminalWorkflowRunStatus, SeedRunFromSchedule>;
@@ -560,9 +516,7 @@ describe("processImminentRecurringRuns", () => {
 					await repos.workflowRun.getById({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
 				).toEqual(expect.objectContaining({ id: runId, status }));
 
-				await withFakeClock(secondOccurrence, () =>
-					processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-				);
+				await withFakeClock(secondOccurrence, () => processImminentRecurringRuns(context, { repos }, config));
 
 				expect(
 					await repos.workflowRun.getByReferenceWithWorkflowAndState({
@@ -592,9 +546,7 @@ describe("processImminentRecurringRuns", () => {
 					await repos.workflowRun.getById({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
 				).toEqual(expect.objectContaining({ id: runId, status }));
 
-				await withFakeClock(secondOccurrence, () =>
-					processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-				);
+				await withFakeClock(secondOccurrence, () => processImminentRecurringRuns(context, { repos }, config));
 
 				expect(
 					await repos.workflowRun.getByReferenceWithWorkflowAndState({
@@ -628,9 +580,7 @@ describe("processImminentRecurringRuns", () => {
 				{ schedule }
 			);
 
-			await withFakeClock(secondOccurrence, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(secondOccurrence, () => processImminentRecurringRuns(context, { repos }, config));
 
 			expect(
 				await repos.workflowRun.getByIdWithState({ namespaceId: namespaceRequestContext.namespaceId, id: runId })
@@ -668,9 +618,7 @@ describe("processImminentRecurringRuns", () => {
 			);
 			const { taskIdByStatus } = await seedTaskInEachStatusOnRun({ repos, namespaceRequestContext }, claimedRun);
 
-			await withFakeClock(schedule.nextRunAt + 60_000, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(schedule.nextRunAt + 60_000, () => processImminentRecurringRuns(context, { repos }, config));
 
 			const discardedTasks = await repos.task.listByWorkflowRunIdsAndStatuses(claimedRun.runId, ["discarded"]);
 			expect(discardedTasks.map((task) => task.id).sort()).toEqual(
@@ -701,9 +649,7 @@ describe("processImminentRecurringRuns", () => {
 				})
 			).toEqual(expect.objectContaining({ workflowRunId: runId, status: "claimed" }));
 
-			await withFakeClock(schedule.nextRunAt + 60_000, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(schedule.nextRunAt + 60_000, () => processImminentRecurringRuns(context, { repos }, config));
 
 			expect(
 				await repos.workflowRunOutbox.getByWorkflowRunId({
@@ -724,19 +670,14 @@ describe("processImminentRecurringRuns", () => {
 				{ daemonContext: context, namespaceRequestContext, repos, publisher },
 				{ schedule }
 			);
-			await createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-				namespaceRequestContext,
-				{
-					type: "optimistic",
-					id: runId,
-					state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
-					expectedRevision: revisionWhenClaimed,
-				}
-			);
+			await createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+				type: "optimistic",
+				id: runId,
+				state: { status: "sleeping", sleepName: "cool-down", durationMs: ONE_HOUR_MS },
+				expectedRevision: revisionWhenClaimed,
+			});
 
-			await withFakeClock(secondOccurrence, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(secondOccurrence, () => processImminentRecurringRuns(context, { repos }, config));
 
 			expect(await repos.sleep.listByWorkflowRunId(runId as WorkflowRunId)).toEqual([
 				expect.objectContaining({
@@ -769,9 +710,7 @@ describe("processImminentRecurringRuns", () => {
 				{ parent: { workflowRunId: runId, expectedRevision: revisionWhenClaimed } }
 			);
 
-			await withFakeClock(schedule.nextRunAt + 60_000, () =>
-				processImminentRecurringRuns(context, { repos, childRunCanceller: createChildRunCanceller() }, config)
-			);
+			await withFakeClock(schedule.nextRunAt + 60_000, () => processImminentRecurringRuns(context, { repos }, config));
 
 			const { rows: scheduledRuns } = await repos.workflowRun.listByFilters(
 				{ namespaceId: namespaceRequestContext.namespaceId, status: ["scheduled"] },
@@ -794,6 +733,41 @@ describe("processImminentRecurringRuns", () => {
 					}),
 				}),
 			]);
+		}));
+
+	test("a cancel_previous schedule adds the cancel-child-runs run's timer to the priority queue, at the cancelled run's priority", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { schedule } = await seedActiveSchedule(
+				{ repos, namespaceRequestContext },
+				{
+					spec: { type: "interval", everyMs: 60_000, overlapPolicy: "cancel_previous" },
+					workflowRunOptions: { priority: 2 },
+				}
+			);
+			const { runId, revisionWhenClaimed } = await seedClaimedRunFromSchedule(
+				{ daemonContext: context, namespaceRequestContext, repos, publisher },
+				{ schedule }
+			);
+			// The child carries no priority, so the timer's priority can only come from the cancelled run.
+			await seedQueuedRun(
+				{ daemonContext: context, namespaceRequestContext, repos },
+				{ parent: { workflowRunId: runId, expectedRevision: revisionWhenClaimed } }
+			);
+
+			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
+			const firedAt = schedule.nextRunAt + 60_000;
+			await withFakeClock(firedAt, () => processImminentRecurringRuns(context, { repos, timerPriorityQueue }, config));
+
+			const { rows: scheduledRuns } = await repos.workflowRun.listByFilters(
+				{ namespaceId: namespaceRequestContext.namespaceId, status: ["scheduled"] },
+				10,
+				0,
+				{ order: "asc" }
+			);
+			expect(scheduledRuns).toEqual([expect.objectContaining({ name: "cancel-child-runs" })]);
+			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual(
+				scheduledRuns.map(({ id }) => ({ type: "scheduled", id, rank: computeRank({ dueAt: firedAt, priority: 2 }) }))
+			);
 		}));
 
 	test("a cancel_previous schedule leaves alone a previous run that completes after the listing, and still fires the occurrence", () =>
@@ -847,11 +821,7 @@ describe("processImminentRecurringRuns", () => {
 
 			// The other schedule's run is cancelled in the same pass, so the pass goes on to record cancellations.
 			await withFakeClock(secondOccurrence, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos: reposCompletingAfterListing, childRunCanceller: createChildRunCanceller() },
-					config
-				)
+				processImminentRecurringRuns(context, { repos: reposCompletingAfterListing }, config)
 			);
 			expect(listedRunIds.sort()).toEqual([runToComplete.runId, runToCancel.runId].sort());
 			expect(
@@ -907,11 +877,7 @@ describe("processImminentRecurringRuns", () => {
 			const timerPriorityQueue = inMemoryTimerPriorityQueue()({ logger: noopLogger });
 			// The next run lands one period on, exactly at the edge of the lookahead.
 			await withFakeClock(schedule.nextRunAt, () =>
-				processImminentRecurringRuns(
-					context,
-					{ repos, childRunCanceller: createChildRunCanceller(), timerPriorityQueue },
-					{ ...config, lookaheadWindowMs: 60_000 }
-				)
+				processImminentRecurringRuns(context, { repos, timerPriorityQueue }, { ...config, lookaheadWindowMs: 60_000 })
 			);
 
 			expect(await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 })).toEqual([

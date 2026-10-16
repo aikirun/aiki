@@ -8,7 +8,6 @@ import { describe, expect, test } from "vitest";
 import { startDueTimersConsumer } from "./due-timers-consumer";
 import type { Repositories } from "../infra/db/types";
 import { computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 
 const ONE_MINUTE_MS = 60 * 1_000;
 
@@ -49,7 +48,6 @@ describe("startDueTimersConsumer", () => {
 			repos: {} as unknown as Repositories,
 			signal,
 			timerPriorityQueue,
-			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
 				pageSize: 1,
 				overshootMs: 10,
@@ -97,7 +95,6 @@ describe("startDueTimersConsumer", () => {
 			repos,
 			signal,
 			timerPriorityQueue,
-			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
 				pageSize: 1_000,
 				overshootMs: 10,
@@ -167,7 +164,6 @@ describe("startDueTimersConsumer", () => {
 				repos,
 				signal,
 				timerPriorityQueue: consumerTimerPriorityQueue,
-				childRunCanceller: createChildRunCanceller(),
 				configProvider: asConfigProvider(() => ({
 					pageSize: 1_000,
 					overshootMs: 10,
@@ -249,7 +245,6 @@ describe("startDueTimersConsumer", () => {
 			repos: {} as unknown as Repositories,
 			signal,
 			timerPriorityQueue,
-			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
 				pageSize: 1_000,
 				overshootMs: ONE_MINUTE_MS,
@@ -305,7 +300,6 @@ describe("startDueTimersConsumer", () => {
 			repos: {} as unknown as Repositories,
 			signal,
 			timerPriorityQueue,
-			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
 				pageSize: 1_000,
 				overshootMs: ONE_MINUTE_MS,
@@ -388,7 +382,6 @@ describe("startDueTimersConsumer", () => {
 			repos,
 			signal,
 			timerPriorityQueue,
-			childRunCanceller: createChildRunCanceller(),
 			configProvider: asConfigProvider(() => ({
 				pageSize: 1_000,
 				// The timer is overdue, but an overshoot larger than any clock reading still makes the consumer wait

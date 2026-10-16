@@ -1,3 +1,4 @@
+import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { NotFoundError, ValidationError } from "@aikirun/lib/error";
 import { propsRequiredNonNull } from "@aikirun/lib/object";
 import { MAX_TIMESTAMP_MS, type TimestampMs } from "@aikirun/lib/timestamp";
@@ -22,7 +23,7 @@ import { InvalidWorkflowRunStateTransitionError, WorkflowRunRevisionConflictErro
 import type { Repositories, TxRepositories } from "../../infra/db/types";
 import type { ImminentTimerQueue } from "../../infra/timer/imminent-timer-queue";
 import type { NamespaceRequestContext } from "../../middleware/context";
-import type { ChildRunCanceller } from "../cancel-child-runs";
+import { cancelChildRuns } from "../cancel-child-runs";
 import { deliverTerminatedSignalToParentRun } from "../deliver-terminated-signals";
 import { discardStaleTasks } from "../discard-stale-tasks";
 
@@ -134,24 +135,19 @@ export function assertIsValidWorkflowRunStateTransition(
 
 export interface WorkflowRunStateMachineDeps {
 	repos: Repositories;
-	childRunCanceller: ChildRunCanceller;
 	imminentTimerQueue?: ImminentTimerQueue;
 }
 
-export const createWorkflowRunStateMachine = ({
-	repos,
-	childRunCanceller,
-	imminentTimerQueue,
-}: WorkflowRunStateMachineDeps) => ({
+export const createWorkflowRunStateMachine = ({ repos, imminentTimerQueue }: WorkflowRunStateMachineDeps) => ({
 	async transitionState(
 		context: NamespaceRequestContext,
 		request: WorkflowRunTransitionStateRequest,
 		txRepos?: TxRepositories
 	): Promise<WorkflowRunTransitionStateResponseV1> {
 		const response = txRepos
-			? await transitionStateInTx(context, request, childRunCanceller, txRepos, imminentTimerQueue)
+			? await transitionStateInTx(context, request, txRepos, imminentTimerQueue)
 			: await repos.transaction(async (newTxRepos) =>
-					transitionStateInTx(context, request, childRunCanceller, newTxRepos, imminentTimerQueue)
+					transitionStateInTx(context, request, newTxRepos, imminentTimerQueue)
 				);
 		context.logger.debug("Workflow state transition", {
 			"aiki.runId": request.id,
@@ -167,7 +163,6 @@ export type WorkflowRunStateMachine = ReturnType<typeof createWorkflowRunStateMa
 async function transitionStateInTx(
 	context: NamespaceRequestContext,
 	request: WorkflowRunTransitionStateRequest,
-	childRunCanceller: ChildRunCanceller,
 	txRepos: TxRepositories,
 	imminentTimerQueue?: ImminentTimerQueue
 ): Promise<WorkflowRunTransitionStateResponseV1> {
@@ -249,15 +244,18 @@ async function transitionStateInTx(
 
 	if (toState.status === "cancelled") {
 		await discardStaleTasks([{ id: runId, revision: updatedRun.revision }], ["running", "awaiting_retry"], txRepos);
-		await childRunCanceller.cancel(
+		const childCancellationTimers = await cancelChildRuns(
 			[{ namespaceId, id: runId, pool: run.options?.pool, priority: run.options?.priority }],
 			txRepos,
 			context.logger
 		);
+		if (imminentTimerQueue && isNonEmptyArray(childCancellationTimers)) {
+			txRepos.onCommit(() => imminentTimerQueue.add(childCancellationTimers));
+		}
 	}
 
 	if (isTerminalWorkflowRunStatus(toState.status) && propsRequiredNonNull(run, "parentWorkflowRunId")) {
-		await deliverTerminatedSignalToParentRun(
+		const parentWakeTimers = await deliverTerminatedSignalToParentRun(
 			[
 				{
 					namespaceId,
@@ -269,9 +267,11 @@ async function transitionStateInTx(
 			],
 			now,
 			txRepos,
-			context.logger,
-			imminentTimerQueue
+			context.logger
 		);
+		if (imminentTimerQueue && isNonEmptyArray(parentWakeTimers)) {
+			txRepos.onCommit(() => imminentTimerQueue.add(parentWakeTimers));
+		}
 	}
 
 	return { revision: updatedRun.revision, state: toState, attempts: run.attempts };

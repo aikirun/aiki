@@ -12,7 +12,7 @@ import { ulid } from "ulidx";
 
 import type { TxRepositories } from "../infra/db/types";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
-import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
+import type { Timer } from "../infra/timer/imminent-timer-queue";
 
 export interface TerminatedChildRun {
 	namespaceId: NamespaceId;
@@ -25,16 +25,15 @@ export interface TerminatedChildRun {
 /**
  * Delivers the terminal signal of each child run to its parent, in one batch: writes the
  * terminal wait rows, bumps each parent's signal sequence once, and wakes the parents that
- * are suspended on one of the children. Every path that takes a run with a parent to a
+ * are suspended on one of the children, returning their timers. Every path that takes a run with a parent to a
  * terminal state must pass through here — a path that skips it opens a path to a lost-wakeup race.
  */
 export async function deliverTerminatedSignalToParentRun(
 	runs: NonEmptyArray<TerminatedChildRun>,
 	now: TimestampMs,
 	txRepos: TxRepositories,
-	logger: Logger,
-	imminentTimerQueue: ImminentTimerQueue | undefined
-): Promise<void> {
+	logger: Logger
+): Promise<Timer[]> {
 	const parentsRunsById = new Map<WorkflowRunId, { namespaceId: NamespaceId; id: WorkflowRunId }>();
 	for (const run of runs) {
 		const parentRunId = run.parentWorkflowRunId as WorkflowRunId;
@@ -72,7 +71,7 @@ export async function deliverTerminatedSignalToParentRun(
 
 	const suspendedParentsRuns = incrementedParentsRuns.filter((parent) => parent.status === "awaiting_child_workflow");
 	if (!isNonEmptyArray(suspendedParentsRuns)) {
-		return;
+		return [];
 	}
 
 	const parentRunsLatestTransition = await txRepos.stateTransition.getByIds(
@@ -119,7 +118,7 @@ export async function deliverTerminatedSignalToParentRun(
 	}
 
 	if (!isNonEmptyArray(parentRunUpdates)) {
-		return;
+		return [];
 	}
 
 	const scheduledParentRunIds = await txRepos.workflowRun.bulkTransitionToScheduled(
@@ -128,7 +127,7 @@ export async function deliverTerminatedSignalToParentRun(
 		parentRunUpdates
 	);
 	if (!isNonEmptyArray(scheduledParentRunIds)) {
-		return;
+		return [];
 	}
 
 	let parentRunStateTransitionEntriesToInsert = parentRunStateTransitionEntries;
@@ -142,20 +141,12 @@ export async function deliverTerminatedSignalToParentRun(
 		await txRepos.stateTransition.appendBatch(parentRunStateTransitionEntriesToInsert);
 	}
 
-	if (imminentTimerQueue) {
-		txRepos.onCommit(() =>
-			imminentTimerQueue.add(
-				asNonEmptyArray(
-					scheduledParentRunIds.map((id) => ({
-						type: "scheduled",
-						id,
-						dueAt: now,
-						priority: incrementedParentRunsById.get(id)?.options?.priority,
-					}))
-				)
-			)
-		);
-	}
-
 	logger.debug("Woke parents waiting on terminal children", { "aiki.parentRunIds": scheduledParentRunIds });
+
+	return scheduledParentRunIds.map((id) => ({
+		type: "scheduled",
+		id,
+		dueAt: now,
+		priority: incrementedParentRunsById.get(id)?.options?.priority,
+	}));
 }

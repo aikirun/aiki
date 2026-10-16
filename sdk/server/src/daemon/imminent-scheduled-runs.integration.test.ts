@@ -9,7 +9,6 @@ import { describe, expect, test } from "vitest";
 import { processImminentScheduledRuns, queueScheduledRuns } from "./imminent-scheduled-runs";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createEventService } from "../service/event";
 import { createWorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import { END_OF_TIME, withFakeClock } from "../testing/clock";
@@ -83,10 +82,11 @@ describe("processImminentScheduledRuns", () => {
 		resumption: async ({ context, repos, publisher }) => {
 			const { runId } = await seedPausedRun({ daemonContext: context, namespaceRequestContext, repos, publisher });
 			await withFakeClock(EPOCH_MS, () =>
-				createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-					namespaceRequestContext,
-					{ type: "pessimistic", id: runId, state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" } }
-				)
+				createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+					type: "pessimistic",
+					id: runId,
+					state: { status: "scheduled", scheduledInMs: 0, reason: "resumption" },
+				})
 			);
 			return { runId };
 		},
@@ -96,10 +96,11 @@ describe("processImminentScheduledRuns", () => {
 				{ sleepName: "cool-down", durationMs: ONE_HOUR_MS }
 			);
 			await withFakeClock(EPOCH_MS, () =>
-				createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-					namespaceRequestContext,
-					{ type: "pessimistic", id: runId, state: { status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" } }
-				)
+				createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+					type: "pessimistic",
+					id: runId,
+					state: { status: "scheduled", scheduledInMs: 0, reason: "wakeup_early" },
+				})
 			);
 			return { runId };
 		},
@@ -110,7 +111,6 @@ describe("processImminentScheduledRuns", () => {
 			);
 			const workflowRunStateMachine = createWorkflowRunStateMachine({
 				repos,
-				childRunCanceller: createChildRunCanceller(),
 			});
 			await withFakeClock(EPOCH_MS, () =>
 				createEventService({ repos, workflowRunStateMachine }).sendEventToWorkflowRun(namespaceRequestContext, {
@@ -131,25 +131,23 @@ describe("processImminentScheduledRuns", () => {
 				publisher,
 			});
 			await withFakeClock(EPOCH_MS, () =>
-				createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-					namespaceRequestContext,
-					{
-						type: "optimistic",
-						id: parentRun.child.runId,
-						state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
-						expectedRevision: parentRun.child.revisionWhenClaimed,
-					}
-				)
+				createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+					type: "optimistic",
+					id: parentRun.child.runId,
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					expectedRevision: parentRun.child.revisionWhenClaimed,
+				})
 			);
 			return { runId: parentRun.runId };
 		},
 		redelivery: async ({ context, repos }) => {
 			const { runId } = await seedStalledRun({ daemonContext: context, namespaceRequestContext, repos });
 			await withFakeClock(EPOCH_MS, () =>
-				createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() }).transitionState(
-					namespaceRequestContext,
-					{ type: "pessimistic", id: runId, state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" } }
-				)
+				createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
+					type: "pessimistic",
+					id: runId,
+					state: { status: "scheduled", scheduledInMs: 0, reason: "redelivery" },
+				})
 			);
 			return { runId };
 		},
@@ -448,7 +446,6 @@ describe("queueScheduledRuns", () => {
 
 			const pausedRunA = await createWorkflowRunStateMachine({
 				repos,
-				childRunCanceller: createChildRunCanceller(),
 			}).transitionState(namespaceRequestContext, { type: "pessimistic", id: runA.runId, state: { status: "paused" } });
 
 			await queueScheduledRuns(context, repos, undefined, republishBackoff, [listedA, listedB]);

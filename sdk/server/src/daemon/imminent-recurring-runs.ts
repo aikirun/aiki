@@ -21,18 +21,18 @@ import type { ScheduleOccurrenceUpdate } from "../infra/db/types/schedule";
 import type { WorkflowRunStateTransitionRowInsert } from "../infra/db/types/state-transition";
 import type { WorkflowRunRowInsert } from "../infra/db/types/workflow-run";
 import type { WorkflowRunOutboxRowInsertPending } from "../infra/db/types/workflow-run-outbox";
+import type { Timer } from "../infra/timer/imminent-timer-queue";
 import { runConcurrently } from "../lib/concurrency";
 import { createKeysetStreamCursorAdvancer } from "../lib/keyset-stream";
 import { computeMaxRank, computeRank } from "../lib/rank";
 import type { DaemonContext } from "../middleware/context";
-import type { CancelledRunMeta, ChildRunCanceller } from "../service/cancel-child-runs";
+import { type CancelledRunMeta, cancelChildRuns } from "../service/cancel-child-runs";
 import { deliverTerminatedSignalToParentRun, type TerminatedChildRun } from "../service/deliver-terminated-signals";
 import { discardStaleTasks } from "../service/discard-stale-tasks";
 import { getDueOccurrences, getReferenceId, scheduleRowToDomain } from "../service/schedule";
 
 export interface ProcessImminentRecurringRunsDeps {
 	repos: Repositories;
-	childRunCanceller: ChildRunCanceller;
 	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
 }
@@ -488,7 +488,7 @@ async function processOverlapCancelPreviousSchedules(
 		republishBackoff: RepublishBackoff;
 	}
 ) {
-	const { repos, childRunCanceller, timerPriorityQueue, publisher } = deps;
+	const { repos, timerPriorityQueue, publisher } = deps;
 	const { schedules, now, maxOccurrencesPerSchedule, lookaheadWindowMs, overshootMs, republishBackoff } = params;
 
 	const { activeRunsByScheduleId } = await fetchActiveRunsBySchedule(repos, schedules);
@@ -588,9 +588,8 @@ async function processOverlapCancelPreviousSchedules(
 	}
 
 	const insertedOutboxEntries = await repos.transaction(async (txRepos) => {
-		const inserted = await cancelPreviousAndInsertRunsInTx(
+		const { outboxEntries, scheduledRunTimers } = await cancelPreviousAndInsertRunsInTx(
 			context,
-			childRunCanceller,
 			now as TimestampMs,
 			{
 				runIdsToCancel,
@@ -602,10 +601,13 @@ async function processOverlapCancelPreviousSchedules(
 			},
 			txRepos
 		);
+		for (const { type, id, dueAt, priority } of scheduledRunTimers) {
+			timersDueSoon.push({ type, id, rank: computeRank({ dueAt, priority }) });
+		}
 		if (timerPriorityQueue && isNonEmptyArray(timersDueSoon)) {
 			txRepos.onCommit(() => queueTimers(context, timerPriorityQueue, timersDueSoon, overshootMs));
 		}
-		return inserted;
+		return outboxEntries;
 	});
 
 	if (publisher && isNonEmptyArray(insertedOutboxEntries)) {
@@ -615,7 +617,6 @@ async function processOverlapCancelPreviousSchedules(
 
 async function cancelPreviousAndInsertRunsInTx(
 	context: DaemonContext,
-	childRunCanceller: ChildRunCanceller,
 	now: TimestampMs,
 	entries: {
 		runIdsToCancel: string[];
@@ -626,7 +627,7 @@ async function cancelPreviousAndInsertRunsInTx(
 		newOutboxEntries: WorkflowRunOutboxRowInsertPending[];
 	},
 	txRepos: TxRepositories
-): Promise<WorkflowRunOutboxRowInsertPending[]> {
+): Promise<{ outboxEntries: WorkflowRunOutboxRowInsertPending[]; scheduledRunTimers: Timer[] }> {
 	const {
 		runIdsToCancel,
 		runsToCancel,
@@ -646,6 +647,7 @@ async function cancelPreviousAndInsertRunsInTx(
 
 	// Step 2: Discard in-flight tasks and outbox entries for the cancelled runs, then insert
 	// cancel state transitions only for actually cancelled runs and set latestStateTransitionId
+	const scheduledRunTimers: Timer[] = [];
 	if (cancelledRunsById.size) {
 		const cancelledRunIds = asNonEmptyArray(Array.from(cancelledRunsById.keys()));
 		await discardStaleTasks(asNonEmptyArray(cancelledRuns), ["running", "awaiting_retry"], txRepos);
@@ -697,12 +699,21 @@ async function cancelPreviousAndInsertRunsInTx(
 			await txRepos.workflowRun.bulkSetLatestStateTransitionId(cancelledRunStateTransitionIdUpdates);
 		}
 		if (isNonEmptyArray(cancelledRunsHavingParent)) {
-			// No imminent timer queue: schedule occurrences have no parents today, so this wakes
-			// nobody. If occurrences ever gain parents, thread the queue through the daemon deps.
-			await deliverTerminatedSignalToParentRun(cancelledRunsHavingParent, now, txRepos, context.logger, undefined);
+			const parentWakeTimers = await deliverTerminatedSignalToParentRun(
+				cancelledRunsHavingParent,
+				now,
+				txRepos,
+				context.logger
+			);
+			for (const timer of parentWakeTimers) {
+				scheduledRunTimers.push(timer);
+			}
 		}
 		if (isNonEmptyArray(cancelledRunsMeta)) {
-			await childRunCanceller.cancel(cancelledRunsMeta, txRepos, context.logger);
+			const childCancellationTimers = await cancelChildRuns(cancelledRunsMeta, txRepos, context.logger);
+			for (const timer of childCancellationTimers) {
+				scheduledRunTimers.push(timer);
+			}
 		}
 	}
 
@@ -711,10 +722,10 @@ async function cancelPreviousAndInsertRunsInTx(
 	await txRepos.stateTransition.appendBatch(newRunStateTransitionEntries);
 	await txRepos.schedule.bulkUpdateOccurrence(scheduleUpdates);
 	if (!isNonEmptyArray(newOutboxEntries)) {
-		return [];
+		return { outboxEntries: [], scheduledRunTimers };
 	}
 	await txRepos.workflowRunOutbox.createBatch(newOutboxEntries);
-	return newOutboxEntries;
+	return { outboxEntries: newOutboxEntries, scheduledRunTimers };
 }
 
 async function fetchActiveRunsBySchedule(repos: Repositories, schedules: NonEmptyArray<DueSchedule>) {
@@ -777,9 +788,9 @@ function queueTimers(
 			.add({ timers, overdueRank: computeMaxRank({ dueBy: Date.now() - overshootMs }) })
 			.then((result) => {
 				if (result.status === "failed") {
-					context.logger.debug("Failed to add recurring timers", { "aiki.count": timers.length });
+					context.logger.debug("Failed to add timers to priority queue", { "aiki.count": timers.length });
 				}
 			}),
-		(err) => context.logger.debug("Failed to add recurring timers", { err, "aiki.count": timers.length })
+		(err) => context.logger.debug("Failed to add timers to priority queue", { err, "aiki.count": timers.length })
 	);
 }

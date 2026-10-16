@@ -20,7 +20,6 @@ import type { ServerRuntimeConfig } from "../config";
 import type { Repositories } from "../infra/db/types";
 import type { DaemonContext } from "../middleware/context";
 import { createDaemonContext } from "../middleware/context";
-import type { ChildRunCanceller } from "../service/cancel-child-runs";
 
 export interface StartDaemonsDeps {
 	repos: Repositories;
@@ -28,7 +27,6 @@ export interface StartDaemonsDeps {
 	configProvider: ConfigProvider<ServerRuntimeConfig>;
 	publisher?: Publisher;
 	timerPriorityQueue?: TimerPriorityQueue;
-	childRunCanceller: ChildRunCanceller;
 }
 
 const MIN_GAP_FRACTION = 0.2;
@@ -90,7 +88,7 @@ export const pollingDaemon = <DaemonConfig>(
 });
 
 export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Promise<void> {
-	const { repos, signal, configProvider, publisher, timerPriorityQueue, childRunCanceller } = deps;
+	const { repos, signal, configProvider, publisher, timerPriorityQueue } = deps;
 
 	const { start: startPollingDaemon } = pollingDaemon(logger, signal, configProvider.scope("daemons"));
 
@@ -158,7 +156,7 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 		startPollingDaemon(
 			processImminentRecurringRuns,
 			"process-imminent-recurring-runs",
-			{ repos, childRunCanceller, publisher, timerPriorityQueue },
+			{ repos, publisher, timerPriorityQueue },
 			(config) => ({
 				...config.imminentRecurringRuns,
 				republishBackoff: config.publishPendingOutboxEntries.republishBackoff,
@@ -196,7 +194,6 @@ export async function startDaemons(logger: Logger, deps: StartDaemonsDeps): Prom
 				repos,
 				signal,
 				timerPriorityQueue,
-				childRunCanceller,
 				publisher,
 				configProvider: asConfigProvider(() => {
 					const config = configProvider.config.daemons;

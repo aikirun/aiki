@@ -7,7 +7,6 @@ import { describe, expect, test } from "vitest";
 import { processImminentSleepElapsedRuns, queueSleepElapsedRuns } from "./imminent-sleep-elapsed-runs";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createWorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import { END_OF_TIME, withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
@@ -398,7 +397,7 @@ describe("queueSleepElapsedRuns", () => {
 				throw new Error("Both sleeping runs must be listed as due");
 			}
 
-			const stateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
+			const stateMachine = createWorkflowRunStateMachine({ repos });
 			const wokenRunA = await stateMachine.transitionState(namespaceRequestContext, {
 				type: "pessimistic",
 				id: runA.runId,

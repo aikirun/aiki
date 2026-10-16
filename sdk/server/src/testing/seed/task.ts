@@ -5,7 +5,6 @@ import type { TaskStatus } from "@aikirun/types/workflow/task";
 
 import { type SeedRunDeps, type SeedRunOverrides, seedClaimedRun } from "./run";
 import { recoverOverdueOutboxEntries } from "../../daemon/recover-overdue-outbox-entries";
-import { createChildRunCanceller } from "../../service/cancel-child-runs";
 import { discardStaleTasks } from "../../service/discard-stale-tasks";
 import { createTaskStateMachine } from "../../service/state-machine/task";
 import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
@@ -238,7 +237,6 @@ export async function seedAwaitingTaskRetryRun(
 
 	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
-		childRunCanceller: createChildRunCanceller(),
 	});
 	const suspendedRun = await workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
@@ -265,7 +263,6 @@ export async function seedAwaitingRetryRunAfterTaskFailure(
 
 	const workflowRunStateMachine = createWorkflowRunStateMachine({
 		repos,
-		childRunCanceller: createChildRunCanceller(),
 	});
 	// The transition takes a relative delay, so a frozen clock turns the authored absolute
 	// due time into that delay. Frozen at 1, not 0: bun's setSystemTime treats the zero

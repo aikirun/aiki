@@ -16,7 +16,6 @@ import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
 import type { NamespaceRequestContext } from "../../../middleware/context";
-import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createWorkflowRunService } from "../../../service/workflow-run";
 import { END_OF_TIME, withFakeClock } from "../../../testing/clock";
 import { referencedWorkflowRunRowFactory } from "../../../testing/data-factory/infra/workflow-run";
@@ -193,7 +192,7 @@ describe("getByReferenceWithWorkflowAndState", () => {
 				{ namespaceRequestContext: context, repos, publisher },
 				{ options: { reference: { id: referenceId } } }
 			);
-			const workflowRunService = createWorkflowRunService({ repos, childRunCanceller: createChildRunCanceller() });
+			const workflowRunService = createWorkflowRunService({ repos });
 			const input = { orderId: "order-7" };
 			const underV3RunId = await workflowRunService.createWorkflowRun(context, {
 				name: runUnderV2.workflowName,

@@ -2,7 +2,6 @@ import type { TimestampMs } from "@aikirun/lib/timestamp";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { describe, expect, test } from "vitest";
 
-import { createChildRunCanceller } from "../../../service/cancel-child-runs";
 import { createWorkflowRunStateMachine } from "../../../service/state-machine/workflow-run";
 import { withFakeClock } from "../../../testing/clock";
 import { createServiceHarness, type ServiceHarnessDeps } from "../../../testing/harness";
@@ -29,7 +28,7 @@ async function completeChildRun(
 	params: { runId: string; expectedRevision: number; output: unknown }
 ): Promise<void> {
 	const { context, repos } = deps;
-	const stateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller: createChildRunCanceller() });
+	const stateMachine = createWorkflowRunStateMachine({ repos });
 	await stateMachine.transitionState(context, {
 		type: "optimistic",
 		id: params.runId,

@@ -10,7 +10,6 @@ import { publishPendingOutboxEntries } from "../../daemon/publish-pending-outbox
 import { stallUndeliverableRuns } from "../../daemon/stall-undeliverable-runs";
 import type { Repositories } from "../../infra/db/types";
 import type { DaemonContext, NamespaceRequestContext } from "../../middleware/context";
-import { createChildRunCanceller } from "../../service/cancel-child-runs";
 import { createWorkflowRunStateMachine } from "../../service/state-machine/workflow-run";
 import { createWorkflowRunService } from "../../service/workflow-run";
 import { withFakeClock } from "../clock";
@@ -23,9 +22,8 @@ const seededRunOutput = { receiptId: "rcp-3" } as const;
 const publishPendingOutboxEntriesDaemonConfig = defaultServerRuntimeConfig.daemons.publishPendingOutboxEntries;
 
 function createServices(repos: Repositories) {
-	const childRunCanceller = createChildRunCanceller();
-	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos, childRunCanceller });
-	const workflowRun = createWorkflowRunService({ repos, childRunCanceller });
+	const workflowRunStateMachine = createWorkflowRunStateMachine({ repos });
+	const workflowRun = createWorkflowRunService({ repos });
 	return { workflowRun, workflowRunStateMachine };
 }
 

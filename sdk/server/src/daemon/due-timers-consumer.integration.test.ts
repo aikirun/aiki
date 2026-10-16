@@ -11,7 +11,6 @@ import { describe, expect, test } from "vitest";
 import { processDueTimers } from "./due-timers-consumer";
 import { defaultServerRuntimeConfig } from "../config/runtime";
 import { computeRank } from "../lib/rank";
-import { createChildRunCanceller } from "../service/cancel-child-runs";
 import { createScheduleService } from "../service/schedule";
 import { withFakeClock } from "../testing/clock";
 import { namespaceRequestContextFactory } from "../testing/data-factory/middleware/context";
@@ -59,7 +58,6 @@ describe("processDueTimers", () => {
 						repos,
 						signal: new AbortController().signal,
 						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
-						childRunCanceller: createChildRunCanceller(),
 						configProvider: asConfigProvider(() => ({
 							pageSize: 100,
 							overshootMs: 0,
@@ -112,7 +110,6 @@ describe("processDueTimers", () => {
 						repos,
 						signal: new AbortController().signal,
 						timerPriorityQueue,
-						childRunCanceller: createChildRunCanceller(),
 						configProvider: asConfigProvider(() => ({
 							pageSize: 100,
 							overshootMs: 0,
@@ -154,7 +151,6 @@ describe("processDueTimers", () => {
 						repos,
 						signal: new AbortController().signal,
 						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
-						childRunCanceller: createChildRunCanceller(),
 						configProvider: asConfigProvider(() => ({
 							pageSize: 100,
 							overshootMs: 0,
@@ -208,7 +204,6 @@ describe("processDueTimers", () => {
 						repos,
 						signal: new AbortController().signal,
 						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
-						childRunCanceller: createChildRunCanceller(),
 						configProvider: asConfigProvider(() => ({
 							pageSize: 100,
 							overshootMs: 0,
@@ -240,7 +235,6 @@ describe("processDueTimers", () => {
 					repos,
 					signal: new AbortController().signal,
 					timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
-					childRunCanceller: createChildRunCanceller(),
 					configProvider: asConfigProvider(() => ({
 						pageSize: 100,
 						overshootMs: 0,
@@ -362,7 +356,6 @@ describe("processDueTimers", () => {
 						repos,
 						signal: new AbortController().signal,
 						timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
-						childRunCanceller: createChildRunCanceller(),
 						configProvider: asConfigProvider(() => ({
 							pageSize: 100,
 							overshootMs: 0,
@@ -397,7 +390,6 @@ describe("processDueTimers", () => {
 					repos,
 					signal: new AbortController().signal,
 					timerPriorityQueue: inMemoryTimerPriorityQueue()({ logger: noopLogger }),
-					childRunCanceller: createChildRunCanceller(),
 					configProvider: asConfigProvider(() => ({
 						pageSize: 100,
 						overshootMs: 0,
