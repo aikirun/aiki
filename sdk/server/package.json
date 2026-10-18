@@ -28,8 +28,8 @@
 	},
 	"dependencies": {
 		"@aikirun/types": "workspace:*",
-		"@orpc/contract": "^1.9.3",
-		"@orpc/server": "^1.9.3",
+		"@orpc/contract": "^1.15.7",
+		"@orpc/server": "^1.15.7",
 		"arktype": "^2.1.29",
 		"cac": "^6.7.14",
 		"cron-parser": "^5.4.0",
