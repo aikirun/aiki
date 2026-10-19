@@ -627,6 +627,14 @@ html.speaker-view body { padding: 20px 28px 40px; }
 	color: var(--faint);
 }
 
+/* Camera mode, for a recording with the camera in the bottom-right corner: the content narrows to leave a
+   strip on the right for it, and the page number moves left, ahead of the reveal dots. Text keeps its size,
+   so a label centred on a narrower chart can reach past the chart's edge into the stage's padding. */
+html.is-camera .stage { padding-right: 204px; }
+html.is-camera .page { right: auto; left: 64px; }
+html.is-camera .reveals { left: 136px; }
+html.is-camera .timeline { overflow: visible; }
+
 /* Motion only answers the presenter's key press: the thing just revealed, the entry just written. */
 .is-entering { animation: enter 320ms ease-out; }
 .entry.is-new { animation: written 1100ms ease-out; }
@@ -1272,7 +1280,6 @@ const PARTS = [
 <script>
 const STAGE_WIDTH = 1280;
 const STAGE_HEIGHT = 720;
-const TIMELINE_WIDTH = STAGE_WIDTH - 128;
 const stage = document.getElementById("stage");
 const notesList = document.getElementById("notes");
 
@@ -1416,10 +1423,16 @@ function renderEntries(slide, state, isEntering) {
 	return `${heading(slide)}<section class="big-entries">${entries}</section>${conclusion}`;
 }
 
+// Timelines and charts span the stage less its side padding, which camera mode widens by 140px on the right.
+function timelineWidth() {
+	return STAGE_WIDTH - 128 - (isCameraMode() ? 140 : 0);
+}
+
 // Polls on a line, the moment the timer is due, and the stretch it waits for the next poll.
 function renderTicks(ticks, classes) {
 	const left = 40;
-	const right = TIMELINE_WIDTH - 40;
+	const width = timelineWidth();
+	const right = width - 40;
 	const axisY = 78;
 	const spanMs = ticks.everyMs * 3;
 	const x = (ms) => left + (ms / spanMs) * (right - left);
@@ -1433,7 +1446,7 @@ function renderTicks(ticks, classes) {
 	}
 
 	return `
-		<svg class="timeline${classes}" viewBox="0 0 ${TIMELINE_WIDTH} 132" width="${TIMELINE_WIDTH}" height="132"
+		<svg class="timeline${classes}" viewBox="0 0 ${width} 132" width="${width}" height="132"
 			role="img" aria-label="The timer is due ${lateMs} ms before the next poll finds it">
 			<line class="axis" x1="${left}" y1="${axisY}" x2="${right}" y2="${axisY}"/>
 			${polls}
@@ -1550,7 +1563,8 @@ function renderSplit(slide, state, isEntering) {
 function renderLookahead(slide, state, isEntering) {
 	const { scanEveryS, lookaheadS, dueAtS, spanS } = slide.timeline;
 	const left = 70;
-	const right = TIMELINE_WIDTH - 70;
+	const width = timelineWidth();
+	const right = width - 70;
 	const axisY = 130;
 	const x = (seconds) => left + (seconds / spanS) * (right - left);
 	const reaches = (scanAtS) => dueAtS > scanAtS && dueAtS <= scanAtS + lookaheadS;
@@ -1579,7 +1593,7 @@ function renderLookahead(slide, state, isEntering) {
 
 	return `
 		${heading(slide)}
-		<svg class="timeline" viewBox="0 0 ${TIMELINE_WIDTH} 230" width="${TIMELINE_WIDTH}" height="230" role="img"
+		<svg class="timeline" viewBox="0 0 ${width} 230" width="${width}" height="230" role="img"
 			aria-label="Scans every ${scanEveryS}s, each looking ${lookaheadS}s ahead, and a timer due at ${dueAtS}s">
 			${lookahead}
 			<line class="axis" x1="${left}" y1="${axisY}" x2="${right}" y2="${axisY}"/>
@@ -1594,7 +1608,8 @@ function renderLookahead(slide, state, isEntering) {
 function renderBurst(slide, state, isEntering) {
 	const { timersAtMs, overshootMs, spanMs } = slide.timeline;
 	const left = 40;
-	const right = TIMELINE_WIDTH - 40;
+	const width = timelineWidth();
+	const right = width - 40;
 	const axisY = 120;
 	const x = (ms) => left + (ms / spanMs) * (right - left);
 	const firstAtMs = timersAtMs[0];
@@ -1615,7 +1630,7 @@ function renderBurst(slide, state, isEntering) {
 
 	return `
 		${heading(slide)}
-		<svg class="timeline" viewBox="0 0 ${TIMELINE_WIDTH} 200" width="${TIMELINE_WIDTH}" height="200" role="img"
+		<svg class="timeline" viewBox="0 0 ${width} 200" width="${width}" height="200" role="img"
 			aria-label="${timersAtMs.length} timers due between ${firstAtMs} and ${lastAtMs} ms, and one wake-up at ${wakeAtMs} ms">
 			<rect class="overshoot${onceClasses}" x="${x(firstAtMs)}" y="${axisY - 20}"
 				width="${x(wakeAtMs) - x(firstAtMs)}" height="40" rx="8"/>
@@ -1649,7 +1664,8 @@ function barPath(x, width, height, baseline) {
 function renderHistograms(slide, state, isEntering) {
 	const { binMs, spanMs } = MEASURED.lateness;
 	const left = 40;
-	const right = TIMELINE_WIDTH - 40;
+	const width = timelineWidth();
+	const right = width - 40;
 	const plotHeight = 118;
 	const x = (ms) => left + (ms / spanMs) * (right - left);
 	const barWidth = x(binMs) - x(0) - 2;
@@ -1679,7 +1695,7 @@ function renderHistograms(slide, state, isEntering) {
 						${escapeHtml(panel.name)}
 						<span>p50 ${run.medianMs} ms, p99 ${run.p99Ms} ms</span>
 					</div>
-					<svg class="timeline" viewBox="0 0 ${TIMELINE_WIDTH} ${plotHeight + 38}" width="${TIMELINE_WIDTH}"
+					<svg class="timeline" viewBox="0 0 ${width} ${plotHeight + 38}" width="${width}"
 						height="${plotHeight + 38}" role="img"
 						aria-label="${escapeHtml(panel.name)}: median ${run.medianMs} ms late, worst ${run.worstMs} ms">
 						${bars}
@@ -1697,7 +1713,8 @@ function renderHistograms(slide, state, isEntering) {
 function renderWiped(slide, state, isEntering) {
 	const { wipedAtS, scanAtS, worstMs, medianMs, points } = MEASURED.wiped;
 	const left = 76;
-	const right = TIMELINE_WIDTH - 40;
+	const width = timelineWidth();
+	const right = width - 40;
 	const top = 44;
 	const bottom = 300;
 	const spanS = 50;
@@ -1726,7 +1743,7 @@ function renderWiped(slide, state, isEntering) {
 
 	return `
 		${heading(slide)}
-		<svg class="timeline chart" viewBox="0 0 ${TIMELINE_WIDTH} 360" width="${TIMELINE_WIDTH}" height="360" role="img"
+		<svg class="timeline chart" viewBox="0 0 ${width} 360" width="${width}" height="360" role="img"
 			aria-label="Sleeps fire about ${medianMs} ms late until the queue is emptied at ${wipedAtS}s. Those due before the next scan at ${scanAtS}s fire up to ${(worstMs / 1_000).toFixed(1)}s late, and then lateness returns to ${medianMs} ms.">
 			${grid}
 			<text class="chart-note" text-anchor="end" x="${left - 12}" y="${top - 20}">late by</text>
@@ -1941,6 +1958,10 @@ function isNotesListShown() {
 	return document.documentElement.classList.contains("is-notes");
 }
 
+function isCameraMode() {
+	return document.documentElement.classList.contains("is-camera");
+}
+
 function showNotesList() {
 	document.documentElement.classList.add("is-notes");
 	renderNotesList();
@@ -2047,6 +2068,7 @@ function attachSpeakerView(target) {
 	const view = target.document;
 	view.title = "Speaker view";
 	view.documentElement.className = "speaker-view";
+	view.documentElement.classList.toggle("is-camera", isCameraMode());
 	view.head.replaceChildren(...Array.from(document.querySelectorAll("style"), (style) => view.importNode(style, true)));
 	view.addEventListener("keydown", onKeyDown);
 	speakerTimerStartedAt = Date.now();
@@ -2064,9 +2086,18 @@ function openSpeakerView() {
 	}
 }
 
+// The speaker view's previews show what the room sees, so they follow camera mode too.
+function toggleCameraMode() {
+	document.documentElement.classList.toggle("is-camera");
+	if (isSpeakerViewOpen()) {
+		speakerWindow.document.documentElement.classList.toggle("is-camera", isCameraMode());
+	}
+	render(false);
+}
+
 // Left and right move one reveal at a time; clickers send Page Up and Page Down for the same.
 // Up and down skip whole slides: down opens the next slide at its start, up shows the previous one complete.
-// p opens the speaker view, n swaps the slides for the notes list, and f toggles full screen.
+// p opens the speaker view, n swaps the slides for the notes list, f toggles full screen, and c toggles camera mode.
 const forwardKeys = new Set(["ArrowRight", "PageDown", " ", "Enter"]);
 const backwardKeys = new Set(["ArrowLeft", "PageUp", "Backspace"]);
 
@@ -2103,6 +2134,8 @@ function onKeyDown(event) {
 		goTo(SLIDES.length - 1, Number.MAX_SAFE_INTEGER);
 	} else if (event.key === "p") {
 		openSpeakerView();
+	} else if (event.key === "c") {
+		toggleCameraMode();
 	} else if (event.key === "n" && isFromSlides) {
 		showNotesList();
 	} else if (event.key === "f" && isFromSlides) {
