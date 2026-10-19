@@ -1116,6 +1116,136 @@ describe("creating a workflow run", () => {
 
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
+
+		test("encodes the input with the definition codec when no client codec is set", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ def: "world" });
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("world");
+								return encodedInput;
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("encodes through the definition codec then the client codec", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ client: { def: "world" } });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toEqual({ def: "world" });
+						return { client: payload };
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("world");
+								return { def: payload };
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
+
+		test("still applies the definition codec when clientCodecPolicy is skip", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ def: "world" });
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("client codec must not run");
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("world");
+								return encodedInput;
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: { clientCodecPolicy: "skip" },
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.with("clientCodecPolicy", "skip").start(client, "world");
+
+				expect(handle.run.id).toBe(newRunRecord.id);
+			}));
 	});
 
 	describe("startAsChild", () => {
@@ -1164,6 +1294,55 @@ describe("creating a workflow run", () => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
 					async handler(_run, payload: string) {
 						return payload;
+					},
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const childRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: encodedInput,
+						clientHasherApplied: false,
+						clientCodecApplied: true,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("encodes the child input through the definition codec then the client codec", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ client: { def: "payload" } });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toEqual({ def: "payload" });
+						return { client: payload };
+					},
+					decode: async (payload) => payload,
+				};
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("payload");
+								return { def: payload };
+							},
+							decode: async (payload) => payload,
+						}),
 					},
 				});
 				const parentRunRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });

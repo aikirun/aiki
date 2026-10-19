@@ -1,5 +1,6 @@
+import type { Logger } from "@aikirun/lib/logger";
 import type { Client } from "@aikirun/types/client";
-import type { Codec } from "@aikirun/types/infra/codec";
+import type { Codec, CreateCodec } from "@aikirun/types/infra/codec";
 import type { OpaquePayload } from "@aikirun/types/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
@@ -13,6 +14,40 @@ import {
 export interface BoundCodec {
 	encode(payload: unknown): Promise<OpaquePayload>;
 	decode(payload: OpaquePayload | undefined): Promise<unknown>;
+}
+
+export type WorkflowDefinitionCodec = {
+	input?: Codec<unknown>;
+	output?: Codec<unknown>;
+};
+
+export type CreateWorkflowDefinitionCodec = {
+	input?: CreateCodec<unknown>;
+	output?: CreateCodec<unknown>;
+};
+
+export function instantiateWorkflowDefinitionCodec(
+	create: CreateWorkflowDefinitionCodec | undefined,
+	logger: Logger
+): WorkflowDefinitionCodec | undefined {
+	if (!create) {
+		return undefined;
+	}
+
+	const codec: WorkflowDefinitionCodec = {};
+	if (create.input) {
+		codec.input = create.input({ logger });
+	}
+
+	if (create.output) {
+		codec.output = create.output({ logger });
+	}
+
+	if (!codec.input && !codec.output) {
+		return undefined;
+	}
+
+	return codec;
 }
 
 export const noopCodec: BoundCodec = {
@@ -42,6 +77,27 @@ export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
 });
 
 /**
+ * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`.
+ */
+export function composeCodecs(inner: BoundCodec, outer: BoundCodec): BoundCodec {
+	return {
+		encode: async (payload) => outer.encode(await inner.encode(payload)),
+		decode: async (encoded) => inner.decode((await outer.decode(encoded)) as OpaquePayload | undefined),
+	};
+}
+
+/**
+ * Binds a definition-level codec, or returns the noop when none is set.
+ */
+export function bindDefinitionCodec(codec: Codec<unknown> | undefined): BoundCodec {
+	if (!codec) {
+		return noopCodec;
+	}
+
+	return toBoundCodec(codec);
+}
+
+/**
  * Picks the codec a start should use from the client's codec and the run's policy. `"skip"` (or no
  * client codec) yields the noop and `applied: false`; otherwise the client codec and `applied: true`.
  */
@@ -54,6 +110,25 @@ export function resolveClientCodec(
 	}
 
 	return { codec: toBoundCodec(clientCodec), applied: true };
+}
+
+/**
+ * Instantiates the definition input codec factory, then composes it (inner) with the client codec
+ * chosen by policy (outer). `clientCodecApplied` reflects only the client layer.
+ */
+export function resolveWorkflowInputCodec(params: {
+	definition: CreateWorkflowDefinitionCodec | undefined;
+	clientCodec: Codec<unknown> | undefined;
+	policy: ClientCodecPolicy | undefined;
+	logger: Logger;
+}): { codec: BoundCodec; clientCodecApplied: boolean } {
+	const definitionInput = params.definition?.input?.({ logger: params.logger });
+	const { codec: clientLayer, applied: clientCodecApplied } = resolveClientCodec(params.clientCodec, params.policy);
+
+	return {
+		codec: composeCodecs(bindDefinitionCodec(definitionInput), clientLayer),
+		clientCodecApplied,
+	};
 }
 
 /**
