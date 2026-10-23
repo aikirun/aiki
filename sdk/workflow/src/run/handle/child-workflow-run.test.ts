@@ -1,8 +1,12 @@
 import { withFakeClient } from "@aikirun/testing/client";
-import { runningWorkflowRunRecordFactory, workflowRunStateByStatus } from "@aikirun/testing/data-factory/workflow/run";
+import {
+	baseWorkflowRunRecordFactory,
+	runningWorkflowRunRecordFactory,
+	workflowRunStateByStatus,
+} from "@aikirun/testing/data-factory/workflow/run";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
-import type { WorkflowRunId } from "@aikirun/types/workflow/run";
+import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
@@ -284,6 +288,23 @@ describe("childWorkflowRunHandle", () => {
 			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
 
 			expect(childHandle.run).toEqual(childRecord);
+		}));
+
+	test("exposes the refetched child run after a refresh", () =>
+		withFakeClient(async (client) => {
+			const childRecord = runningWorkflowRunRecordFactory.build();
+			const parentHandle = workflowRunHandle(client, runningWorkflowRunRecordFactory.build());
+			const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
+
+			const refreshedChildRecord: WorkflowRunRecord = {
+				...baseWorkflowRunRecordFactory.build({ id: childRecord.id }),
+				state: { status: "completed", output: asOpaquePayload("done") },
+			};
+			client.api.workflowRun.getByIdV1.once({ id: childRecord.id }, { run: refreshedChildRecord });
+
+			await childHandle.refresh();
+
+			expect(childHandle.run).toEqual(refreshedChildRecord);
 		}));
 
 	test("cancels the child run, not the parent", () =>
