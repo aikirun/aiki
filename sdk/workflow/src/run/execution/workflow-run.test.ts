@@ -14,6 +14,7 @@ import {
 	runningTaskInfoFactory,
 } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import type { CreateCodec } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -44,12 +45,13 @@ const configProvider = asConfigProvider(() => ({
 }));
 
 function fakeWorkflowVersion(
-	handler: (run: Omit<WorkflowRun<unknown, EventsDefinition>, "context">, input: unknown) => Promise<void>
+	handler: (run: Omit<WorkflowRun<unknown, EventsDefinition>, "context">, input: unknown) => Promise<void>,
+	codec?: { input?: CreateCodec<unknown>; output?: CreateCodec<unknown> }
 ): AnyWorkflowVersion {
 	return {
 		name: "dummy-workflow" as WorkflowName,
 		versionId: "1.0.0" as WorkflowVersionId,
-		[INTERNAL]: { eventsDefinition: {}, handler },
+		[INTERNAL]: { eventsDefinition: {}, handler, codec },
 	} as unknown as AnyWorkflowVersion;
 }
 
@@ -895,6 +897,44 @@ describe("executeWorkflowRun", () => {
 			});
 
 			expect(capturedInput).toEqual(decodedInput);
+		}));
+
+	test("decodes the run input through the client codec then the definition codec", () =>
+		withFakeClient(async (client) => {
+			const encodedInput = asOpaquePayload({ client: { def: { orderId: "o1" } } });
+			client[INTERNAL].codec = {
+				encode: async (payload) => payload,
+				decode: async (payload) => {
+					expect(payload).toEqual(encodedInput);
+					return { def: { orderId: "o1" } };
+				},
+			};
+			const workflowRun = runningWorkflowRunRecordFactory.build({ input: encodedInput, clientCodecApplied: true });
+			let capturedInput: unknown;
+			const workflowVersion = fakeWorkflowVersion(
+				async (_run, input) => {
+					capturedInput = input;
+				},
+				{
+					input: () => ({
+						encode: async (payload) => payload,
+						decode: async (payload) => {
+							expect(payload).toEqual({ def: { orderId: "o1" } });
+							return { orderId: "o1" };
+						},
+					}),
+				}
+			);
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedInput).toEqual({ orderId: "o1" });
 		}));
 
 	test("returns false when the run was recorded with the client codec applied but the client has none", () =>

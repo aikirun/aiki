@@ -99,12 +99,16 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		const handle = workflowRunHandle(client, workflowRun, {
+			eventsDefinition,
+			logger,
+			workflowCodec: workflowVersion[INTERNAL].codec,
+		});
 		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
 		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
-		const codec = handle[INTERNAL].codec;
+		const codec = handle[INTERNAL].codec.input;
 
 		// Every hash inside the run must come from the hasher that made the run's own hash.
 		let hasher: BoundHasher;

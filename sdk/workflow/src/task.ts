@@ -36,6 +36,7 @@ import type { WorkflowRun } from "./run";
 import type { TaskExecutionTracker } from "./run/execution/task-execution-tracker";
 import { type TaskHandlerScope, taskHandlerScopeStorage } from "./run/execution/task-handler-scope";
 import type { WorkflowExecutionConfig } from "./run/execution/workflow-run";
+import { bindDeclaredCodec } from "./run/handle/bound-codec";
 import { isRequestInvalid, type WorkflowRunHandle } from "./run/handle/workflow-run";
 import { validateWithSchema } from "./run/schema-validation";
 
@@ -181,12 +182,16 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const attempts = 1;
 		const retryStrategy = startOptions.retry ?? { type: "never" };
+		const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+			runId: handle.run.id as WorkflowRunId,
+			clientCodecApplied: handle.run.clientCodecApplied,
+		});
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			input: await handle[INTERNAL].codec.encode(input),
+			input: await codec.encode(input),
 			inputHash,
 		});
 
@@ -211,7 +216,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
+			state: { status: "completed", output: await codec.encode(output) },
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 
@@ -229,7 +234,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return (await handle[INTERNAL].codec.decode(existingTaskState.output)) as Output;
+			const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+				runId: handle.run.id as WorkflowRunId,
+				clientCodecApplied: handle.run.clientCodecApplied,
+			});
+			return (await codec.decode(existingTaskState.output)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -313,10 +322,14 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			taskLogger
 		);
 
+		const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+			runId: handle.run.id as WorkflowRunId,
+			clientCodecApplied: handle.run.clientCodecApplied,
+		});
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
+			state: { status: "completed", output: await codec.encode(output) },
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 

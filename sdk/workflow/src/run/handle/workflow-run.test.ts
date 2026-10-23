@@ -504,6 +504,41 @@ describe("workflowRunHandle", () => {
 				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
 			}));
 
+		test("decodes the completed output through the client codec then the definition output codec", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ client: { def: "done" } });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return { def: "done" };
+					},
+				};
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const handle = workflowRunHandle(client, record, {
+					workflowCodec: {
+						output: () => ({
+							encode: async (payload) => payload,
+							decode: async (payload) => {
+								expect(payload).toEqual({ def: "done" });
+								return "done";
+							},
+						}),
+					},
+				});
+
+				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
+				const completed: WorkflowRunRecord = {
+					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
+					state: { status: "completed", output: storedOutput },
+				};
+				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
+
+				const result = await handle.wait();
+
+				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
+			}));
+
 		test("resolves with whatever terminal state the run reached", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build();
