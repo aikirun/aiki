@@ -39,7 +39,11 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { WorkflowRun } from "./run";
 import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
 import { isControlFlowError } from "./run/execution/control-flow-error";
-import { type CreateWorkflowDefinitionCodec, resolveWorkflowInputCodec } from "./run/handle/bound-codec";
+import {
+	type CreateWorkflowDefinitionCodec,
+	instantiateWorkflowDefinitionCodec,
+	resolveInputCodec,
+} from "./run/handle/bound-codec";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle/child-workflow-run";
 import {
 	isRequestInvalid,
@@ -209,11 +213,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
-			definition: this[INTERNAL].codec,
+		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger);
+		const { codec, clientCodecApplied } = resolveInputCodec({
+			definition: workflowCodec,
 			clientCodec,
 			policy: startOptions.clientCodecPolicy,
-			logger: client.logger,
 		});
 		const schema = this.params.schema?.input;
 		if (schema) {
@@ -245,7 +249,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return workflowRunHandle(client, id as WorkflowRunId, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec: this[INTERNAL].codec,
+			workflowCodec,
 		});
 	}
 
@@ -278,11 +282,11 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		// we should use a parent hasher instead of the client to enforce consistency
 		const inputHash = { value: await parentRunHasher(input) };
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
-			definition: this[INTERNAL].codec,
+		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, parentRunLogger);
+		const { codec, clientCodecApplied } = resolveInputCodec({
+			definition: workflowCodec,
 			clientCodec: client[INTERNAL].codec,
 			policy: startOptions.clientCodecPolicy,
-			logger: parentRunLogger,
 		});
 
 		const referenceId = startOptions.reference?.id;
@@ -313,7 +317,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 				return childWorkflowRunHandle(client, existingRun, parentRunHandle, logger, {
 					eventsDefinition: this[INTERNAL].eventsDefinition,
-					workflowCodec: this[INTERNAL].codec,
+					workflowCodec,
 				});
 			}
 
@@ -371,7 +375,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return childWorkflowRunHandle(client, newRun, parentRunHandle, logger, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec: this[INTERNAL].codec,
+			workflowCodec,
 		});
 	}
 
@@ -413,7 +417,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		return workflowRunHandle(client, runId as WorkflowRunId, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec: this[INTERNAL].codec,
+			workflowCodec: instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger),
 		});
 	}
 
@@ -428,7 +432,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		});
 		return workflowRunHandle(client, run as WorkflowRunRecord, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec: this[INTERNAL].codec,
+			workflowCodec: instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger),
 		});
 	}
 

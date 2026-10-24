@@ -517,13 +517,13 @@ describe("workflowRunHandle", () => {
 				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const handle = workflowRunHandle(client, record, {
 					workflowCodec: {
-						output: () => ({
+						output: {
 							encode: async (payload) => payload,
 							decode: async (payload) => {
 								expect(payload).toEqual({ def: "done" });
 								return "done";
 							},
-						}),
+						},
 					},
 				});
 

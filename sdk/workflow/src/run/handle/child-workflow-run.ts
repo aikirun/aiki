@@ -5,7 +5,7 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type WorkflowRunId, type WorkflowRunRecord, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
-import type { CreateWorkflowDefinitionCodec } from "./bound-codec";
+import type { WorkflowDefinitionCodec } from "./bound-codec";
 import {
 	decodeWaitResultState,
 	type WorkflowRunHandle,
@@ -16,7 +16,7 @@ import type { EventsDefinition } from "../event";
 
 export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition = EventsDefinition> {
 	eventsDefinition?: TEvents;
-	workflowCodec?: CreateWorkflowDefinitionCodec;
+	workflowCodec?: WorkflowDefinitionCodec;
 }
 
 export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition>(

@@ -10,6 +10,7 @@ import {
 	ClientCodecMissingError,
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
+	CodecInitFailedError,
 	type NonDeterminismError,
 	type WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -25,6 +26,7 @@ import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
 import { createEventWaiters } from "../event";
+import { instantiateWorkflowDefinitionCodec } from "../handle/bound-codec";
 import { workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
 
@@ -102,7 +104,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const handle = workflowRunHandle(client, workflowRun, {
 			eventsDefinition,
 			logger,
-			workflowCodec: workflowVersion[INTERNAL].codec,
+			workflowCodec: instantiateWorkflowDefinitionCodec(workflowVersion[INTERNAL].codec, logger),
 		});
 		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
 		flushTaskExecutions = taskExecutionsFlusher;
@@ -158,6 +160,11 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		if (isControlFlowError(err)) {
 			if (err instanceof ClientCodecMissingError) {
 				logger.error("The workflow run  expects a client codec, but none present", { err });
+				return false;
+			}
+
+			if (err instanceof CodecInitFailedError) {
+				logger.error("Codec failed to initialize for the workflow run", { err });
 				return false;
 			}
 

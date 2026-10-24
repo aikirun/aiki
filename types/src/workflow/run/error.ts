@@ -95,6 +95,19 @@ export class ClientCodecMissingError extends Error {
 }
 
 /**
+ * A codec factory threw while creating a codec. The factory's error is the `cause`.
+ * In a workflow, this error ends the execution even when the workflow code catches it, and the run
+ * is left for a worker whose codec can be created.
+ */
+export class CodecInitFailedError extends Error {
+	public override readonly name = "CodecInitFailedError";
+
+	constructor(cause: unknown) {
+		super("Codec failed to initialize", { cause });
+	}
+}
+
+/**
  * A codec (client or definition) threw while encoding a payload. The codec's error is the `cause`.
  * In a workflow, this error ends the execution even when the workflow code catches it, and the run
  * is left for a worker whose codec can encode the payload.

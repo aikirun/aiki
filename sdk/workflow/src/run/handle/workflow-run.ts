@@ -29,9 +29,8 @@ import {
 	type BoundCodec,
 	bindDeclaredCodec,
 	bindDefinitionCodec,
-	type CreateWorkflowDefinitionCodec,
 	composeCodecs,
-	instantiateWorkflowDefinitionCodec,
+	type WorkflowDefinitionCodec,
 } from "./bound-codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
 import { isControlFlowError } from "../execution/control-flow-error";
@@ -40,7 +39,7 @@ import { taskHandlerScopeStorage } from "../execution/task-handler-scope";
 export interface WorkflowRunHandleOptions<TEvents extends EventsDefinition = EventsDefinition> {
 	eventsDefinition?: TEvents;
 	logger?: Logger;
-	workflowCodec?: CreateWorkflowDefinitionCodec;
+	workflowCodec?: WorkflowDefinitionCodec;
 }
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition>(
@@ -228,7 +227,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		private _run: WorkflowRunRecord,
 		eventsDefinition: TEvents,
 		private readonly logger: Logger,
-		workflowCodec?: CreateWorkflowDefinitionCodec
+		workflowCodec?: WorkflowDefinitionCodec
 	) {
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
@@ -237,13 +236,12 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			runId: this._run.id as WorkflowRunId,
 			clientCodecApplied: this._run.clientCodecApplied,
 		});
-		const definitionCodec = instantiateWorkflowDefinitionCodec(workflowCodec, this.logger);
 
 		this[INTERNAL] = {
 			client,
 			codec: {
-				input: composeCodecs(bindDefinitionCodec(definitionCodec?.input), clientCodec),
-				output: composeCodecs(bindDefinitionCodec(definitionCodec?.output), clientCodec),
+				input: composeCodecs(bindDefinitionCodec(workflowCodec?.input), clientCodec),
+				output: composeCodecs(bindDefinitionCodec(workflowCodec?.output), clientCodec),
 			},
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),

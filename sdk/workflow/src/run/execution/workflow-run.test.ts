@@ -22,6 +22,7 @@ import {
 	ClientCodecMissingError,
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
+	CodecInitFailedError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -57,12 +58,16 @@ function fakeWorkflowVersion(
 
 describe("executeWorkflowRun", () => {
 	describe("error classification", () => {
-		// ClientCodecMissingError, CodecEncodeFailedError, CodecDecodeFailedError and
+		// ClientCodecMissingError, CodecInitFailedError, CodecEncodeFailedError, CodecDecodeFailedError and
 		// WorkflowRunStateUnknownError return false, and have their own tests below.
 		const createControlFlowErrorByName: {
 			[Member in Exclude<
 				ControlFlowError,
-				ClientCodecMissingError | CodecEncodeFailedError | CodecDecodeFailedError | WorkflowRunStateUnknownError
+				| ClientCodecMissingError
+				| CodecInitFailedError
+				| CodecEncodeFailedError
+				| CodecDecodeFailedError
+				| WorkflowRunStateUnknownError
 			> as Member["name"]]: () => Member;
 		} = {
 			WorkflowRunNotExecutableError: () => new WorkflowRunNotExecutableError("run-1" as WorkflowRunId, "paused"),
@@ -98,6 +103,24 @@ describe("executeWorkflowRun", () => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
 					throw new ClientCodecMissingError(workflowRun.id as WorkflowRunId);
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("returns false when the handler throws CodecInitFailedError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new CodecInitFailedError(new Error("No keyring available"));
 				});
 
 				const result = await executeWorkflowRun({

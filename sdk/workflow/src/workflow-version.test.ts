@@ -20,6 +20,7 @@ import {
 	ClientCodecMissingError,
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
+	CodecInitFailedError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -648,6 +649,7 @@ describe("workflow version execution", () => {
 			NonDeterminismError: (id, attempts) =>
 				new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
+			CodecInitFailedError: () => new CodecInitFailedError(new Error("No keyring available")),
 			CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
 			CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
 		};

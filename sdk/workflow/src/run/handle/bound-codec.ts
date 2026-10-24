@@ -8,6 +8,7 @@ import {
 	type ClientCodecPolicy,
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
+	CodecInitFailedError,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 
@@ -26,6 +27,11 @@ export type CreateWorkflowDefinitionCodec<EncodedInput = unknown, EncodedOutput 
 	output?: CreateCodec<EncodedOutput>;
 };
 
+/**
+ * Instantiates definition codecs from their factories. A factory can throw anything, so its
+ * errors are wrapped in `CodecInitFailedError` for the SDK to recognise, with the factory's
+ * error as the cause.
+ */
 export function instantiateWorkflowDefinitionCodec(
 	create: CreateWorkflowDefinitionCodec | undefined,
 	logger: Logger
@@ -36,11 +42,19 @@ export function instantiateWorkflowDefinitionCodec(
 
 	const codec: WorkflowDefinitionCodec = {};
 	if (create.input) {
-		codec.input = create.input({ logger });
+		try {
+			codec.input = create.input({ logger });
+		} catch (err) {
+			throw new CodecInitFailedError(err);
+		}
 	}
 
 	if (create.output) {
-		codec.output = create.output({ logger });
+		try {
+			codec.output = create.output({ logger });
+		} catch (err) {
+			throw new CodecInitFailedError(err);
+		}
 	}
 
 	if (!codec.input && !codec.output) {
@@ -113,20 +127,18 @@ export function resolveClientCodec(
 }
 
 /**
- * Instantiates the definition input codec factory, then composes it (inner) with the client codec
- * chosen by policy (outer). `clientCodecApplied` reflects only the client layer.
+ * Composes the definition input codec (inner) with the client codec chosen by policy (outer).
+ * `clientCodecApplied` reflects only the client layer.
  */
-export function resolveWorkflowInputCodec(params: {
-	definition: CreateWorkflowDefinitionCodec | undefined;
+export function resolveInputCodec(params: {
+	definition: WorkflowDefinitionCodec | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
-	logger: Logger;
 }): { codec: BoundCodec; clientCodecApplied: boolean } {
-	const definitionCodec = instantiateWorkflowDefinitionCodec(params.definition, params.logger);
 	const { codec: clientLayer, applied: clientCodecApplied } = resolveClientCodec(params.clientCodec, params.policy);
 
 	return {
-		codec: composeCodecs(bindDefinitionCodec(definitionCodec?.input), clientLayer),
+		codec: composeCodecs(bindDefinitionCodec(params.definition?.input), clientLayer),
 		clientCodecApplied,
 	};
 }

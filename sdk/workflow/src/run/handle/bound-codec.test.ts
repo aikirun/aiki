@@ -6,6 +6,7 @@ import {
 	ClientCodecMissingError,
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
+	CodecInitFailedError,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
@@ -14,11 +15,54 @@ import {
 	bindDeclaredCodec,
 	bindDefinitionCodec,
 	composeCodecs,
+	instantiateWorkflowDefinitionCodec,
 	noopCodec,
 	resolveClientCodec,
-	resolveWorkflowInputCodec,
+	resolveInputCodec,
 	toBoundCodec,
 } from "./bound-codec";
+
+describe("instantiateWorkflowDefinitionCodec", () => {
+	test("throws CodecInitFailedError, caused by the factory's error, when the input factory throws", () => {
+		const codecError = new Error("No keyring available");
+		let thrown: unknown;
+		try {
+			instantiateWorkflowDefinitionCodec(
+				{
+					input: () => {
+						throw codecError;
+					},
+				},
+				noopLogger
+			);
+		} catch (err) {
+			thrown = err;
+		}
+
+		expect(thrown).toBeInstanceOf(CodecInitFailedError);
+		expect(thrown).toMatchObject({ cause: codecError });
+	});
+
+	test("throws CodecInitFailedError, caused by the factory's error, when the output factory throws", () => {
+		const codecError = new Error("No keyring available");
+		let thrown: unknown;
+		try {
+			instantiateWorkflowDefinitionCodec(
+				{
+					output: () => {
+						throw codecError;
+					},
+				},
+				noopLogger
+			);
+		} catch (err) {
+			thrown = err;
+		}
+
+		expect(thrown).toBeInstanceOf(CodecInitFailedError);
+		expect(thrown).toMatchObject({ cause: codecError });
+	});
+});
 
 describe("toBoundCodec", () => {
 	test("delegates encode and decode to the codec", async () => {
@@ -201,15 +245,15 @@ describe("bindDefinitionCodec", () => {
 	});
 });
 
-describe("resolveWorkflowInputCodec", () => {
+describe("resolveInputCodec", () => {
 	const definition = {
-		input: () => ({
+		input: {
 			encode: async (payload: unknown) => ({ def: payload }),
 			decode: async (payload: unknown) => {
 				const { def } = payload as { def: unknown };
 				return def;
 			},
-		}),
+		},
 	};
 	const clientCodec = {
 		encode: async (payload: unknown) => ({ client: payload }),
@@ -220,11 +264,10 @@ describe("resolveWorkflowInputCodec", () => {
 	};
 
 	test("composes definition inside client when both are present", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied } = resolveInputCodec({
 			definition,
 			clientCodec,
 			policy: undefined,
-			logger: noopLogger,
 		});
 		const payload = { value: 1 };
 
@@ -234,11 +277,10 @@ describe("resolveWorkflowInputCodec", () => {
 	});
 
 	test("applies only the definition when the client codec is skipped", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied } = resolveInputCodec({
 			definition,
 			clientCodec,
 			policy: "skip",
-			logger: noopLogger,
 		});
 		const payload = { value: 1 };
 
@@ -248,11 +290,10 @@ describe("resolveWorkflowInputCodec", () => {
 	});
 
 	test("applies only the client when no definition codec is set", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied } = resolveInputCodec({
 			definition: undefined,
 			clientCodec,
 			policy: "apply",
-			logger: noopLogger,
 		});
 		const payload = { value: 1 };
 
@@ -261,11 +302,10 @@ describe("resolveWorkflowInputCodec", () => {
 	});
 
 	test("is a no-op when neither layer is present", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied } = resolveInputCodec({
 			definition: undefined,
 			clientCodec: undefined,
 			policy: undefined,
-			logger: noopLogger,
 		});
 		const payload = { value: 1 };
 
