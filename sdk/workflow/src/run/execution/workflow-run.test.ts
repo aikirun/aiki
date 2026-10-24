@@ -19,9 +19,9 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -57,15 +57,12 @@ function fakeWorkflowVersion(
 
 describe("executeWorkflowRun", () => {
 	describe("error classification", () => {
-		// ClientCodecMissingError, ClientCodecEncodeFailedError, ClientCodecDecodeFailedError and
+		// ClientCodecMissingError, CodecEncodeFailedError, CodecDecodeFailedError and
 		// WorkflowRunStateUnknownError return false, and have their own tests below.
 		const createControlFlowErrorByName: {
 			[Member in Exclude<
 				ControlFlowError,
-				| ClientCodecMissingError
-				| ClientCodecEncodeFailedError
-				| ClientCodecDecodeFailedError
-				| WorkflowRunStateUnknownError
+				ClientCodecMissingError | CodecEncodeFailedError | CodecDecodeFailedError | WorkflowRunStateUnknownError
 			> as Member["name"]]: () => Member;
 		} = {
 			WorkflowRunNotExecutableError: () => new WorkflowRunNotExecutableError("run-1" as WorkflowRunId, "paused"),
@@ -114,11 +111,11 @@ describe("executeWorkflowRun", () => {
 				expect(result).toBe(false);
 			}));
 
-		test("returns false when the handler throws ClientCodecEncodeFailedError, so the run is redelivered", () =>
+		test("returns false when the handler throws CodecEncodeFailedError, so the run is redelivered", () =>
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					throw new ClientCodecEncodeFailedError(new Error("Key 2025-06 not found"));
+					throw new CodecEncodeFailedError(new Error("Key 2025-06 not found"));
 				});
 
 				const result = await executeWorkflowRun({
@@ -132,11 +129,11 @@ describe("executeWorkflowRun", () => {
 				expect(result).toBe(false);
 			}));
 
-		test("returns false when the handler throws ClientCodecDecodeFailedError, so the run is redelivered", () =>
+		test("returns false when the handler throws CodecDecodeFailedError, so the run is redelivered", () =>
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					throw new ClientCodecDecodeFailedError(new Error("No codec named aes-v1"));
+					throw new CodecDecodeFailedError(new Error("No codec named aes-v1"));
 				});
 
 				const result = await executeWorkflowRun({

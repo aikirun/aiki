@@ -250,13 +250,13 @@ describe("schedule", () => {
 					},
 					decode: async (payload) => payload,
 				};
-				const workflowWithCodec = workflow({ name: "sync-inventory-codec" }).v<{ warehouseId: string }>("1.0.0", {
-					handler: async () => {},
+				const workflowWithCodec = workflow({ name: "sync-inventory-codec" }).v("1.0.0", {
+					handler: async (_run, _input: { warehouseId: string }) => {},
 					codec: {
 						input: () => ({
 							encode: async (payload) => {
 								expect(payload).toEqual(workflowRunInput);
-								return { def: payload };
+								return { def: workflowRunInput };
 							},
 							decode: async (payload) => payload,
 						}),

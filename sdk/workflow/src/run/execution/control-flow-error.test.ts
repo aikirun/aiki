@@ -1,8 +1,8 @@
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -26,8 +26,8 @@ describe("isControlFlowError", () => {
 		WorkflowRunNotExecutableError: new WorkflowRunNotExecutableError(runId, "paused"),
 		NonDeterminismError: new NonDeterminismError(runId, 1, { taskIds: [], childWorkflowRunIds: [] }),
 		ClientCodecMissingError: new ClientCodecMissingError(runId),
-		ClientCodecEncodeFailedError: new ClientCodecEncodeFailedError(new Error("Key 2025-06 not found")),
-		ClientCodecDecodeFailedError: new ClientCodecDecodeFailedError(new Error("No codec named aes-v1")),
+		CodecEncodeFailedError: new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
+		CodecDecodeFailedError: new CodecDecodeFailedError(new Error("No codec named aes-v1")),
 	};
 
 	for (const [name, error] of Object.entries(controlFlowErrors)) {

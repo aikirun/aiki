@@ -89,12 +89,20 @@ export interface WorkflowParams {
 export interface Workflow<Context> {
 	name: WorkflowName;
 
-	v: <Input = void, Output = void, TEvents extends EventsDefinition = Record<string, never>>(
+	v: <
+		Input = void,
+		Output = void,
+		TEvents extends EventsDefinition = Record<string, never>,
+		EncodedInput = never,
+		EncodedOutput = never,
+	>(
 		versionId: string,
-		params: WorkflowVersionParams<Input, Output, Context, TEvents> &
+		params: WorkflowVersionParams<Input, Output, Context, TEvents, EncodedInput, EncodedOutput> &
 			Serializable<Input, "input"> &
 			Serializable<Output, "output"> &
-			Serializable<EventsData<TEvents>, "events">
+			Serializable<EventsData<TEvents>, "events"> &
+			Serializable<EncodedInput, "encoded"> &
+			Serializable<EncodedOutput, "encoded">
 	) => WorkflowVersion<Input, Output, Context, TEvents>;
 
 	[INTERNAL]: {

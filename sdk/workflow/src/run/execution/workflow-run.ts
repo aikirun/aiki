@@ -7,9 +7,9 @@ import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
 	type NonDeterminismError,
 	type WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -161,13 +161,13 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			if (err instanceof ClientCodecEncodeFailedError) {
-				logger.error("The client codec failed to encode a payload of the workflow run", { err });
+			if (err instanceof CodecEncodeFailedError) {
+				logger.error("Codec failed to encode a payload of the workflow run", { err });
 				return false;
 			}
 
-			if (err instanceof ClientCodecDecodeFailedError) {
-				logger.error("The client codec failed to decode a payload of the workflow run", { err });
+			if (err instanceof CodecDecodeFailedError) {
+				logger.error("Codec failed to decode a payload of the workflow run", { err });
 				return false;
 			}
 

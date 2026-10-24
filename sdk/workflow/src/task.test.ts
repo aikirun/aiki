@@ -20,9 +20,9 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -1691,8 +1691,8 @@ describe("a control-flow error the task handler throws itself", () => {
 		WorkflowRunNotExecutableError: (id) => new WorkflowRunNotExecutableError(id, "paused"),
 		NonDeterminismError: (id) => new NonDeterminismError(id, 1, { taskIds: [], childWorkflowRunIds: [] }),
 		ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
-		ClientCodecEncodeFailedError: () => new ClientCodecEncodeFailedError(new Error("Key 2025-06 not found")),
-		ClientCodecDecodeFailedError: () => new ClientCodecDecodeFailedError(new Error("No codec named aes-v1")),
+		CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
+		CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
 	};
 
 	for (const [name, createControlFlowError] of Object.entries(createControlFlowErrorByName)) {

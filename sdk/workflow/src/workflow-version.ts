@@ -50,7 +50,14 @@ import {
 } from "./run/handle/workflow-run";
 import { validateWithSchema } from "./run/schema-validation";
 
-export interface WorkflowVersionParams<Input, Output, Context, TEvents extends EventsDefinition> {
+export interface WorkflowVersionParams<
+	Input,
+	Output,
+	Context,
+	TEvents extends EventsDefinition,
+	EncodedInput = unknown,
+	EncodedOutput = unknown,
+> {
 	handler: (run: Readonly<WorkflowRun<Context, TEvents>>, input: Input) => Promise<Output>;
 	events?: TEvents;
 	retry?: RetryStrategy;
@@ -63,8 +70,12 @@ export interface WorkflowVersionParams<Input, Output, Context, TEvents extends E
 	 * codec at the call site and again at consumption: definition encodes first, client wraps;
 	 * decode reverses that order. Does not replace the client codec, and does not apply to tasks
 	 * or events.
+	 *
+	 * Handles obtained without this definition — for example via the generic
+	 * {@link workflowRunHandle} or a client API that does not pass the workflow version — have no
+	 * definition codec. Their `wait()` returns the still-encoded output with no error.
 	 */
-	codec?: CreateWorkflowDefinitionCodec;
+	codec?: CreateWorkflowDefinitionCodec<EncodedInput, EncodedOutput>;
 }
 
 export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> {

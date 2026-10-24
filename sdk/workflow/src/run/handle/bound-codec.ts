@@ -4,10 +4,10 @@ import type { Codec, CreateCodec } from "@aikirun/types/infra/codec";
 import type { OpaquePayload } from "@aikirun/types/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
 	type ClientCodecPolicy,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 
@@ -21,9 +21,9 @@ export type WorkflowDefinitionCodec = {
 	output?: Codec<unknown>;
 };
 
-export type CreateWorkflowDefinitionCodec = {
-	input?: CreateCodec<unknown>;
-	output?: CreateCodec<unknown>;
+export type CreateWorkflowDefinitionCodec<EncodedInput = unknown, EncodedOutput = unknown> = {
+	input?: CreateCodec<EncodedInput>;
+	output?: CreateCodec<EncodedOutput>;
 };
 
 export function instantiateWorkflowDefinitionCodec(
@@ -56,22 +56,22 @@ export const noopCodec: BoundCodec = {
 };
 
 /**
- * A codec can throw anything, so its errors are wrapped in `ClientCodecEncodeFailedError` and
- * `ClientCodecDecodeFailedError` for the SDK to recognise, with the codec's error as the cause.
+ * A codec can throw anything, so its errors are wrapped in `CodecEncodeFailedError` and
+ * `CodecDecodeFailedError` for the SDK to recognise, with the codec's error as the cause.
  */
 export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
 	encode: async (payload) => {
 		try {
 			return (await codec.encode(payload)) as OpaquePayload;
 		} catch (err) {
-			throw new ClientCodecEncodeFailedError(err);
+			throw new CodecEncodeFailedError(err);
 		}
 	},
 	decode: async (encoded) => {
 		try {
 			return await codec.decode(encoded);
 		} catch (err) {
-			throw new ClientCodecDecodeFailedError(err);
+			throw new CodecDecodeFailedError(err);
 		}
 	},
 });
@@ -122,11 +122,11 @@ export function resolveWorkflowInputCodec(params: {
 	policy: ClientCodecPolicy | undefined;
 	logger: Logger;
 }): { codec: BoundCodec; clientCodecApplied: boolean } {
-	const definitionInput = params.definition?.input?.({ logger: params.logger });
+	const definitionCodec = instantiateWorkflowDefinitionCodec(params.definition, params.logger);
 	const { codec: clientLayer, applied: clientCodecApplied } = resolveClientCodec(params.clientCodec, params.policy);
 
 	return {
-		codec: composeCodecs(bindDefinitionCodec(definitionInput), clientLayer),
+		codec: composeCodecs(bindDefinitionCodec(definitionCodec?.input), clientLayer),
 		clientCodecApplied,
 	};
 }

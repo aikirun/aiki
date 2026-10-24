@@ -3,9 +3,9 @@ import { withFakeClient } from "@aikirun/testing/client";
 import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
@@ -32,7 +32,7 @@ describe("toBoundCodec", () => {
 		expect(await bound.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
 	});
 
-	test("rejects with ClientCodecEncodeFailedError, caused by the codec's error, when the codec cannot encode", async () => {
+	test("rejects with CodecEncodeFailedError, caused by the codec's error, when the codec cannot encode", async () => {
 		const codecError = new Error("Key 2025-06 not found");
 		const bound = toBoundCodec({
 			encode: async () => {
@@ -42,11 +42,11 @@ describe("toBoundCodec", () => {
 		});
 
 		const encoding = bound.encode({ value: 1 });
-		await expect(encoding).rejects.toThrow(ClientCodecEncodeFailedError);
+		await expect(encoding).rejects.toThrow(CodecEncodeFailedError);
 		await expect(encoding).rejects.toMatchObject({ cause: codecError });
 	});
 
-	test("rejects with ClientCodecDecodeFailedError, caused by the codec's error, when the codec cannot decode", async () => {
+	test("rejects with CodecDecodeFailedError, caused by the codec's error, when the codec cannot decode", async () => {
 		const codecError = new Error("No codec named aes-v1");
 		const bound = toBoundCodec({
 			encode: async (payload) => payload,
@@ -56,7 +56,7 @@ describe("toBoundCodec", () => {
 		});
 
 		const decoding = bound.decode(asOpaquePayload("aes-v1:charged"));
-		await expect(decoding).rejects.toThrow(ClientCodecDecodeFailedError);
+		await expect(decoding).rejects.toThrow(CodecDecodeFailedError);
 		await expect(decoding).rejects.toMatchObject({ cause: codecError });
 	});
 });
