@@ -284,11 +284,6 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		// we should use a parent hasher instead of the client to enforce consistency
 		const inputHash = { value: await parentRunHasher(input) };
 		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, parentRunLogger);
-		const { codec, clientCodecApplied } = resolveInputCodec({
-			definition: workflowCodec,
-			clientCodec: client[INTERNAL].codec,
-			policy: startOptions.clientCodecPolicy,
-		});
 
 		const referenceId = startOptions.reference?.id;
 		const address = getCompositeId<WorkflowRunAddress>({
@@ -331,12 +326,18 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			);
 		}
 
-		// Below the replay block on purpose: a replayed start creates nothing, so it is never refused.
+		// Below the replay block on purpose: a replayed start creates nothing, so codec resolve
+		// and the clientCodecPolicy refusal only apply when we would create a new child.
 		if (parentRunHandle.run.clientCodecApplied && startOptions.clientCodecPolicy === "skip") {
 			const err = new ChildWorkflowRunClientCodecSkippedError(parentRun.id, this.name, this.versionId);
 			return this.failRun(parentRunHandle, { attempts: parentRunHandle.run.attempts, err }, parentRunLogger);
 		}
 
+		const { codec, clientCodecApplied } = resolveInputCodec({
+			definition: workflowCodec,
+			clientCodec: client[INTERNAL].codec,
+			policy: startOptions.clientCodecPolicy,
+		});
 		const encodedInput = await codec.encode(input);
 
 		let newRun: WorkflowRunRecord;
