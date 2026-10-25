@@ -957,6 +957,67 @@ describe("executeWorkflowRun", () => {
 			expect(capturedInput).toEqual({ orderId: "o1" });
 		}));
 
+	test("encodes the handler output through the definition output codec then the client codec", () =>
+		withFakeClient(async (client) => {
+			const encodedOutput = asOpaquePayload({ client: { def: "done" } });
+			client[INTERNAL].codec = {
+				encode: async (payload) => {
+					expect(payload).toEqual({ def: "done" });
+					return { client: payload };
+				},
+				decode: async (payload) => payload,
+			};
+			const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+				async handler() {
+					return "done";
+				},
+				codec: {
+					output: () => ({
+						encode: async (payload) => {
+							expect(payload).toBe("done");
+							return { def: "done" };
+						},
+						decode: async (payload) => payload,
+					}),
+				},
+			});
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+
+			client.api.workflowRun.transitionStateV1
+				.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "running" },
+						expectedRevision: workflowRun.revision,
+					},
+					{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+				)
+				.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: { status: "completed", output: encodedOutput },
+						expectedRevision: workflowRun.revision,
+					},
+					{
+						revision: workflowRun.revision,
+						state: { status: "completed", output: encodedOutput },
+						attempts: workflowRun.attempts,
+					}
+				);
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(true);
+		}));
+
 	test("returns false when the run was recorded with the client codec applied but the client has none", () =>
 		withFakeClient(async (client) => {
 			const workflowRun = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
@@ -1004,6 +1065,130 @@ describe("executeWorkflowRun", () => {
 
 			expect(result).toBe(false);
 			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the definition input codec factory throws, so the run is redelivered", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build();
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(
+				async () => {
+					handlerCalled = true;
+				},
+				{
+					input: () => {
+						throw new Error("No keyring available");
+					},
+				}
+			);
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the definition output codec factory throws, so the run is redelivered", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build();
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(
+				async () => {
+					handlerCalled = true;
+				},
+				{
+					output: () => {
+						throw new Error("No keyring available");
+					},
+				}
+			);
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the definition input codec cannot decode the run's input", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				input: asOpaquePayload({ def: "order-1" }),
+			});
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(
+				async () => {
+					handlerCalled = true;
+				},
+				{
+					input: () => ({
+						encode: async (payload) => payload,
+						decode: async () => {
+							throw new Error("No codec named aes-v1");
+						},
+					}),
+				}
+			);
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the definition output codec cannot encode the handler output", () =>
+		withFakeClient(async (client) => {
+			const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+				async handler() {
+					return "done";
+				},
+				codec: {
+					output: () => ({
+						encode: async () => {
+							throw new Error("cannot encode output");
+						},
+						decode: async (payload) => payload,
+					}),
+				},
+			});
+			const workflowRun = runningWorkflowRunRecordFactory.build();
+
+			client.api.workflowRun.transitionStateV1.once(
+				{
+					type: "optimistic",
+					id: workflowRun.id,
+					state: { status: "running" },
+					expectedRevision: workflowRun.revision,
+				},
+				{ revision: workflowRun.revision, state: workflowRun.state, attempts: workflowRun.attempts }
+			);
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
 		}));
 
 	test("hashes inside the run with the plain function when the run declares no client hasher, whatever the client holds", () =>

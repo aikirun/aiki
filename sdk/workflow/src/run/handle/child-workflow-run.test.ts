@@ -64,6 +64,48 @@ describe("childWorkflowRunHandle", () => {
 				});
 			}));
 
+		test("decodes the child's completed output through the client codec then the definition output codec", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ client: { def: "done" } });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return { def: "done" };
+					},
+				};
+				const childRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: {
+						[childRecord.id]: {
+							timeouts: [],
+							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+						},
+					},
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger, {
+					workflowCodec: {
+						input: {
+							encode: async (payload) => payload,
+							decode: async () => "from-input",
+						},
+						output: {
+							encode: async (payload) => payload,
+							decode: async (payload) => {
+								expect(payload).toEqual({ def: "done" });
+								return "done";
+							},
+						},
+					},
+				});
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
+
 		test("resolves with whatever terminal state the child reached", () =>
 			withFakeClient(async (client) => {
 				const childRecord = runningWorkflowRunRecordFactory.build();
