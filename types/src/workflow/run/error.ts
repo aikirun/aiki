@@ -84,6 +84,34 @@ export class NonDeterminismError extends Error {
 	}
 }
 
+/**
+ * A get-by-id for a workflow run returned a run whose name or versionId does not match the
+ * workflow version used to look it up.
+ */
+export class WorkflowRunGetByIdFailedError extends Error {
+	public override readonly name = "WorkflowRunGetByIdFailedError";
+	public readonly id: WorkflowRunId;
+	public readonly expectedName: WorkflowName;
+	public readonly expectedVersionId: WorkflowVersionId;
+	public readonly actualName: string;
+	public readonly actualVersionId: string;
+
+	constructor(
+		id: WorkflowRunId,
+		expectedName: WorkflowName,
+		expectedVersionId: WorkflowVersionId,
+		actualName: string,
+		actualVersionId: string
+	) {
+		super(`Workflow run ${id} is ${actualName}:${actualVersionId}, expected ${expectedName}:${expectedVersionId}`);
+		this.id = id;
+		this.expectedName = expectedName;
+		this.expectedVersionId = expectedVersionId;
+		this.actualName = actualName;
+		this.actualVersionId = actualVersionId;
+	}
+}
+
 export class ClientCodecMissingError extends Error {
 	public override readonly name = "ClientCodecMissingError";
 	public readonly id: WorkflowRunId;

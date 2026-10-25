@@ -24,6 +24,7 @@ import {
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
+	WorkflowRunGetByIdFailedError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
@@ -2161,13 +2162,27 @@ describe("getting a run handle", () => {
 			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
 				async handler() {},
 			});
-			const runRecord = runningWorkflowRunRecordFactory.build();
+			const runRecord = runningWorkflowRunRecordFactory.build({ name: "orders", versionId: "1.0.0" });
 
 			client.api.workflowRun.getByIdV1.once({ id: runRecord.id }, { run: runRecord });
 
 			const handle = await workflowVersion.getHandleById(client, runRecord.id);
 
 			expect(handle.run.id).toBe(runRecord.id);
+		}));
+
+	test("getHandleById throws when the run name or versionId does not match the workflow version", () =>
+		withFakeClient(async (client) => {
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build({ name: "payments", versionId: "2.0.0" });
+
+			client.api.workflowRun.getByIdV1.once({ id: runRecord.id }, { run: runRecord });
+
+			await expect(workflowVersion.getHandleById(client, runRecord.id)).rejects.toBeInstanceOf(
+				WorkflowRunGetByIdFailedError
+			);
 		}));
 
 	test("getHandleByReferenceId looks the run up by the workflow name, version, and reference id", () =>
