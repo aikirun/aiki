@@ -62,15 +62,15 @@
 		]
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.9",
+		"@biomejs/biome": "2.6.2",
 		"@types/node": "^22.10.2",
 		"bun-types": "^1.1.38",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.2.7",
 		"tsup": "^8.5.1",
 		"typescript": "^5.7.2",
-		"vite": "^8.3.1",
-		"vitest": "^5.0.3"
+		"vite": "^8.3.5",
+		"vitest": "^5.0.5"
 	},
 	"overrides": {
 		"mdast-util-to-markdown": "2.1.2"
