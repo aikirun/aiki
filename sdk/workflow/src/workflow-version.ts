@@ -79,6 +79,10 @@ export interface WorkflowVersionParams<
 	 * Handles obtained without this definition — for example via the generic
 	 * {@link workflowRunHandle} or a client API that does not pass the workflow version — have no
 	 * definition codec. Their `wait()` returns the still-encoded output with no error.
+	 *
+	 * Adding or removing a codec on a version that has stored runs or schedules breaks those runs:
+	 * they will decode with the wrong layer, either returning still-encoded data or
+	 * throwing inside your codec.
 	 */
 	codec?: CreateWorkflowDefinitionCodec<EncodedInput, EncodedOutput>;
 }
