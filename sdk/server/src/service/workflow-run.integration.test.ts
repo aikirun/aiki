@@ -70,7 +70,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				options: { pool: "eu-west" },
 			});
 
-			const run = await service.getWorkflowRunById(context, runId);
+			const run = await service.getWorkflowRunById(context, runId, undefined);
 
 			expect(run).toEqual(
 				expect.objectContaining({
@@ -114,9 +114,31 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				clientCodecApplied: true,
 			});
 
-			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
 				expect.objectContaining({ id: runId, clientCodecApplied: true })
 			);
+		}));
+
+	test("finds the run only under the workflow version it belongs to", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId, { name: "checkout", versionId: "v1" })).toEqual(
+				expect.objectContaining({ id: runId })
+			);
+			await expect(
+				service.getWorkflowRunById(context, runId, { name: "checkout", versionId: "v2" })
+			).rejects.toBeInstanceOf(NotFoundError);
 		}));
 
 	test("records that a client hasher was applied", () =>
@@ -132,7 +154,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				clientCodecApplied: false,
 			});
 
-			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
 				expect.objectContaining({ id: runId, clientHasherApplied: true })
 			);
 		}));
@@ -152,7 +174,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				options: { clientCodecPolicy: "skip" },
 			});
 
-			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
 				expect.objectContaining({ id: runId, options: { clientCodecPolicy: "skip" } })
 			);
 		}));
@@ -166,7 +188,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			});
 
 			const { service } = createService(repos);
-			const run = await service.getWorkflowRunById(context, runId);
+			const run = await service.getWorkflowRunById(context, runId, undefined);
 			expect(Object.values(run.tasks)).toEqual([
 				[
 					{
@@ -196,7 +218,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				reference: undefined,
 			});
 
-			const run = await service.getWorkflowRunById(context, runId);
+			const run = await service.getWorkflowRunById(context, runId, undefined);
 			expect(run.eventWaits).toEqual({
 				orderShipped: [expect.objectContaining({ status: "received", data: encodedData, clientCodecApplied: true })],
 			});
@@ -725,9 +747,9 @@ describe("WorkflowRunService cancelByIds", () => {
 			});
 
 			const cascadeRuns = scheduledRuns.rows.filter((row) => row.name === "cancel-child-runs");
-			expect(await Promise.all(cascadeRuns.map((row) => service.getWorkflowRunById(context, row.id)))).toEqual([
-				expect.objectContaining({ name: "cancel-child-runs", clientCodecApplied: false }),
-			]);
+			expect(
+				await Promise.all(cascadeRuns.map((row) => service.getWorkflowRunById(context, row.id, undefined)))
+			).toEqual([expect.objectContaining({ name: "cancel-child-runs", clientCodecApplied: false })]);
 		}));
 });
 
@@ -955,7 +977,7 @@ describe("WorkflowRunService createWorkflowRun delay", () => {
 				})
 			);
 
-			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
 				expect.objectContaining({
 					id: runId,
 					state: expect.objectContaining({ status: "scheduled", scheduledAt: MAX_TIMESTAMP_MS }),
@@ -1006,7 +1028,7 @@ describe("WorkflowRunService createWorkflowRun retry delay", () => {
 				})
 			);
 
-			expect(await service.getWorkflowRunById(context, runId)).toEqual(
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
 				expect.objectContaining({ id: runId, options: expect.objectContaining({ retry }) })
 			);
 		}));

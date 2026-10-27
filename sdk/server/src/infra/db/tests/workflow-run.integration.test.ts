@@ -158,6 +158,22 @@ describe("getByIdWithWorkflowAndState", () => {
 			expect(row?.state).toHaveProperty("output");
 			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
+
+	test("finds the run only under its own workflow name and version", () =>
+		withHarness(async ({ context, repos }) => {
+			const { runId, workflowName, workflowVersionId } = await seedScheduledRun({
+				namespaceRequestContext: context,
+				repos,
+			});
+			const getRunUnderWorkflow = (workflow: { name: string; versionId: string }) =>
+				repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId: context.namespaceId, id: runId, workflow });
+
+			expect(await getRunUnderWorkflow({ name: workflowName, versionId: workflowVersionId })).toEqual(
+				expect.objectContaining({ run: expect.objectContaining({ id: runId }) })
+			);
+			expect(await getRunUnderWorkflow({ name: workflowName, versionId: "v9" })).toBeNull();
+			expect(await getRunUnderWorkflow({ name: "bill-orders", versionId: workflowVersionId })).toBeNull();
+		}));
 });
 
 describe("getByReferenceWithWorkflowAndState", () => {

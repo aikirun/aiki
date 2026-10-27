@@ -79,6 +79,10 @@ export interface WorkflowRunListResponseV1 {
 
 export interface WorkflowRunGetByIdRequestV1 {
 	id: string;
+	workflow?: {
+		name: string;
+		versionId: string;
+	};
 }
 
 export interface WorkflowRunGetByIdResponseV1 {

@@ -70,11 +70,18 @@ export const createWorkflowRunService = ({ repos, imminentTimerQueue }: Workflow
 		return repos.transaction(async (txRepos) => createWorkflowRunInTx(context, request, txRepos, imminentTimerQueue));
 	},
 
-	async getWorkflowRunById(context: NamespaceRequestContext, id: string): Promise<WorkflowRunRecord> {
+	async getWorkflowRunById(
+		context: NamespaceRequestContext,
+		id: string,
+		workflow: { name: string; versionId: string } | undefined
+	): Promise<WorkflowRunRecord> {
 		const { namespaceId } = context;
 
-		const result = await repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId, id });
+		const result = await repos.workflowRun.getByIdWithWorkflowAndState({ namespaceId, id, workflow });
 		if (!result) {
+			if (workflow) {
+				throw new NotFoundError(`Workflow run ${workflow.name}:${workflow.versionId} not found: ${id}`);
+			}
 			throw new NotFoundError(`Workflow run not found: ${id}`);
 		}
 
