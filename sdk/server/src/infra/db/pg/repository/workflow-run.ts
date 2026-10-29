@@ -274,7 +274,13 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 	async getByIdWithWorkflowAndState(filter: {
 		namespaceId: NamespaceId;
 		id: string;
+		workflow?: { name: string; versionId: string };
 	}): Promise<WorkflowRunWithWorkflowAndState | null> {
+		const conditions = [eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)];
+		if (filter.workflow !== undefined) {
+			conditions.push(eq(workflow.name, filter.workflow.name), eq(workflow.versionId, filter.workflow.versionId));
+		}
+
 		const result = await db
 			.select({
 				run: {
@@ -299,7 +305,7 @@ export const createWorkflowRunRepository = (db: PgDb) => ({
 			.from(workflowRun)
 			.innerJoin(workflow, eq(workflowRun.workflowId, workflow.id))
 			.innerJoin(stateTransition, eq(workflowRun.latestStateTransitionId, stateTransition.id))
-			.where(and(eq(workflowRun.namespaceId, filter.namespaceId), eq(workflowRun.id, filter.id)))
+			.where(and(...conditions))
 			.limit(1);
 
 		const row = result[0];
