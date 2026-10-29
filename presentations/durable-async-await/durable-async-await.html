@@ -74,7 +74,7 @@ tr:nth-child(even) td{background:#fff}
 tr:nth-child(odd) td{background:var(--code-bg)}
 td:first-child{font-weight:600;color:var(--ink);white-space:nowrap}
 tr.ours td{background:var(--accent-soft)}
-td.ours-cell{background:var(--accent-soft)!important;color:var(--ink);font-weight:600}
+tr td.ours-cell{background:var(--accent-soft);color:var(--ink);font-weight:600}
 /* the polling table drawn as data, coloured by the requirement that added each part */
 .db{font-size:21px}
 .db th{font:600 19px var(--mono);background:#475569}
@@ -83,13 +83,13 @@ td.ours-cell{background:var(--accent-soft)!important;color:var(--ink);font-weigh
 .db td{padding:9px 16px}
 .db td:first-child{font-weight:400;color:var(--body)}
 .db td code{font-size:.95em}
-.db td .chip{font-size:17px;margin:0}
-.chip.inline{font-size:.8em;padding:1px 8px;vertical-align:1px}
-.status-values{margin-top:22px;font-size:22px}
 .chip{display:inline-block;font:500 19px var(--mono);padding:3px 10px;border-radius:6px;color:#fff;margin:2px 2px}
 .chip.r1{background:var(--r1)}
 .chip.r2{background:var(--r2)}
 .chip.r3{background:var(--r3)}
+.db td .chip{font-size:17px;margin:0}
+.chip.inline{font-size:.8em;padding:1px 8px;vertical-align:1px}
+.status-values{margin-top:22px;font-size:22px}
 
 /* layout helpers */
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:28px;align-items:start}
@@ -122,7 +122,7 @@ td.ours-cell{background:var(--accent-soft)!important;color:var(--ink);font-weigh
 .links-qr svg{width:230px;height:230px;display:block;border-radius:12px}
 .links-list p{font-size:26px;margin:0 0 14px;color:var(--body)}
 .links-list a{color:var(--ink);text-decoration:none;border-bottom:2px solid var(--accent-soft)}
-.links-speaker{font-weight:600;color:var(--ink)!important;margin-top:24px!important}
+.links-list .links-speaker{font-weight:600;color:var(--ink);margin-top:24px}
 .x-icon{width:20px;height:20px;fill:currentColor;vertical-align:-3px;margin-right:10px}
 .code-label{margin:10px 0 -6px;font:600 19px var(--display);color:var(--muted)}
 .side-note{margin:32px 0 0;font:600 24px/1.35 var(--display);color:var(--body);text-align:left}
@@ -569,7 +569,7 @@ for (const pre of document.querySelectorAll("pre")) {
     .join("");
 }
 
-function fit() {
+function fitStage() {
   const notesHeight = $("#notes").hidden ? 0 : $("#notes").offsetHeight;
   document.documentElement.style.setProperty("--notes-h", `${notesHeight}px`);
   const scale = Math.min(window.innerWidth / 1280, (window.innerHeight - notesHeight) / 720) * 0.97;
@@ -577,7 +577,9 @@ function fit() {
 }
 
 function render() {
-  slides.forEach((slide, slideIndex) => slide.classList.toggle("current", slideIndex === index));
+  slides.forEach((slide, slideIndex) => {
+    slide.classList.toggle("current", slideIndex === index);
+  });
   $("#page").textContent = `${index + 1} / ${slides.length}`;
   const notes = slides[index].querySelector("aside.notes");
   $("#notesBody").innerHTML = notes ? notes.innerHTML : "<p>No notes.</p>";
@@ -608,7 +610,7 @@ document.addEventListener("keydown", (keyEvent) => {
   }
   if (keyEvent.key === "n" || keyEvent.key === "N") {
     $("#notes").hidden = !$("#notes").hidden;
-    fit();
+    fitStage();
   }
   if (keyEvent.key === "f" || keyEvent.key === "F") {
     if (document.fullscreenElement) {
@@ -619,10 +621,10 @@ document.addEventListener("keydown", (keyEvent) => {
   }
 });
 
-window.addEventListener("resize", fit);
+window.addEventListener("resize", fitStage);
 const start = Number(location.hash.slice(1));
 go(Number.isInteger(start) && start > 0 ? start - 1 : 0);
-fit();
+fitStage();
 </script>
 </body>
 </html>
