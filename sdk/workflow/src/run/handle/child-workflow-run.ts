@@ -5,6 +5,7 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type WorkflowRunId, type WorkflowRunRecord, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
+import type { WorkflowDefinitionCodec } from "./bound-codec";
 import {
 	decodeWaitResultState,
 	type WorkflowRunHandle,
@@ -13,14 +14,22 @@ import {
 } from "./workflow-run";
 import type { EventsDefinition } from "../event";
 
-export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
+export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition = EventsDefinition> {
+	eventsDefinition?: TEvents;
+	workflowCodec?: WorkflowDefinitionCodec;
+}
+
+export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition>(
 	client: Client<Context>,
 	run: WorkflowRunRecord,
 	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
 	logger: Logger,
-	eventsDefinition?: TEvents
+	options?: ChildWorkflowRunHandleOptions<TEvents>
 ): ChildWorkflowRunHandle<Output, Context, TEvents> {
-	const handle = workflowRunHandle<Output, Context, TEvents>(client, run, eventsDefinition, logger);
+	const handle = workflowRunHandle<Output, Context, TEvents>(client, run, {
+		logger,
+		...options,
+	});
 
 	return {
 		get run() {
@@ -126,7 +135,7 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 			if (terminal) {
 				return {
 					success: true,
-					state: await decodeWaitResultState<Output>(handle[INTERNAL].codec, terminal.state),
+					state: await decodeWaitResultState<Output>(handle[INTERNAL].codec.output, terminal.state),
 				};
 			}
 

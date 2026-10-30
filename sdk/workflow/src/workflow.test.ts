@@ -100,3 +100,59 @@ describe("workflow.v input/output serializability", () => {
 		orders.v("1.0.0", { events: { shipped }, handler: async () => {} });
 	});
 });
+
+describe("workflow.v definition codec encoded serializability", () => {
+	test("accepts a hand-written input codec that encodes to a string", () => {
+		const orders = workflow({ name: "orders" });
+		orders.v("1.0.0", {
+			handler: async () => {},
+			codec: {
+				input: () => ({
+					encode: async (payload) => JSON.stringify(payload),
+					decode: async (encoded) => JSON.parse(String(encoded)),
+				}),
+			},
+		});
+	});
+
+	test("accepts a hand-written output codec that encodes to a string", () => {
+		const orders = workflow({ name: "orders" });
+		orders.v("1.0.0", {
+			handler: async () => "ok",
+			codec: {
+				output: () => ({
+					encode: async (payload) => JSON.stringify(payload),
+					decode: async (encoded) => JSON.parse(String(encoded)),
+				}),
+			},
+		});
+	});
+
+	test("rejects a hand-written input codec that encodes to raw bytes", () => {
+		const orders = workflow({ name: "orders" });
+		// @ts-expect-error encoded.iv is binary data
+		orders.v("1.0.0", {
+			handler: async () => {},
+			codec: {
+				input: () => ({
+					encode: async () => ({ iv: new Uint8Array(12), ct: "…" }),
+					decode: async (encoded) => encoded,
+				}),
+			},
+		});
+	});
+
+	test("rejects a hand-written output codec that encodes to raw bytes", () => {
+		const orders = workflow({ name: "orders" });
+		// @ts-expect-error encoded.iv is binary data
+		orders.v("1.0.0", {
+			handler: async () => "ok",
+			codec: {
+				output: () => ({
+					encode: async () => ({ iv: new Uint8Array(12), ct: "…" }),
+					decode: async (encoded) => encoded,
+				}),
+			},
+		});
+	});
+});

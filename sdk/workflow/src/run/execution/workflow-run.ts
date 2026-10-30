@@ -7,9 +7,10 @@ import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
+	CodecInitFailedError,
 	type NonDeterminismError,
 	type WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -25,6 +26,7 @@ import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
 import { createEventWaiters } from "../event";
+import { instantiateWorkflowDefinitionCodec } from "../handle/bound-codec";
 import { workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
 
@@ -99,12 +101,16 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		const handle = workflowRunHandle(client, workflowRun, {
+			eventsDefinition,
+			logger,
+			workflowCodec: instantiateWorkflowDefinitionCodec(workflowVersion[INTERNAL].codec, logger),
+		});
 		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
 		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
-		const codec = handle[INTERNAL].codec;
+		const codec = handle[INTERNAL].codec.input;
 
 		// Every hash inside the run must come from the hasher that made the run's own hash.
 		let hasher: BoundHasher;
@@ -157,13 +163,18 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			if (err instanceof ClientCodecEncodeFailedError) {
-				logger.error("The client codec failed to encode a payload of the workflow run", { err });
+			if (err instanceof CodecInitFailedError) {
+				logger.error("Codec failed to initialize for the workflow run", { err });
 				return false;
 			}
 
-			if (err instanceof ClientCodecDecodeFailedError) {
-				logger.error("The client codec failed to decode a payload of the workflow run", { err });
+			if (err instanceof CodecEncodeFailedError) {
+				logger.error("Codec failed to encode a payload of the workflow run", { err });
+				return false;
+			}
+
+			if (err instanceof CodecDecodeFailedError) {
+				logger.error("Codec failed to decode a payload of the workflow run", { err });
 				return false;
 			}
 

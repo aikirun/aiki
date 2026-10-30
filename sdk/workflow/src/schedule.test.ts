@@ -239,6 +239,46 @@ describe("schedule", () => {
 					workflowRunInput
 				);
 			}));
+
+		test("encodes schedule input through the definition codec then the client codec", () =>
+			withFakeClient(async (client) => {
+				const encodedInput = asOpaquePayload({ client: { def: workflowRunInput } });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toEqual({ def: workflowRunInput });
+						return { client: payload };
+					},
+					decode: async (payload) => payload,
+				};
+				const workflowWithCodec = workflow({ name: "sync-inventory-codec" }).v("1.0.0", {
+					handler: async (_run, _input: { warehouseId: string }) => {},
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toEqual(workflowRunInput);
+								return { def: workflowRunInput };
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+				client.api.schedule.activateV1.once(
+					intervalScheduleActivateRequestFactory.build({
+						workflowName: workflowWithCodec.name,
+						workflowVersionId: workflowWithCodec.versionId,
+						workflowRunInput: encodedInput,
+						workflowRunInputHash: { value: workflowRunInputHash },
+						clientCodecApplied: true,
+					}),
+					{ schedule: intervalScheduleFactory.build() }
+				);
+
+				await schedule({ type: "interval", every: { seconds: 1 } }).activate(
+					client,
+					workflowWithCodec,
+					workflowRunInput
+				);
+			}));
 	});
 
 	describe("handle operations", () => {
