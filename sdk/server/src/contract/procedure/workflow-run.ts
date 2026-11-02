@@ -115,6 +115,7 @@ const getByIdV1: ContractProcedure<WorkflowRunGetByIdRequestV1, WorkflowRunGetBy
 	.input(
 		type({
 			id: "string > 0",
+			"workflow?": type({ name: "string > 0", versionId: "string > 0" }).or("undefined"),
 		})
 	)
 	.output(

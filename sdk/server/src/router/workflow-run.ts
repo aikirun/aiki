@@ -24,7 +24,7 @@ export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
 
 		getByIdV1: os.getByIdV1.handler(async ({ input: request, context }) => {
 			return {
-				run: await workflowRunService.getWorkflowRunById(context, request.id),
+				run: await workflowRunService.getWorkflowRunById(context, request.id, request.workflow),
 			};
 		}),
 

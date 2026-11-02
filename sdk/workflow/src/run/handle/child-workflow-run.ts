@@ -32,7 +32,9 @@ export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDe
 	});
 
 	return {
-		run: handle.run,
+		get run() {
+			return handle.run;
+		},
 		events: handle.events,
 		refresh: handle.refresh.bind(handle),
 		wait: createWaiter(handle, parentRunHandle, logger),

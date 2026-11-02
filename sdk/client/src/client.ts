@@ -25,7 +25,7 @@ const EMBEDDED_BASE_URL = "aiki://embedded/api";
  * });
  *
  * // Embedded — server and client in the same process
- * const aiki = server({ db: { connectionString: "postgres://..." } });
+ * const aiki = server({ db: database({ provider: "pg", url: "postgres://..." }) });
  * const aikiClient = client({ handler: aiki.handler });
  *
  * const handle = await myWorkflow.start(aikiClient, { email: "user@example.com" });
