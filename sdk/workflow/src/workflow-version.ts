@@ -75,9 +75,8 @@ export interface WorkflowVersionParams<
 	 * decode reverses that order. Does not replace the client codec, and does not apply to tasks
 	 * or events.
 	 *
-	 * Handles obtained without this definition — for example via the generic
-	 * {@link workflowRunHandle} or a client API that does not pass the workflow version — have no
-	 * definition codec. Their `wait()` returns the still-encoded output with no error.
+	 * Each handle and each execution builds its own codec from these factories, so keep any state
+	 * that should outlive a handle or an execution outside the factory.
 	 *
 	 * Adding or removing a codec on a version that has stored runs or schedules breaks those runs:
 	 * they will decode with the wrong layer, either returning still-encoded data or
