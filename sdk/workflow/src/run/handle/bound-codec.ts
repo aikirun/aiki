@@ -10,6 +10,8 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	type DefinitionCodecLevel,
+	type DefinitionCodecRole,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 
@@ -29,6 +31,27 @@ export type CreateWorkflowDefinitionCodec<EncodedInput = never, EncodedOutput = 
 }>;
 
 /**
+ * Instantiates a codec from its factory. A factory can throw anything, so its errors are wrapped
+ * in `CodecInitFailedError` for the SDK to recognise, with the factory's error as the cause.
+ */
+export function instantiateCodec(
+	create: CreateCodec<unknown> | undefined,
+	logger: Logger,
+	level: DefinitionCodecLevel,
+	role: DefinitionCodecRole
+): Codec<unknown> | undefined {
+	if (!create) {
+		return undefined;
+	}
+
+	try {
+		return create({ logger });
+	} catch (err) {
+		throw new CodecInitFailedError(level, role, err);
+	}
+}
+
+/**
  * Instantiates definition codecs from their factories. A factory can throw anything, so its
  * errors are wrapped in `CodecInitFailedError` for the SDK to recognise, with the factory's
  * error as the cause.
@@ -43,21 +66,11 @@ export function instantiateWorkflowDefinitionCodec(
 
 	const codec: WorkflowDefinitionCodec = {};
 	if (create.input) {
-		try {
-			codec.input = create.input({ logger });
-		} catch (err) {
-			throw new CodecInitFailedError(err);
-		}
+		codec.input = instantiateCodec(create.input, logger, "workflow", "input");
 	}
-
 	if (create.output) {
-		try {
-			codec.output = create.output({ logger });
-		} catch (err) {
-			throw new CodecInitFailedError(err);
-		}
+		codec.output = instantiateCodec(create.output, logger, "workflow", "output");
 	}
-
 	return codec;
 }
 
@@ -112,14 +125,14 @@ export function composeCodecs(inner: Codec<unknown> | undefined, outer: Codec<un
  * `clientCodecApplied` reflects only the client layer.
  */
 export function resolveWorkflowInputCodec(params: {
-	definition: WorkflowDefinitionCodec | undefined;
+	definitionCodec: Codec<unknown> | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
 }): { codec: BoundCodec; clientCodecApplied: boolean } {
 	const clientCodecApplied = params.policy !== "skip" && params.clientCodec !== undefined;
 
 	return {
-		codec: composeCodecs(params.definition?.input, clientCodecApplied ? params.clientCodec : undefined),
+		codec: composeCodecs(params.definitionCodec, clientCodecApplied ? params.clientCodec : undefined),
 		clientCodecApplied,
 	};
 }

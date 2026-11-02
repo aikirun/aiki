@@ -218,7 +218,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger);
 		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
-			definition: workflowCodec,
+			definitionCodec: workflowCodec?.input,
 			clientCodec,
 			policy: startOptions.clientCodecPolicy,
 		});
@@ -336,7 +336,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		}
 
 		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
-			definition: workflowCodec,
+			definitionCodec: workflowCodec?.input,
 			clientCodec: client[INTERNAL].codec,
 			policy: startOptions.clientCodecPolicy,
 		});

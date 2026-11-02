@@ -94,6 +94,12 @@ export class ClientCodecMissingError extends Error {
 	}
 }
 
+export const DEFINITION_CODEC_LEVELS = ["workflow", "task"] as const;
+export type DefinitionCodecLevel = (typeof DEFINITION_CODEC_LEVELS)[number];
+
+export const DEFINITION_CODEC_ROLES = ["input", "output"] as const;
+export type DefinitionCodecRole = (typeof DEFINITION_CODEC_ROLES)[number];
+
 /**
  * A codec factory threw while creating a codec. The factory's error is the `cause`.
  * In a workflow, this error ends the execution even when the workflow code catches it, and the run
@@ -101,9 +107,15 @@ export class ClientCodecMissingError extends Error {
  */
 export class CodecInitFailedError extends Error {
 	public override readonly name = "CodecInitFailedError";
+	public readonly level: DefinitionCodecLevel;
+	public readonly role: DefinitionCodecRole;
 
-	constructor(cause: unknown) {
-		super("Codec failed to initialize", { cause });
+	constructor(level: DefinitionCodecLevel, role: DefinitionCodecRole, cause: unknown) {
+		const levelLabel = { workflow: "Workflow", task: "Task" }[level];
+		const roleLabel = { input: "input", output: "output" }[role];
+		super(`${levelLabel} ${roleLabel} codec failed to initialize`, { cause });
+		this.level = level;
+		this.role = role;
 	}
 }
 

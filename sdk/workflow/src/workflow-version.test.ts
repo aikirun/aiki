@@ -800,7 +800,7 @@ describe("workflow version execution", () => {
 			NonDeterminismError: (id, attempts) =>
 				new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
-			CodecInitFailedError: () => new CodecInitFailedError(new Error("No keyring available")),
+			CodecInitFailedError: () => new CodecInitFailedError("workflow", "input", new Error("No keyring available")),
 			CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
 			CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
 		};
@@ -1381,7 +1381,7 @@ describe("creating a workflow run", () => {
 
 				const starting = workflowVersion.start(client, "world");
 				await expect(starting).rejects.toThrow(CodecInitFailedError);
-				await expect(starting).rejects.toMatchObject({ cause: codecError });
+				await expect(starting).rejects.toMatchObject({ cause: codecError, level: "workflow", role: "input" });
 			}));
 
 		test("reports a failure to create the definition output codec as CodecInitFailedError, caused by the factory's error", () =>
@@ -1400,7 +1400,7 @@ describe("creating a workflow run", () => {
 
 				const starting = workflowVersion.start(client, "world");
 				await expect(starting).rejects.toThrow(CodecInitFailedError);
-				await expect(starting).rejects.toMatchObject({ cause: codecError });
+				await expect(starting).rejects.toMatchObject({ cause: codecError, level: "workflow", role: "output" });
 			}));
 
 		test("reports a failure to encode the input with the definition codec as CodecEncodeFailedError, caused by the codec's error", () =>
@@ -1733,7 +1733,7 @@ describe("creating a workflow run", () => {
 
 				const starting = childWorkflow.startAsChild(parentRun, "payload");
 				await expect(starting).rejects.toThrow(CodecInitFailedError);
-				await expect(starting).rejects.toMatchObject({ cause: codecError });
+				await expect(starting).rejects.toMatchObject({ cause: codecError, level: "workflow", role: "input" });
 			}));
 
 		test("reports a failure to encode the child input with the definition codec as CodecEncodeFailedError, caused by the codec's error", () =>
