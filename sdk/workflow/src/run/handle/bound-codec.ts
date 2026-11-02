@@ -1,4 +1,5 @@
 import type { Logger } from "@aikirun/lib/logger";
+import type { RequireAtLeastOneProp } from "@aikirun/lib/object";
 import type { Client } from "@aikirun/types/client";
 import type { Codec, CreateCodec } from "@aikirun/types/infra/codec";
 import type { OpaquePayload } from "@aikirun/types/payload";
@@ -22,10 +23,10 @@ export type WorkflowDefinitionCodec = {
 	output?: Codec<unknown>;
 };
 
-export type CreateWorkflowDefinitionCodec<EncodedInput = unknown, EncodedOutput = unknown> = {
+export type CreateWorkflowDefinitionCodec<EncodedInput = never, EncodedOutput = never> = RequireAtLeastOneProp<{
 	input?: CreateCodec<EncodedInput>;
 	output?: CreateCodec<EncodedOutput>;
-};
+}>;
 
 /**
  * Instantiates definition codecs from their factories. A factory can throw anything, so its
@@ -33,7 +34,7 @@ export type CreateWorkflowDefinitionCodec<EncodedInput = unknown, EncodedOutput 
  * error as the cause.
  */
 export function instantiateWorkflowDefinitionCodec(
-	create: CreateWorkflowDefinitionCodec | undefined,
+	create: CreateWorkflowDefinitionCodec<unknown, unknown> | undefined,
 	logger: Logger
 ): WorkflowDefinitionCodec | undefined {
 	if (!create) {
@@ -55,10 +56,6 @@ export function instantiateWorkflowDefinitionCodec(
 		} catch (err) {
 			throw new CodecInitFailedError(err);
 		}
-	}
-
-	if (!codec.input && !codec.output) {
-		return undefined;
 	}
 
 	return codec;
@@ -91,24 +88,23 @@ export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
 });
 
 /**
- * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`.
+ * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`. Absent layers are
+ * skipped; the result is bound once.
  */
-export function composeCodecs(inner: BoundCodec, outer: BoundCodec): BoundCodec {
-	return {
-		encode: async (payload) => outer.encode(await inner.encode(payload)),
-		decode: async (encoded) => inner.decode((await outer.decode(encoded)) as OpaquePayload | undefined),
-	};
-}
-
-/**
- * Binds a definition-level codec, or returns the noop when none is set.
- */
-export function bindDefinitionCodec(codec: Codec<unknown> | undefined): BoundCodec {
-	if (!codec) {
-		return noopCodec;
+export function composeCodecs(inner: Codec<unknown> | undefined, outer: Codec<unknown> | undefined): BoundCodec {
+	if (inner && outer) {
+		return toBoundCodec({
+			encode: async (payload) => outer.encode(await inner.encode(payload)),
+			decode: async (encoded) => inner.decode(await outer.decode(encoded)),
+		});
 	}
-
-	return toBoundCodec(codec);
+	if (inner) {
+		return toBoundCodec(inner);
+	}
+	if (outer) {
+		return toBoundCodec(outer);
+	}
+	return noopCodec;
 }
 
 /**
@@ -135,12 +131,32 @@ export function resolveInputCodec(params: {
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
 }): { codec: BoundCodec; clientCodecApplied: boolean } {
-	const { codec: clientLayer, applied: clientCodecApplied } = resolveClientCodec(params.clientCodec, params.policy);
+	const clientCodecApplied = params.policy !== "skip" && params.clientCodec !== undefined;
 
 	return {
-		codec: composeCodecs(bindDefinitionCodec(params.definition?.input), clientLayer),
+		codec: composeCodecs(params.definition?.input, clientCodecApplied ? params.clientCodec : undefined),
 		clientCodecApplied,
 	};
+}
+
+/**
+ * Returns the client's codec when a stored record declares it was applied, undefined otherwise.
+ * Throws when the record expects a codec the client lacks.
+ */
+export function resolveDeclaredClientCodec<Context>(
+	client: Client<Context>,
+	declaration: { runId: WorkflowRunId; clientCodecApplied: boolean }
+): Codec<unknown> | undefined {
+	if (!declaration.clientCodecApplied) {
+		return undefined;
+	}
+
+	const codec = client[INTERNAL].codec;
+	if (!codec) {
+		throw new ClientCodecMissingError(declaration.runId);
+	}
+
+	return codec;
 }
 
 /**
@@ -151,14 +167,6 @@ export function bindDeclaredCodec<Context>(
 	client: Client<Context>,
 	declaration: { runId: WorkflowRunId; clientCodecApplied: boolean }
 ): BoundCodec {
-	if (!declaration.clientCodecApplied) {
-		return noopCodec;
-	}
-
-	const codec = client[INTERNAL].codec;
-	if (!codec) {
-		throw new ClientCodecMissingError(declaration.runId);
-	}
-
-	return toBoundCodec(codec);
+	const codec = resolveDeclaredClientCodec(client, declaration);
+	return codec ? toBoundCodec(codec) : noopCodec;
 }

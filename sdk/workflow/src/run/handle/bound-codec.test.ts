@@ -13,11 +13,11 @@ import { describe, expect, test } from "vitest";
 
 import {
 	bindDeclaredCodec,
-	bindDefinitionCodec,
 	composeCodecs,
 	instantiateWorkflowDefinitionCodec,
 	noopCodec,
 	resolveClientCodec,
+	resolveDeclaredClientCodec,
 	resolveInputCodec,
 	toBoundCodec,
 } from "./bound-codec";
@@ -151,6 +151,38 @@ describe("resolveClientCodec", () => {
 	});
 });
 
+describe("resolveDeclaredClientCodec", () => {
+	const runId = "run-1" as WorkflowRunId;
+
+	test("returns the client's codec when the declaration says it was applied", () =>
+		withFakeClient((client) => {
+			const codec = {
+				encode: async (payload: unknown) => ({ marked: payload }),
+				decode: async (payload: unknown) => ({ unmarked: payload }),
+			};
+			client[INTERNAL].codec = codec;
+
+			expect(resolveDeclaredClientCodec(client, { runId, clientCodecApplied: true })).toBe(codec);
+		}));
+
+	test("returns undefined when the declaration says it was not applied", () =>
+		withFakeClient((client) => {
+			client[INTERNAL].codec = {
+				encode: async (payload) => ({ marked: payload }),
+				decode: async (payload) => ({ unmarked: payload }),
+			};
+
+			expect(resolveDeclaredClientCodec(client, { runId, clientCodecApplied: false })).toBeUndefined();
+		}));
+
+	test("throws ClientCodecMissingError when the declaration expects a client codec the client lacks", () =>
+		withFakeClient((client) => {
+			expect(() => resolveDeclaredClientCodec(client, { runId, clientCodecApplied: true })).toThrow(
+				ClientCodecMissingError
+			);
+		}));
+});
+
 describe("bindDeclaredCodec", () => {
 	const runId = "run-1" as WorkflowRunId;
 
@@ -189,20 +221,20 @@ describe("bindDeclaredCodec", () => {
 });
 
 describe("composeCodecs", () => {
-	const inner = toBoundCodec({
-		encode: async (payload) => ({ inner: payload }),
-		decode: async (payload) => {
+	const inner = {
+		encode: async (payload: unknown) => ({ inner: payload }),
+		decode: async (payload: unknown) => {
 			const { inner: body } = payload as { inner: unknown };
 			return body;
 		},
-	});
-	const outer = toBoundCodec({
-		encode: async (payload) => ({ outer: payload }),
-		decode: async (payload) => {
+	};
+	const outer = {
+		encode: async (payload: unknown) => ({ outer: payload }),
+		decode: async (payload: unknown) => {
 			const { outer: body } = payload as { outer: unknown };
 			return body;
 		},
-	});
+	};
 
 	test("encodes through inner then outer, and decodes in reverse", async () => {
 		const composed = composeCodecs(inner, outer);
@@ -213,35 +245,28 @@ describe("composeCodecs", () => {
 		expect(await composed.decode(encoded)).toEqual(payload);
 	});
 
-	test("is a no-op when both layers are noop", async () => {
-		const composed = composeCodecs(noopCodec, noopCodec);
+	test("binds only the inner when the outer is absent", async () => {
+		const composed = composeCodecs(inner, undefined);
+		const payload = { value: 1 };
+
+		expect(await composed.encode(payload)).toEqual(asOpaquePayload({ inner: payload }));
+		expect(await composed.decode(asOpaquePayload({ inner: payload }))).toEqual(payload);
+	});
+
+	test("binds only the outer when the inner is absent", async () => {
+		const composed = composeCodecs(undefined, outer);
+		const payload = { value: 1 };
+
+		expect(await composed.encode(payload)).toEqual(asOpaquePayload({ outer: payload }));
+		expect(await composed.decode(asOpaquePayload({ outer: payload }))).toEqual(payload);
+	});
+
+	test("is a no-op when both layers are absent", async () => {
+		const composed = composeCodecs(undefined, undefined);
 		const payload = { value: 1 };
 
 		expect(await composed.encode(payload)).toBe(asOpaquePayload(payload));
 		expect(await composed.decode(asOpaquePayload(payload))).toBe(payload);
-	});
-});
-
-describe("bindDefinitionCodec", () => {
-	test("binds the codec", async () => {
-		const codec = bindDefinitionCodec({
-			encode: async (payload) => ({ marked: payload }),
-			decode: async (payload) => {
-				const { marked } = payload as { marked: unknown };
-				return marked;
-			},
-		});
-		const payload = { value: 1 };
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-		expect(await codec.decode(asOpaquePayload({ marked: payload }))).toEqual(payload);
-	});
-
-	test("returns the noop when no codec is set", async () => {
-		const codec = bindDefinitionCodec(undefined);
-		const payload = { value: 1 };
-
-		expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
-		expect(await codec.decode(asOpaquePayload(payload))).toBe(payload);
 	});
 });
 

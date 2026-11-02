@@ -60,8 +60,8 @@ export interface WorkflowVersionParams<
 	Output,
 	Context,
 	TEvents extends EventsDefinition,
-	EncodedInput = unknown,
-	EncodedOutput = unknown,
+	EncodedInput = never,
+	EncodedOutput = never,
 > {
 	handler: (run: Readonly<WorkflowRun<Context, TEvents>>, input: Input) => Promise<Output>;
 	events?: TEvents;
@@ -132,7 +132,7 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 		eventsDefinition: TEvents;
 		handler: (run: Omit<WorkflowRun<Context, TEvents>, "context">, input: Input) => Promise<void>;
 		runOptions: () => WorkflowRunOptions;
-		codec: CreateWorkflowDefinitionCodec | undefined;
+		codec: CreateWorkflowDefinitionCodec<unknown, unknown> | undefined;
 	};
 }
 
@@ -172,7 +172,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	constructor(
 		public readonly name: WorkflowName,
 		public readonly versionId: WorkflowVersionId,
-		private readonly params: WorkflowVersionParams<Input, Output, Context, TEvents>,
+		private readonly params: WorkflowVersionParams<Input, Output, Context, TEvents, unknown, unknown>,
 		startOptionsBuilder?: ObjectBuilder<WorkflowStartOptions>
 	) {
 		const eventsDefinition = this.params.events ?? ({} as TEvents);

@@ -14,12 +14,12 @@ import {
 } from "./workflow-run";
 import type { EventsDefinition } from "../event";
 
-export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition = EventsDefinition> {
+export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition> {
 	eventsDefinition?: TEvents;
 	workflowCodec?: WorkflowDefinitionCodec;
 }
 
-export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition>(
+export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
 	client: Client<Context>,
 	run: WorkflowRunRecord,
 	parentRunHandle: WorkflowRunHandle<unknown, Context, EventsDefinition>,
@@ -44,7 +44,7 @@ export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDe
 	};
 }
 
-export type ChildWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition = EventsDefinition> = Omit<
+export type ChildWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition> = Omit<
 	WorkflowRunHandle<Output, Context, TEvents>,
 	"wait"
 > & {

@@ -101,8 +101,8 @@ export interface Workflow<Context> {
 			Serializable<Input, "input"> &
 			Serializable<Output, "output"> &
 			Serializable<EventsData<TEvents>, "events"> &
-			Serializable<EncodedInput, "encoded"> &
-			Serializable<EncodedOutput, "encoded">
+			Serializable<EncodedInput, "codec.input"> &
+			Serializable<EncodedOutput, "codec.output">
 	) => WorkflowVersion<Input, Output, Context, TEvents>;
 
 	[INTERNAL]: {

@@ -130,7 +130,7 @@ describe("workflow.v definition codec encoded serializability", () => {
 
 	test("rejects a hand-written input codec that encodes to raw bytes", () => {
 		const orders = workflow({ name: "orders" });
-		// @ts-expect-error encoded.iv is binary data
+		// @ts-expect-error codec.input.iv is binary data
 		orders.v("1.0.0", {
 			handler: async () => {},
 			codec: {
@@ -144,7 +144,7 @@ describe("workflow.v definition codec encoded serializability", () => {
 
 	test("rejects a hand-written output codec that encodes to raw bytes", () => {
 		const orders = workflow({ name: "orders" });
-		// @ts-expect-error encoded.iv is binary data
+		// @ts-expect-error codec.output.iv is binary data
 		orders.v("1.0.0", {
 			handler: async () => "ok",
 			codec: {
