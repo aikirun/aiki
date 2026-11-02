@@ -29,7 +29,6 @@ import {
 	ChildWorkflowRunClientCodecSkippedError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
-	WorkflowRunGetByIdFailedError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
@@ -421,16 +420,10 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		client: Client<Context>,
 		runId: string
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
-		const { run } = await client.api.workflowRun.getByIdV1({ id: runId });
-		if (run.name !== this.name || run.versionId !== this.versionId) {
-			throw new WorkflowRunGetByIdFailedError(
-				runId as WorkflowRunId,
-				this.name,
-				this.versionId,
-				run.name,
-				run.versionId
-			);
-		}
+		const { run } = await client.api.workflowRun.getByIdV1({
+			id: runId,
+			workflow: { name: this.name, versionId: this.versionId },
+		});
 		return workflowRunHandle(client, run as WorkflowRunRecord, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
 			workflowCodec: instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger),
