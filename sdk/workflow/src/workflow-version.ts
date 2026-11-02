@@ -42,7 +42,7 @@ import { isControlFlowError } from "./run/execution/control-flow-error";
 import {
 	type CreateWorkflowDefinitionCodec,
 	instantiateWorkflowDefinitionCodec,
-	resolveInputCodec,
+	resolveWorkflowInputCodec,
 } from "./run/handle/bound-codec";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle/child-workflow-run";
 import {
@@ -217,7 +217,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		let input = args[0];
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger);
-		const { codec, clientCodecApplied } = resolveInputCodec({
+		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
 			definition: workflowCodec,
 			clientCodec,
 			policy: startOptions.clientCodecPolicy,
@@ -335,7 +335,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			return this.failRun(parentRunHandle, { attempts: parentRunHandle.run.attempts, err }, parentRunLogger);
 		}
 
-		const { codec, clientCodecApplied } = resolveInputCodec({
+		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
 			definition: workflowCodec,
 			clientCodec: client[INTERNAL].codec,
 			policy: startOptions.clientCodecPolicy,
@@ -460,7 +460,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		await transitionStateOptimistic({
 			status: "completed",
-			output: await codec.output.encode(output),
+			output: await codec.workflowOutput.encode(output),
 		});
 		logger.debug("Workflow complete");
 	}

@@ -135,7 +135,7 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 			if (terminal) {
 				return {
 					success: true,
-					state: await decodeWaitResultState<Output>(handle[INTERNAL].codec.output, terminal.state),
+					state: await decodeWaitResultState<Output>(handle[INTERNAL].codec.workflowOutput, terminal.state),
 				};
 			}
 

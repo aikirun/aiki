@@ -27,6 +27,7 @@ import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
 	type BoundCodec,
+	bindDeclaredCodec,
 	composeCodecs,
 	resolveDeclaredClientCodec,
 	type WorkflowDefinitionCodec,
@@ -155,8 +156,9 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 	[INTERNAL]: {
 		client: Client<Context>;
 		codec: {
-			input: BoundCodec;
-			output: BoundCodec;
+			client: BoundCodec;
+			workflowInput: BoundCodec;
+			workflowOutput: BoundCodec;
 		};
 		transitionStateOptimistic: (state: WorkflowRunTransitionStateRequestOptimistic["state"]) => Promise<void>;
 		transitionTaskState: (
@@ -231,16 +233,18 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
 
-		const clientCodec = resolveDeclaredClientCodec(client, {
+		const declaration = {
 			runId: this._run.id as WorkflowRunId,
 			clientCodecApplied: this._run.clientCodecApplied,
-		});
+		};
+		const clientCodec = resolveDeclaredClientCodec(client, declaration);
 
 		this[INTERNAL] = {
 			client,
 			codec: {
-				input: composeCodecs(workflowCodec?.input, clientCodec),
-				output: composeCodecs(workflowCodec?.output, clientCodec),
+				client: bindDeclaredCodec(client, declaration),
+				workflowInput: composeCodecs(workflowCodec?.input, clientCodec),
+				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
 			},
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
@@ -301,7 +305,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 				return {
 					success: true,
 					state: await decodeWaitResultState<Output>(
-						this[INTERNAL].codec.output,
+						this[INTERNAL].codec.workflowOutput,
 						this._run.state as TerminalWorkflowRunState
 					),
 				};

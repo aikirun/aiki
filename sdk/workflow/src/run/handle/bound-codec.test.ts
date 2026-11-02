@@ -16,9 +16,8 @@ import {
 	composeCodecs,
 	instantiateWorkflowDefinitionCodec,
 	noopCodec,
-	resolveClientCodec,
 	resolveDeclaredClientCodec,
-	resolveInputCodec,
+	resolveWorkflowInputCodec,
 	toBoundCodec,
 } from "./bound-codec";
 
@@ -111,43 +110,6 @@ describe("noopCodec", () => {
 
 		expect(await noopCodec.encode(payload)).toBe(asOpaquePayload(payload));
 		expect(await noopCodec.decode(asOpaquePayload(payload))).toBe(payload);
-	});
-});
-
-describe("resolveClientCodec", () => {
-	const clientCodec = {
-		encode: async (payload: unknown) => ({ marked: payload }),
-		decode: async (payload: unknown) => ({ unmarked: payload }),
-	};
-
-	test("applies the client codec when the policy is unset", async () => {
-		const { codec, applied } = resolveClientCodec(clientCodec, undefined);
-		const payload = { value: 1 };
-
-		expect(applied).toBe(true);
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-	});
-
-	test("applies the client codec when the policy is apply", async () => {
-		const { codec, applied } = resolveClientCodec(clientCodec, "apply");
-		const payload = { value: 1 };
-
-		expect(applied).toBe(true);
-		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-	});
-
-	test("skips the client codec when the policy is skip", async () => {
-		const { codec, applied } = resolveClientCodec(clientCodec, "skip");
-		const payload = { value: 1 };
-
-		expect(applied).toBe(false);
-		expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
-	});
-
-	test("skips when the client has no codec, whatever the policy", async () => {
-		expect(resolveClientCodec(undefined, "apply")).toEqual({ codec: noopCodec, applied: false });
-		expect(resolveClientCodec(undefined, "skip")).toEqual({ codec: noopCodec, applied: false });
-		expect(resolveClientCodec(undefined, undefined)).toEqual({ codec: noopCodec, applied: false });
 	});
 });
 
@@ -270,7 +232,7 @@ describe("composeCodecs", () => {
 	});
 });
 
-describe("resolveInputCodec", () => {
+describe("resolveWorkflowInputCodec", () => {
 	const definition = {
 		input: {
 			encode: async (payload: unknown) => ({ def: payload }),
@@ -289,7 +251,7 @@ describe("resolveInputCodec", () => {
 	};
 
 	test("composes definition inside client when both are present", async () => {
-		const { codec, clientCodecApplied } = resolveInputCodec({
+		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
 			definition,
 			clientCodec,
 			policy: undefined,
@@ -302,7 +264,7 @@ describe("resolveInputCodec", () => {
 	});
 
 	test("applies only the definition when the client codec is skipped", async () => {
-		const { codec, clientCodecApplied } = resolveInputCodec({
+		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
 			definition,
 			clientCodec,
 			policy: "skip",
@@ -315,7 +277,7 @@ describe("resolveInputCodec", () => {
 	});
 
 	test("applies only the client when no definition codec is set", async () => {
-		const { codec, clientCodecApplied } = resolveInputCodec({
+		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
 			definition: undefined,
 			clientCodec,
 			policy: "apply",
@@ -327,7 +289,7 @@ describe("resolveInputCodec", () => {
 	});
 
 	test("is a no-op when neither layer is present", async () => {
-		const { codec, clientCodecApplied } = resolveInputCodec({
+		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
 			definition: undefined,
 			clientCodec: undefined,
 			policy: undefined,

@@ -108,25 +108,10 @@ export function composeCodecs(inner: Codec<unknown> | undefined, outer: Codec<un
 }
 
 /**
- * Picks the codec a start should use from the client's codec and the run's policy. `"skip"` (or no
- * client codec) yields the noop and `applied: false`; otherwise the client codec and `applied: true`.
- */
-export function resolveClientCodec(
-	clientCodec: Codec<unknown> | undefined,
-	policy: ClientCodecPolicy | undefined
-): { codec: BoundCodec; applied: boolean } {
-	if (policy === "skip" || clientCodec === undefined) {
-		return { codec: noopCodec, applied: false };
-	}
-
-	return { codec: toBoundCodec(clientCodec), applied: true };
-}
-
-/**
  * Composes the definition input codec (inner) with the client codec chosen by policy (outer).
  * `clientCodecApplied` reflects only the client layer.
  */
-export function resolveInputCodec(params: {
+export function resolveWorkflowInputCodec(params: {
 	definition: WorkflowDefinitionCodec | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;

@@ -110,7 +110,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
-		const codec = handle[INTERNAL].codec.input;
+		const codec = handle[INTERNAL].codec.workflowInput;
 
 		// Every hash inside the run must come from the hasher that made the run's own hash.
 		let hasher: BoundHasher;
