@@ -1100,6 +1100,62 @@ describe("creating a workflow run", () => {
 
 				expect(handle.run.id).toBe(newRunRecord.id);
 			}));
+
+		test("returns a handle whose wait decodes the completed output with the definition codec", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ def: "done" });
+				const workflowVersion = workflow({ name: "greet" }).v("1.0.0", {
+					async handler(_run, name: string) {
+						return name;
+					},
+					codec: {
+						output: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("done");
+								return { def: "done" };
+							},
+							decode: async (payload) => {
+								expect(payload).toEqual(storedOutput);
+								return "done";
+							},
+						}),
+					},
+				});
+				const newRunRecord = runningWorkflowRunRecordFactory.build();
+				const inputHash = await hashInput("world");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "greet",
+						versionId: "1.0.0",
+						input: asOpaquePayload("world"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						options: {},
+					},
+					{ id: newRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: newRunRecord.id }, { run: newRunRecord });
+
+				const handle = await workflowVersion.start(client, "world");
+
+				client.api.workflowRun.hasTerminatedV1.once({ id: newRunRecord.id }, { terminated: true });
+				client.api.workflowRun.getByIdV1.once(
+					{ id: newRunRecord.id },
+					{
+						run: {
+							...baseWorkflowRunRecordFactory.build({ id: newRunRecord.id }),
+							state: { status: "completed", output: storedOutput },
+						},
+					}
+				);
+
+				expect(await handle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
 	});
 
 	describe("with", () => {
@@ -1492,6 +1548,61 @@ describe("creating a workflow run", () => {
 				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
 
 				expect(childHandle.run.id).toBe(childRunRecord.id);
+			}));
+
+		test("returns a handle whose wait decodes the completed output with the definition codec", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ def: "done" });
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+					codec: {
+						output: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("done");
+								return { def: "done" };
+							},
+							decode: async (payload) => {
+								expect(payload).toEqual(storedOutput);
+								return "done";
+							},
+						}),
+					},
+				});
+				const childRunRecord = runningWorkflowRunRecordFactory.build();
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: {
+						[childRunRecord.id]: {
+							timeouts: [],
+							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+						},
+					},
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+				const inputHash = await hashInput("payload");
+
+				client.api.workflowRun.createV1.once(
+					{
+						name: "child-workflow",
+						versionId: "1.0.0",
+						input: asOpaquePayload("payload"),
+						clientHasherApplied: false,
+						clientCodecApplied: false,
+						inputHash: { value: inputHash },
+						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
+						options: {},
+					},
+					{ id: childRunRecord.id }
+				);
+				client.api.workflowRun.getByIdV1.once({ id: childRunRecord.id }, { run: childRunRecord });
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
 			}));
 
 		test("encodes the child input with the parent's bound codec and inherits the parent's declaration", () =>
@@ -2239,6 +2350,61 @@ describe("creating a workflow run", () => {
 				expect(childHandle.run.id).toBe(recordedChildRun.id);
 			}));
 
+		test("returns a handle whose wait decodes the completed output with the definition codec when replaying a recorded child", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ def: "done" });
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+					codec: {
+						output: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe("done");
+								return { def: "done" };
+							},
+							decode: async (payload) => {
+								expect(payload).toEqual(storedOutput);
+								return "done";
+							},
+						}),
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+					childWorkflowRunWaits: {
+						[recordedChildRun.id]: {
+							timeouts: [],
+							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+						},
+					},
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.getByIdV1.once(
+					{ id: recordedChildRun.id },
+					{ run: runningWorkflowRunRecordFactory.build({ id: recordedChildRun.id }) }
+				);
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
+
 		test("reports the parent's state as unknown when fetching the recorded child on replay gets no response", () =>
 			withFakeClient(async (client) => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
@@ -2427,6 +2593,52 @@ describe("getting a run handle", () => {
 			expect(handle.run.id).toBe(runRecord.id);
 		}));
 
+	test("getHandleById returns a handle whose wait decodes the completed output with the definition codec", () =>
+		withFakeClient(async (client) => {
+			const storedOutput = asOpaquePayload({ def: "done" });
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {
+					return "done";
+				},
+				codec: {
+					output: () => ({
+						encode: async (payload) => {
+							expect(payload).toBe("done");
+							return { def: "done" };
+						},
+						decode: async (payload) => {
+							expect(payload).toEqual(storedOutput);
+							return "done";
+						},
+					}),
+				},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build({ name: "orders", versionId: "1.0.0" });
+
+			client.api.workflowRun.getByIdV1.once(
+				{ id: runRecord.id, workflow: { name: "orders", versionId: "1.0.0" } },
+				{ run: runRecord }
+			);
+
+			const handle = await workflowVersion.getHandleById(client, runRecord.id);
+
+			client.api.workflowRun.hasTerminatedV1.once({ id: runRecord.id }, { terminated: true });
+			client.api.workflowRun.getByIdV1.once(
+				{ id: runRecord.id },
+				{
+					run: {
+						...baseWorkflowRunRecordFactory.build({ id: runRecord.id }),
+						state: { status: "completed", output: storedOutput },
+					},
+				}
+			);
+
+			expect(await handle.wait()).toEqual({
+				success: true,
+				state: { status: "completed", output: "done" },
+			});
+		}));
+
 	test("getHandleByReferenceId looks the run up by the workflow name, version, and reference id", () =>
 		withFakeClient(async (client) => {
 			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
@@ -2442,5 +2654,51 @@ describe("getting a run handle", () => {
 			const handle = await workflowVersion.getHandleByReferenceId(client, "order-42");
 
 			expect(handle.run.id).toBe(runRecord.id);
+		}));
+
+	test("getHandleByReferenceId returns a handle whose wait decodes the completed output with the definition codec", () =>
+		withFakeClient(async (client) => {
+			const storedOutput = asOpaquePayload({ def: "done" });
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {
+					return "done";
+				},
+				codec: {
+					output: () => ({
+						encode: async (payload) => {
+							expect(payload).toBe("done");
+							return { def: "done" };
+						},
+						decode: async (payload) => {
+							expect(payload).toEqual(storedOutput);
+							return "done";
+						},
+					}),
+				},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build();
+
+			client.api.workflowRun.getByReferenceIdV1.once(
+				{ name: "orders", versionId: "1.0.0", referenceId: "order-42" },
+				{ run: runRecord }
+			);
+
+			const handle = await workflowVersion.getHandleByReferenceId(client, "order-42");
+
+			client.api.workflowRun.hasTerminatedV1.once({ id: runRecord.id }, { terminated: true });
+			client.api.workflowRun.getByIdV1.once(
+				{ id: runRecord.id },
+				{
+					run: {
+						...baseWorkflowRunRecordFactory.build({ id: runRecord.id }),
+						state: { status: "completed", output: storedOutput },
+					},
+				}
+			);
+
+			expect(await handle.wait()).toEqual({
+				success: true,
+				state: { status: "completed", output: "done" },
+			});
 		}));
 });
