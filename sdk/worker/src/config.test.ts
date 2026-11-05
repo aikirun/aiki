@@ -5,7 +5,7 @@ import { describe, expect, test } from "vitest";
 import { dynamicWorkerConfigProvider, type WorkerConfigOverrides } from "./config";
 
 describe("dynamicWorkerConfigProvider", () => {
-	test("sets a setting back to its initial value once refresh stops returning it", async () => {
+	test("sets a config key back to its initial value once refresh stops returning it", async () => {
 		const abortController = new AbortController();
 		const refreshedOverrides: WorkerConfigOverrides[] = [{ maxConcurrentWorkflowRuns: 10 }, {}];
 		let refreshCount = 0;
