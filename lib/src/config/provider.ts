@@ -35,22 +35,24 @@ export const asConfigProvider = <Config>(read: () => Config): ConfigProvider<Con
 
 /**
  * A config provider that starts on initial value and refreshes it in the background.
+ * `applyOverrides` turns what each refresh returns into the next snapshot.
  * A failed refresh retains the current snapshot and retries with backoff.
  * The loop runs off the context signal and stops when it aborts.
  */
-export function dynamicConfigProvider<Config>(params: {
+export function dynamicConfigProvider<Config, Overrides>(params: {
 	initial: Config;
-	refresh: (current: Config) => Config | Promise<Config>;
+	refresh: () => Overrides | Promise<Overrides>;
+	applyOverrides: (overrides: Overrides) => Config;
 	refreshIntervalMs: number;
 }): CreateConfigProvider<Config> {
-	const { initial, refresh, refreshIntervalMs } = params;
+	const { initial, refresh, applyOverrides, refreshIntervalMs } = params;
 
 	return ({ logger, signal }) => {
 		let config = initial;
 
 		const refreshConfig = async (): Promise<void> => {
-			const response = refresh(config);
-			config = response instanceof Promise ? await response : response;
+			const response = refresh();
+			config = applyOverrides(response instanceof Promise ? await response : response);
 		};
 
 		const refreshConfigLoop = async (): Promise<void> => {

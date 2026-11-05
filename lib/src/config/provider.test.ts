@@ -58,6 +58,7 @@ describe("dynamicConfigProvider", () => {
 		const provider = dynamicConfigProvider({
 			initial: { v: 1 },
 			refresh: () => refreshPromise,
+			applyOverrides: (overrides) => overrides,
 			refreshIntervalMs: 10_000,
 		})({ logger, signal: abortController.signal });
 
@@ -67,54 +68,31 @@ describe("dynamicConfigProvider", () => {
 		resolveRefresh({ v: 2 });
 	});
 
-	test("threads the current config into each refresh and advances it", async () => {
-		const logger = noopLogger;
-		const abortController = new AbortController();
-		const seenConfigs: number[] = [];
-
-		const twoRefreshesApplied = createBinaryLatch();
-
-		dynamicConfigProvider({
-			initial: { v: 0 },
-			refresh: (current) => {
-				seenConfigs.push(current.v);
-				if (seenConfigs.length >= 2) {
-					twoRefreshesApplied.signal();
-				}
-				return { v: current.v + 1 };
-			},
-			refreshIntervalMs: 1,
-		})({ logger, signal: abortController.signal });
-
-		await twoRefreshesApplied.wait();
-		abortController.abort();
-
-		expect(seenConfigs[0]).toBe(0);
-		expect(seenConfigs[1]).toBe(1);
-	});
-
-	test("applies a successful refresh to the live snapshot", async () => {
+	test("applies a successful refresh to the live snapshot through applyOverrides", async () => {
 		const logger = noopLogger;
 		const abortController = new AbortController();
 
+		let refreshCount = 0;
 		const refreshApplied = createBinaryLatch();
+		const initialConfig = { v: 1, w: 1 };
 
 		const provider = dynamicConfigProvider({
-			initial: { v: 1 },
-			refresh: (current) => {
-				// Signal refreshApplied when the loop calls refresh again with the
-				// applied value as `current` — proof that { v: 2 } was swapped into the snapshot.
-				if (current.v === 2) {
+			initial: initialConfig,
+			refresh: () => {
+				// The loop calls refresh again only after it applied the previous result.
+				refreshCount++;
+				if (refreshCount >= 2) {
 					refreshApplied.signal();
 				}
 				return { v: 2 };
 			},
+			applyOverrides: (overrides) => ({ ...initialConfig, ...overrides }),
 			refreshIntervalMs: 1,
 		})({ logger, signal: abortController.signal });
 
 		await refreshApplied.wait();
 
-		expect(provider.config).toEqual({ v: 2 });
+		expect(provider.config).toEqual({ v: 2, w: 1 });
 		abortController.abort();
 	});
 
@@ -130,6 +108,7 @@ describe("dynamicConfigProvider", () => {
 			refresh: () => {
 				throw new Error("boom");
 			},
+			applyOverrides: (overrides) => overrides,
 			refreshIntervalMs: 10_000,
 		})({ logger, signal: abortController.signal });
 
@@ -155,13 +134,14 @@ describe("dynamicConfigProvider", () => {
 			// Synchronous refresh function:
 			// * so no event loop yield between abort signal check and refresh apply
 			// * consequently, there can be no inflight refreshes on abort
-			refresh: (current) => {
+			refresh: () => {
 				refreshCount++;
 				if (refreshCount >= 2) {
 					refreshLoopRunning.signal();
 				}
-				return { v: current.v + 1 };
+				return { v: refreshCount };
 			},
+			applyOverrides: (overrides) => overrides,
 			refreshIntervalMs,
 		})({ logger, signal: abortController.signal });
 

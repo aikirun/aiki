@@ -31,18 +31,21 @@ export function staticWorkerConfigProvider(overrides?: WorkerConfigOverrides): C
 
 /**
  * Worker config that reloads on a timer, letting an operator retune a running
- * worker without redeploying. `refresh` receives the current config and returns the next.
- * The worker starts on defaults with `initial` overrided applied.
+ * worker without redeploying. The worker starts on defaults with `initial` overrides applied.
+ * `refresh` returns overrides too, and each refresh applies them on top of `initial`,
+ * so a setting that `refresh` stops returning goes back to its `initial` or default value.
  * Every refresh runs in the background, and a failed refresh keeps the current snapshot.
  */
 export function dynamicWorkerConfigProvider(params: {
 	initial?: WorkerConfigOverrides;
-	refresh: (current: WorkerConfig) => WorkerConfig | Promise<WorkerConfig>;
+	refresh: () => WorkerConfigOverrides | Promise<WorkerConfigOverrides>;
 	refreshIntervalMs: number;
 }): CreateConfigProvider<WorkerConfig> {
+	const initialConfig = merge(defaultWorkerConfig, params.initial);
 	return dynamicConfigProvider({
-		initial: merge(defaultWorkerConfig, params.initial),
+		initial: initialConfig,
 		refresh: params.refresh,
+		applyOverrides: (overrides) => merge(initialConfig, overrides),
 		refreshIntervalMs: params.refreshIntervalMs,
 	});
 }

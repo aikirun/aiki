@@ -72,8 +72,8 @@ const aikiWorker = worker({
 	workflows: [orderWorkflowV1],
 	config: dynamicWorkerConfigProvider({
 		initial: { maxConcurrentWorkflowRuns: 10 },
-		async refresh(current) {
-			return { ...current, maxConcurrentWorkflowRuns: await configService.workerConcurrency() };
+		async refresh() {
+			return { maxConcurrentWorkflowRuns: await configService.workerConcurrency() };
 		},
 		refreshIntervalMs: 30_000,
 	}),
@@ -83,7 +83,7 @@ const aikiWorker = worker({
 Its behavior:
 
 - The worker starts immediately on the defaults with `initial` applied — construction never blocks on your config source being reachable.
-- `refresh` receives the current config and returns the next complete config.
+- `refresh` returns overrides, like `initial`. Each refresh deep-merges them onto the defaults with `initial` applied, so a setting `refresh` stops returning goes back to its `initial` or default value.
 - A failed refresh keeps the last-good snapshot and retries with backoff; the worker keeps running throughout.
 - The refresh loop stops when the worker shuts down.
 

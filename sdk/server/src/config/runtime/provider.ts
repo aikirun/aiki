@@ -17,18 +17,21 @@ export function staticRuntimeConfigProvider(
 
 /**
  * Config that reloads on a timer, letting an operator retune a running server
- * without redeploying. `refresh` receives the current config and returns the next.
- * The server starts on defaults with `initial` overrided applied.
+ * without redeploying. The server starts on defaults with `initial` overrides applied.
+ * `refresh` returns overrides too, and each refresh applies them on top of `initial`,
+ * so a setting that `refresh` stops returning goes back to its `initial` or default value.
  * Every refresh runs in the background, and a failed refresh keeps the current snapshot.
  */
 export function dynamicRuntimeConfigProvider(params: {
 	initial?: ServerRuntimeConfigOverrides;
-	refresh: (current: ServerRuntimeConfig) => ServerRuntimeConfig | Promise<ServerRuntimeConfig>;
+	refresh: () => ServerRuntimeConfigOverrides | Promise<ServerRuntimeConfigOverrides>;
 	refreshIntervalMs: number;
 }): CreateConfigProvider<ServerRuntimeConfig> {
+	const initialConfig = merge(defaultServerRuntimeConfig, params.initial);
 	return dynamicConfigProvider({
-		initial: merge(defaultServerRuntimeConfig, params.initial),
+		initial: initialConfig,
 		refresh: params.refresh,
+		applyOverrides: (overrides) => merge(initialConfig, overrides),
 		refreshIntervalMs: params.refreshIntervalMs,
 	});
 }
