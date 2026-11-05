@@ -2,6 +2,7 @@ import { asConfigProvider, type CreateConfigProvider, dynamicConfigProvider } fr
 import { merge } from "@aikirun/lib/object";
 
 import { defaultServerRuntimeConfig } from "./defaults";
+import { migrateDeprecatedConfigKeys, serverRuntimeConfigDeprecations } from "./deprecated-config";
 import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./schema";
 
 /**
@@ -11,8 +12,13 @@ import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./schema
 export function staticRuntimeConfigProvider(
 	overrides?: ServerRuntimeConfigOverrides
 ): CreateConfigProvider<ServerRuntimeConfig> {
-	const config = merge(defaultServerRuntimeConfig, overrides);
-	return () => asConfigProvider(() => config);
+	return ({ logger }) => {
+		const config = merge(
+			defaultServerRuntimeConfig,
+			migrateDeprecatedConfigKeys({ overrides, deprecations: serverRuntimeConfigDeprecations, logger })
+		);
+		return asConfigProvider(() => config);
+	};
 }
 
 /**
@@ -27,11 +33,25 @@ export function dynamicRuntimeConfigProvider(params: {
 	refresh: () => ServerRuntimeConfigOverrides | Promise<ServerRuntimeConfigOverrides>;
 	refreshIntervalMs: number;
 }): CreateConfigProvider<ServerRuntimeConfig> {
-	const initialConfig = merge(defaultServerRuntimeConfig, params.initial);
-	return dynamicConfigProvider({
-		initial: initialConfig,
-		refresh: params.refresh,
-		applyOverrides: (overrides) => merge(initialConfig, overrides),
-		refreshIntervalMs: params.refreshIntervalMs,
-	});
+	return (context) => {
+		const { logger } = context;
+		const initialConfig = merge(
+			defaultServerRuntimeConfig,
+			migrateDeprecatedConfigKeys({
+				overrides: params.initial,
+				deprecations: serverRuntimeConfigDeprecations,
+				logger,
+			})
+		);
+		return dynamicConfigProvider({
+			initial: initialConfig,
+			refresh: params.refresh,
+			applyOverrides: (overrides) =>
+				merge(
+					initialConfig,
+					migrateDeprecatedConfigKeys({ overrides, deprecations: serverRuntimeConfigDeprecations, logger })
+				),
+			refreshIntervalMs: params.refreshIntervalMs,
+		})(context);
+	};
 }

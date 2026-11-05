@@ -30,7 +30,7 @@ const serverRuntimeConfigSchema = type({
 		imminentEventWaitTimedOutRuns: imminentPollingDaemonConfigSchema,
 		imminentChildRunWaitTimedOutRuns: imminentPollingDaemonConfigSchema,
 		imminentRecurringRuns: imminentPollingDaemonConfigSchema.and({
-			maxOccurrencesPerSchedule: "number.integer > 0",
+			maxOccurrencesCaughtUpPerSchedulePerPass: "number.integer > 0",
 		}),
 		publishPendingOutboxEntries: pollingDaemonConfigSchema.and({
 			leaseDurationMs: "number.integer > 0",
@@ -58,8 +58,31 @@ export type PageProcessingConfig = typeof pageProcessingConfigSchema.infer;
 
 export type ServerRuntimeConfig = typeof serverRuntimeConfigSchema.infer;
 
-export type ServerRuntimeConfigOverrides = DeepPartial<ServerRuntimeConfig>;
+export interface DeprecatedServerRuntimeConfig {
+	daemons?: {
+		imminentRecurringRuns?: {
+			/**
+			 * @deprecated Use `maxOccurrencesCaughtUpPerSchedulePerPass`, which wins when both are set.
+			 * This name will be removed in the next release.
+			 */
+			maxOccurrencesPerSchedule?: number;
+		};
+	};
+}
+
+export type ServerRuntimeConfigOverrides = DeepPartial<ServerRuntimeConfig> & DeprecatedServerRuntimeConfig;
 
 export function validateServerRuntimeConfig(config: ServerRuntimeConfig): ConfigValidationResult {
 	return validateAgainstSchema(serverRuntimeConfigSchema, config);
+}
+
+const serverRuntimeConfigWithoutUndeclaredKeysSchema = serverRuntimeConfigSchema.onDeepUndeclaredKey("reject");
+
+/** The paths of the keys in `config` that the schema does not declare, such as a deprecated or misspelled key. */
+export function findUndeclaredServerRuntimeConfigKeys(config: ServerRuntimeConfig): string[] {
+	const result = serverRuntimeConfigWithoutUndeclaredKeysSchema(config);
+	if (!(result instanceof type.errors)) {
+		return [];
+	}
+	return result.filter((error) => error.expected === "removed").map((error) => error.propString);
 }

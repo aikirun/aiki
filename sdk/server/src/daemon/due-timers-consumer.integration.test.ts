@@ -62,7 +62,8 @@ describe("processDueTimers", () => {
 							pageSize: 100,
 							overshootMs: 0,
 							republishBackoff,
-							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							maxOccurrencesCaughtUpPerSchedulePerPass:
+								daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 							lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
@@ -114,7 +115,8 @@ describe("processDueTimers", () => {
 							pageSize: 100,
 							overshootMs: 0,
 							republishBackoff,
-							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							maxOccurrencesCaughtUpPerSchedulePerPass:
+								daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 							lookaheadWindowMs: 60_000,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
@@ -155,7 +157,8 @@ describe("processDueTimers", () => {
 							pageSize: 100,
 							overshootMs: 0,
 							republishBackoff,
-							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							maxOccurrencesCaughtUpPerSchedulePerPass:
+								daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 							lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
@@ -208,7 +211,8 @@ describe("processDueTimers", () => {
 							pageSize: 100,
 							overshootMs: 0,
 							republishBackoff,
-							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							maxOccurrencesCaughtUpPerSchedulePerPass:
+								daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 							lookaheadWindowMs: 0,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
@@ -239,7 +243,8 @@ describe("processDueTimers", () => {
 						pageSize: 100,
 						overshootMs: 0,
 						republishBackoff,
-						maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+						maxOccurrencesCaughtUpPerSchedulePerPass:
+							daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 						lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
 						chunkByTimerType: chunkConfigByTimerType,
 					})),
@@ -360,7 +365,8 @@ describe("processDueTimers", () => {
 							pageSize: 100,
 							overshootMs: 0,
 							republishBackoff,
-							maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+							maxOccurrencesCaughtUpPerSchedulePerPass:
+								daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 							lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
 							chunkByTimerType: chunkConfigByTimerType,
 						})),
@@ -394,7 +400,8 @@ describe("processDueTimers", () => {
 						pageSize: 100,
 						overshootMs: 0,
 						republishBackoff,
-						maxOccurrencesPerSchedule: daemonConfig.imminentRecurringRuns.maxOccurrencesPerSchedule,
+						maxOccurrencesCaughtUpPerSchedulePerPass:
+							daemonConfig.imminentRecurringRuns.maxOccurrencesCaughtUpPerSchedulePerPass,
 						lookaheadWindowMs: daemonConfig.imminentRecurringRuns.lookaheadWindowMs,
 						chunkByTimerType: chunkConfigByTimerType,
 					})),
