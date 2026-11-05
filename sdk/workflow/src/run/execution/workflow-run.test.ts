@@ -14,6 +14,7 @@ import {
 	runningTaskInfoFactory,
 } from "@aikirun/testing/data-factory/workflow/task";
 import { asOpaquePayload } from "@aikirun/testing/payload";
+import { CodecPermanentError } from "@aikirun/types/infra/codec";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
@@ -146,6 +147,98 @@ describe("executeWorkflowRun", () => {
 				});
 
 				expect(result).toBe(false);
+			}));
+
+		test("fails the run when the handler throws ClientCodecEncodeFailedError caused by CodecPermanentError", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const permanent = new CodecPermanentError('Encryption key "2025-06" was not found', {
+					keyId: "2025-06",
+				});
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new ClientCodecEncodeFailedError(permanent);
+				});
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: expect.objectContaining({
+								name: "CodecPermanentError",
+								message: 'Encryption key "2025-06" was not found',
+							}),
+						},
+						expectedRevision: workflowRun.revision,
+					},
+					{
+						revision: workflowRun.revision,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: { name: "CodecPermanentError", message: 'Encryption key "2025-06" was not found' },
+						},
+						attempts: workflowRun.attempts,
+					}
+				);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(true);
+			}));
+
+		test("fails the run when the handler throws ClientCodecDecodeFailedError caused by CodecPermanentError", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const permanent = new CodecPermanentError('Encryption key "2025-06" was not found', {
+					keyId: "2025-06",
+				});
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new ClientCodecDecodeFailedError(permanent);
+				});
+
+				client.api.workflowRun.transitionStateV1.once(
+					{
+						type: "optimistic",
+						id: workflowRun.id,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: expect.objectContaining({
+								name: "CodecPermanentError",
+								message: 'Encryption key "2025-06" was not found',
+							}),
+						},
+						expectedRevision: workflowRun.revision,
+					},
+					{
+						revision: workflowRun.revision,
+						state: {
+							status: "failed",
+							cause: "self",
+							error: { name: "CodecPermanentError", message: 'Encryption key "2025-06" was not found' },
+						},
+						attempts: workflowRun.attempts,
+					}
+				);
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(true);
 			}));
 
 		test("returns false without logging an error when the handler throws WorkflowRunStateUnknownError", () =>

@@ -2,7 +2,9 @@ import { runOnInterval } from "@aikirun/lib/async";
 import type { ConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import type { Logger } from "@aikirun/lib/logger";
+import { createSerializableError } from "@aikirun/lib/serializable";
 import type { Client } from "@aikirun/types/client";
+import { CodecPermanentError } from "@aikirun/types/infra/codec";
 import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
@@ -25,7 +27,7 @@ import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
 import { createEventWaiters } from "../event";
-import { workflowRunHandle } from "../handle/workflow-run";
+import { type WorkflowRunHandle, workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
 
 export interface ExecuteWorkflowParams<Context> {
@@ -72,6 +74,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 	const intervals: Array<{ stop: () => void }> = [];
 	let flushTaskExecutions: (() => Promise<void>) | undefined;
+	let handle: WorkflowRunHandle<unknown, Context> | undefined;
 	try {
 		intervals.push(
 			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
@@ -99,7 +102,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-		const handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
 		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
 		flushTaskExecutions = taskExecutionsFlusher;
 
@@ -143,7 +146,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					createTaskExecutionTracker,
 					configProvider,
 					hasher,
-					createContext: () => (createContext ? createContext(handle.run) : null),
+					createContext: () => (createContext !== undefined && handle !== undefined ? createContext(handle.run) : null),
 				},
 			},
 			await codec.decode(workflowRun.input)
@@ -157,13 +160,20 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			if (err instanceof ClientCodecEncodeFailedError) {
-				logger.error("The client codec failed to encode a payload of the workflow run", { err });
-				return false;
-			}
+			if (err instanceof ClientCodecEncodeFailedError || err instanceof ClientCodecDecodeFailedError) {
+				if (err.cause instanceof CodecPermanentError && handle !== undefined) {
+					logger.error("The client codec permanently failed on a payload of the workflow run", { err });
 
-			if (err instanceof ClientCodecDecodeFailedError) {
-				logger.error("The client codec failed to decode a payload of the workflow run", { err });
+					return await failRun(handle, err.cause, logger);
+				}
+
+				logger.error(
+					err instanceof ClientCodecEncodeFailedError
+						? "The client codec failed to encode a payload of the workflow run"
+						: "The client codec failed to decode a payload of the workflow run",
+					{ err }
+				);
+
 				return false;
 			}
 
@@ -193,5 +203,27 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		for (const interval of intervals) {
 			interval.stop();
 		}
+	}
+}
+
+async function failRun(handle: WorkflowRunHandle<unknown, unknown>, error: Error, logger: Logger): Promise<boolean> {
+	try {
+		await handle[INTERNAL].transitionStateOptimistic({
+			status: "failed",
+			cause: "self",
+			error: createSerializableError(error),
+		});
+		return true;
+	} catch (failErr) {
+		if (failErr instanceof WorkflowRunStateUnknownError) {
+			logger.warn("Workflow run state unknown while failing after a permanent codec error", {
+				err: failErr,
+			});
+			return false;
+		}
+		logger.error("Failed to mark the workflow run as failed after a permanent codec error", {
+			err: failErr,
+		});
+		return false;
 	}
 }
