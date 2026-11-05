@@ -1,4 +1,5 @@
 import { noopLogger } from "@aikirun/lib/logger";
+import { CodecPermanentError } from "@aikirun/types/infra/codec";
 import { describe, expect, test } from "vitest";
 
 import { CodecNameMismatchError, codec, InvalidEncodedValueError } from "./codec";
@@ -33,9 +34,11 @@ describe("codec", () => {
 		await expect(instance.decode({ name: "alice" })).rejects.toMatchObject({
 			name: "InvalidEncodedValueError",
 			codecName: "test-codec",
+			details: { codecName: "test-codec" },
 			message: 'Codec "test-codec" received a value that was not produced by encode',
 		});
 		await expect(instance.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
+		await expect(instance.decode({ name: "alice" })).rejects.toBeInstanceOf(CodecPermanentError);
 	});
 
 	test("decode rejects a mismatched codec name", async () => {

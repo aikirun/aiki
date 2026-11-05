@@ -3,6 +3,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
 	entry: {
 		"async/index": "src/async/index.ts",
+		"cache/index": "src/cache/index.ts",
 		"collection/array/index": "src/collection/array/index.ts",
 		"collection/heap/index": "src/collection/heap/index.ts",
 		"collection/map/index": "src/collection/map/index.ts",

@@ -22,7 +22,8 @@ export const noopCodec: BoundCodec = {
 
 /**
  * A codec can throw anything, so its errors are wrapped in `ClientCodecEncodeFailedError` and
- * `ClientCodecDecodeFailedError` for the SDK to recognise, with the codec's error as the cause.
+ * `ClientCodecDecodeFailedError` for the SDK to recognise, with the codec's error as the cause. A
+ * `CodecPermanentError` cause fails the run; any other cause leaves it for redelivery.
  */
 export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
 	encode: async (payload) => {
