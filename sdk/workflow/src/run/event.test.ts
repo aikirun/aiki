@@ -59,7 +59,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event<{ trackingId: string }>() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -81,7 +81,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event<{ trackingId: string }>() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -98,7 +98,7 @@ describe("createEventWaiters", () => {
 				eventWaits: { orderShipped: [{ status: "timeout", timedOutAt: 1_700_000_060_000 }] },
 			});
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -118,7 +118,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event({ schema: appendBangSchema }) };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -140,7 +140,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event<{ unmarked: string }>() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -162,7 +162,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event<string>() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -180,7 +180,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -191,7 +191,7 @@ describe("createEventWaiters", () => {
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 			client.api.workflowRun.transitionStateV1.once(
 				{
 					type: "optimistic",
@@ -212,7 +212,7 @@ describe("createEventWaiters", () => {
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 			client.api.workflowRun.transitionStateV1.once(
 				{
 					type: "optimistic",
@@ -235,7 +235,7 @@ describe("createEventWaiters", () => {
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 			client.api.workflowRun.transitionStateV1.rejectsOnce(
 				{
 					type: "optimistic",
@@ -265,7 +265,7 @@ describe("createEventWaiters", () => {
 				},
 			});
 			const definition = { orderShipped: event<string>() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
@@ -277,7 +277,7 @@ describe("createEventWaiters", () => {
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build({ revision: 0 });
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 			client.api.workflowRun.transitionStateV1.rejectsOnce(
 				{
 					type: "optimistic",
@@ -300,7 +300,7 @@ describe("createEventWaiters", () => {
 		withFakeClient(async (client) => {
 			const record = runningWorkflowRunRecordFactory.build();
 			const definition = { orderShipped: event() };
-			const handle = workflowRunHandle(client, record, definition);
+			const handle = workflowRunHandle(client, record, { eventsDefinition: definition });
 			const waiters = createEventWaiters(handle, definition, client.logger);
 
 			const suspension = new WorkflowRunSuspendedError(record.id as WorkflowRunId);
