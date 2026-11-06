@@ -261,6 +261,133 @@ describe("task", () => {
 				expect(await sendEmail.start(run, input)).toBe(output);
 			}));
 
+		test("does not apply the workflow definition codec when replaying a completed task", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const output = "previously-sent";
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: asOpaquePayload(output) },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord, {
+					workflowCodec: {
+						input: {
+							encode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+						},
+						output: {
+							encode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+						},
+					},
+				});
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+				});
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
+		test("does not apply the workflow definition codec when completing a retried task", () =>
+			withFakeClient(async (client) => {
+				const input = { cardId: "card-1" };
+				const output = "charged";
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "charge-card", referenceId: inputHash });
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: "charge-card",
+					options: { retry },
+					state: { nextAttemptAt: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [awaitingRetryTaskInfo] },
+				});
+				const run = createTestWorkflowRun(client, runRecord, {
+					workflowCodec: {
+						input: {
+							encode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+						},
+						output: {
+							encode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+						},
+					},
+				});
+
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => output,
+				});
+
+				const retriedTaskInfo = runningTaskInfoFactory.build({
+					id: awaitingRetryTaskInfo.id,
+					name: chargeCard.name,
+					attempts: 2,
+				});
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: retriedTaskInfo }
+					)
+					.once(
+						{
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							state: { status: "completed", output: asOpaquePayload(output) },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: awaitingRetryTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 2,
+								state: { output: asOpaquePayload(output) },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe(output);
+			}));
+
 		test("retries in-memory when the delay is within the max inline wait, recording no extra transition", () =>
 			withFakeClient(async (client) => {
 				const runRecord = runningWorkflowRunRecordFactory.build();
