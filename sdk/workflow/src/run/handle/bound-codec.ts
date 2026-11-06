@@ -104,12 +104,15 @@ export function composeCodecs(inner: Codec<unknown> | undefined, outer: Codec<un
 			decode: async (encoded) => inner.decode(await outer.decode(encoded)),
 		});
 	}
+
 	if (inner) {
 		return toBoundCodec(inner);
 	}
+
 	if (outer) {
 		return toBoundCodec(outer);
 	}
+
 	return noopCodec;
 }
 

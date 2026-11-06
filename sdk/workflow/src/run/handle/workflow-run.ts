@@ -27,9 +27,10 @@ import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
 	type BoundCodec,
-	bindDeclaredCodec,
 	composeCodecs,
+	noopCodec,
 	resolveDeclaredClientCodec,
+	toBoundCodec,
 	type WorkflowDefinitionCodec,
 } from "./bound-codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
@@ -242,7 +243,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this[INTERNAL] = {
 			client,
 			codec: {
-				client: bindDeclaredCodec(client, declaration),
+				client: clientCodec ? toBoundCodec(clientCodec) : noopCodec,
 				workflowInput: composeCodecs(workflowCodec?.input, clientCodec),
 				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
 			},
