@@ -120,7 +120,7 @@ describe("executeWorkflowRun", () => {
 			withFakeClient(async (client) => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
-					throw new CodecInitFailedError("workflow", "input", new Error("No keyring available"));
+					throw new CodecInitFailedError(new Error("No keyring available"));
 				});
 
 				const result = await executeWorkflowRun({

@@ -10,8 +10,6 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
-	type DefinitionCodecLevel,
-	type DefinitionCodecRole,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 
@@ -34,12 +32,7 @@ export type CreateWorkflowDefinitionCodec<EncodedInput = never, EncodedOutput = 
  * Instantiates a codec from its factory. A factory can throw anything, so its errors are wrapped
  * in `CodecInitFailedError` for the SDK to recognise, with the factory's error as the cause.
  */
-export function instantiateCodec(
-	create: CreateCodec<unknown> | undefined,
-	logger: Logger,
-	level: DefinitionCodecLevel,
-	role: DefinitionCodecRole
-): Codec<unknown> | undefined {
+export function instantiateCodec(create: CreateCodec<unknown> | undefined, logger: Logger): Codec<unknown> | undefined {
 	if (!create) {
 		return undefined;
 	}
@@ -47,7 +40,7 @@ export function instantiateCodec(
 	try {
 		return create({ logger });
 	} catch (err) {
-		throw new CodecInitFailedError(level, role, err);
+		throw new CodecInitFailedError(err);
 	}
 }
 
@@ -66,10 +59,10 @@ export function instantiateWorkflowDefinitionCodec(
 
 	const codec: WorkflowDefinitionCodec = {};
 	if (create.input) {
-		codec.input = instantiateCodec(create.input, logger, "workflow", "input");
+		codec.input = instantiateCodec(create.input, logger);
 	}
 	if (create.output) {
-		codec.output = instantiateCodec(create.output, logger, "workflow", "output");
+		codec.output = instantiateCodec(create.output, logger);
 	}
 	return codec;
 }

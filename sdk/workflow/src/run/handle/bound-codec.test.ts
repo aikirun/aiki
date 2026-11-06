@@ -27,24 +27,19 @@ describe("instantiateCodec", () => {
 		const codecError = new Error("No keyring available");
 		let thrown: unknown;
 		try {
-			instantiateCodec(
-				() => {
-					throw codecError;
-				},
-				noopLogger,
-				"workflow",
-				"input"
-			);
+			instantiateCodec(() => {
+				throw codecError;
+			}, noopLogger);
 		} catch (err) {
 			thrown = err;
 		}
 
 		expect(thrown).toBeInstanceOf(CodecInitFailedError);
-		expect(thrown).toMatchObject({ cause: codecError, level: "workflow", role: "input" });
+		expect(thrown).toMatchObject({ cause: codecError });
 	});
 
 	test("returns undefined when no factory is provided", () => {
-		expect(instantiateCodec(undefined, noopLogger, "workflow", "input")).toBeUndefined();
+		expect(instantiateCodec(undefined, noopLogger)).toBeUndefined();
 	});
 });
 
@@ -66,7 +61,7 @@ describe("instantiateWorkflowDefinitionCodec", () => {
 		}
 
 		expect(thrown).toBeInstanceOf(CodecInitFailedError);
-		expect(thrown).toMatchObject({ cause: codecError, level: "workflow", role: "input" });
+		expect(thrown).toMatchObject({ cause: codecError });
 	});
 
 	test("throws CodecInitFailedError, caused by the factory's error, when the output factory throws", () => {
@@ -86,7 +81,7 @@ describe("instantiateWorkflowDefinitionCodec", () => {
 		}
 
 		expect(thrown).toBeInstanceOf(CodecInitFailedError);
-		expect(thrown).toMatchObject({ cause: codecError, level: "workflow", role: "output" });
+		expect(thrown).toMatchObject({ cause: codecError });
 	});
 });
 

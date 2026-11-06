@@ -1761,7 +1761,7 @@ describe("a control-flow error the task handler throws itself", () => {
 		WorkflowRunNotExecutableError: (id) => new WorkflowRunNotExecutableError(id, "paused"),
 		NonDeterminismError: (id) => new NonDeterminismError(id, 1, { taskIds: [], childWorkflowRunIds: [] }),
 		ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
-		CodecInitFailedError: () => new CodecInitFailedError("task", "input", new Error("No keyring available")),
+		CodecInitFailedError: () => new CodecInitFailedError(new Error("No keyring available")),
 		CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
 		CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
 	};

@@ -78,7 +78,7 @@ async function activateWithOptions<Input, Output, Context, TEvents extends Event
 	const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 	const workflowRunOptions = workflow[INTERNAL].runOptions();
 	const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
-		definitionCodec: instantiateCodec(workflow[INTERNAL].codec?.input, client.logger, "workflow", "input"),
+		definitionCodec: instantiateCodec(workflow[INTERNAL].codec?.input, client.logger),
 		clientCodec,
 		policy: workflowRunOptions.clientCodecPolicy,
 	});
