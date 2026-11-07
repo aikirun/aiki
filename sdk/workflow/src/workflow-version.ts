@@ -447,7 +447,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 	private async handler(run: Omit<WorkflowRun<Context, TEvents>, "context">, input: Input): Promise<void> {
 		const { logger } = run;
-		const { assertExecutionAllowed, codec, transitionStateOptimistic } = run[INTERNAL].handle[INTERNAL];
+		const { handle } = run[INTERNAL];
+		const { assertExecutionAllowed, codec, transitionStateOptimistic } = handle[INTERNAL];
 
 		assertExecutionAllowed();
 
@@ -458,9 +459,16 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		const output = await this.tryExecuteWorkflow(input, run, retryStrategy);
 
+		let jsonOutput: unknown;
+		try {
+			jsonOutput = output !== undefined ? JSON.parse(JSON.stringify(output)) : output;
+		} catch (err) {
+			return this.failRun(handle, { attempts: handle.run.attempts, err }, logger);
+		}
+
 		await transitionStateOptimistic({
 			status: "completed",
-			output: await codec.workflowOutput.encode(output),
+			output: await codec.workflowOutput.encode(jsonOutput),
 		});
 		logger.debug("Workflow complete");
 	}

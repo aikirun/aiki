@@ -535,6 +535,88 @@ describe("workflow version execution", () => {
 
 				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
 			}));
+
+		test("persists the handler output as JSON, turning a date into its ISO string", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ shippedAt: "1970-01-01T00:00:00.000Z" });
+				const workflowVersion = workflow({ name: "completing-workflow" }).v("1.0.0", {
+					async handler() {
+						// The type says string but it really is a date
+						return { shippedAt: new Date(0) as unknown as string };
+					},
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "completed", output: storedOutput },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: { status: "completed", output: storedOutput },
+							attempts: runRecord.attempts,
+						}
+					);
+
+				expect(await workflowVersion[INTERNAL].handler(run)).toBeUndefined();
+			}));
+
+		test("fails without retrying when the handler output cannot be stored as JSON, even with a retry strategy", () =>
+			withFakeClient(async (client) => {
+				const workflowVersion = workflow({ name: "counting-workflow" }).v("1.0.0", {
+					async handler() {
+						// The type says number but it really is a bigint
+						return 12n as unknown as number;
+					},
+					retry: { type: "fixed", maxAttempts: 5, delayMs: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				client.api.workflowRun.transitionStateV1
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "running" },
+							expectedRevision: runRecord.revision,
+						},
+						{ revision: runRecord.revision, state: runRecord.state, attempts: runRecord.attempts }
+					)
+					.once(
+						{
+							type: "optimistic",
+							id: runRecord.id,
+							state: { status: "failed", cause: "self", error: expect.objectContaining({ name: "TypeError" }) },
+							expectedRevision: runRecord.revision,
+						},
+						{
+							revision: runRecord.revision,
+							state: {
+								status: "failed",
+								cause: "self",
+								error: { name: "TypeError", message: "cannot serialize a bigint" },
+							},
+							attempts: runRecord.attempts,
+						}
+					);
+
+				await expect(workflowVersion[INTERNAL].handler(run)).rejects.toBeInstanceOf(WorkflowRunFailedError);
+			}));
 	});
 
 	describe("task failures", () => {

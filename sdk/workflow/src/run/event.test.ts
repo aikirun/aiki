@@ -401,6 +401,26 @@ describe("createEventSenders", () => {
 
 			await senders.orderShipped.send({ trackingId: "T1" });
 		}));
+
+	test("sends the event data as JSON, turning a date into its ISO string", () =>
+		withFakeClient(async (client) => {
+			const senders = createEventSenders(
+				client,
+				"run-1",
+				{ orderShipped: event<{ shippedAt: string }>() },
+				client.logger
+			);
+			client.api.workflowRun.sendEventV1.once({
+				id: "run-1",
+				eventName: "orderShipped",
+				data: asOpaquePayload({ shippedAt: "1970-01-01T00:00:00.000Z" }),
+				clientCodecApplied: false,
+				options: {},
+			});
+
+			// The type says string but it really is a date
+			await senders.orderShipped.send({ shippedAt: new Date(0) as unknown as string });
+		}));
 });
 
 describe("createEventMulticasters", () => {
@@ -617,5 +637,47 @@ describe("createEventMulticasters", () => {
 			);
 
 			await multicasters.orderShipped.sendByReferenceId(client, "ref-1", { trackingId: "T1" });
+		}));
+
+	test("multicasts the event data as JSON, turning a date into its ISO string", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ shippedAt: string }>(),
+			});
+			client.api.workflowRun.multicastEventV1.once(
+				{
+					ids: ["run-1"],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ shippedAt: "1970-01-01T00:00:00.000Z" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			// The type says string but it really is a date
+			await multicasters.orderShipped.send(client, "run-1", { shippedAt: new Date(0) as unknown as string });
+		}));
+
+	test("multicasts the event data by reference as JSON, turning a date into its ISO string", () =>
+		withFakeClient(async (client) => {
+			const multicasters = createEventMulticasters(workflowName, versionId, {
+				orderShipped: event<{ shippedAt: string }>(),
+			});
+			client.api.workflowRun.multicastEventByReferenceV1.once(
+				{
+					references: [{ name: "order-workflow", versionId: "1.0.0", referenceId: "ref-1" }],
+					eventName: "orderShipped",
+					data: asOpaquePayload({ shippedAt: "1970-01-01T00:00:00.000Z" }),
+					clientCodecApplied: false,
+					options: {},
+				},
+				{ sentIds: ["run-1"], failedIds: [] }
+			);
+
+			// The type says string but it really is a date
+			await multicasters.orderShipped.sendByReferenceId(client, "ref-1", {
+				shippedAt: new Date(0) as unknown as string,
+			});
 		}));
 });
