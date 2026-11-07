@@ -1,5 +1,5 @@
 import { inspect } from "node:util";
-import { noopLogger } from "@aikirun/lib/logger";
+import { type Logger, noopLogger } from "@aikirun/lib/logger";
 import type { ApiClient, Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunRecord } from "@aikirun/types/workflow/run";
@@ -199,9 +199,12 @@ function fakeClient<Context = null>(options: FakeClientOptions<Context> = {}): F
 		}
 	};
 
+	// Its own logger, so a spy on one client's logger never sees another client's calls.
+	const logger: Logger = { ...noopLogger, child: () => logger };
+
 	return {
 		api,
-		logger: noopLogger,
+		logger,
 		[INTERNAL]: {
 			...(options.context ? { context: options.context } : {}),
 		},
