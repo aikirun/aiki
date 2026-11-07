@@ -2,6 +2,7 @@ import { createBinaryLatch, delay } from "@aikirun/lib/async";
 import { asConfigProvider } from "@aikirun/lib/config";
 import { hashInput } from "@aikirun/lib/crypto";
 import { getCompositeId } from "@aikirun/lib/id";
+import { type Logger, noopLogger } from "@aikirun/lib/logger";
 import { withFakeClient } from "@aikirun/testing/client";
 import {
 	baseWorkflowRunRecordFactory,
@@ -1265,6 +1266,40 @@ describe("executeWorkflowRun", () => {
 
 			expect(result).toBe(false);
 			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false and logs the hasher's error when the client's hasher throws while binding to the run's hash", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ clientHasherApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+			const keyStoreError = new Error("key store unreachable");
+			client[INTERNAL].hasher = Object.assign(async () => ({ value: "unused" }), {
+				for: async () => {
+					throw keyStoreError;
+				},
+			});
+			const error = vi.fn();
+			const logger: Logger = { ...noopLogger, error, child: () => logger };
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+			expect(error.mock.calls).toEqual([
+				[
+					"Cannot get hasher that produced the run's input hash",
+					{ workflowRunId: workflowRun.id, "aiki.inputHash": workflowRun.inputHash, err: keyStoreError },
+				],
+			]);
 		}));
 
 	describe("claim refresh", () => {

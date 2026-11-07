@@ -123,7 +123,17 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			const boundHasher = await clientHasher.for(workflowRun.inputHash);
+			let boundHasher: BoundHasher | null;
+			try {
+				boundHasher = await clientHasher.for(workflowRun.inputHash);
+			} catch (err) {
+				logger.error("Cannot get hasher that produced the run's input hash", {
+					workflowRunId,
+					"aiki.inputHash": workflowRun.inputHash,
+					err,
+				});
+				return false;
+			}
 			if (!boundHasher) {
 				logger.error("The client's hasher cannot hash under the rotation that produced the run's input hash", {
 					workflowRunId,
