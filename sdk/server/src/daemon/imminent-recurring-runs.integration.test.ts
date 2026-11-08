@@ -38,7 +38,7 @@ const config = {
 	pageSize: 100,
 	lookaheadWindowMs: 0,
 	overshootMs: 0,
-	maxOccurrencesPerSchedule: NO_CAP,
+	maxOccurrencesCaughtUpPerSchedulePerPass: NO_CAP,
 	republishBackoff,
 	chunk: { size: 100, maxConcurrency: 10 },
 };
@@ -144,7 +144,7 @@ describe("processImminentRecurringRuns", () => {
 
 			// Three occurrences are due under a cap of two.
 			await withFakeClock(schedule.nextRunAt + 120_000, () =>
-				processImminentRecurringRuns(context, { repos }, { ...config, maxOccurrencesPerSchedule: 2 })
+				processImminentRecurringRuns(context, { repos }, { ...config, maxOccurrencesCaughtUpPerSchedulePerPass: 2 })
 			);
 
 			expect(await repos.workflowRunOutbox.listPending(context, 100)).toEqual([
@@ -176,7 +176,7 @@ describe("processImminentRecurringRuns", () => {
 
 			// Three occurrences are due under a cap of two, so the second pass owes one.
 			await withFakeClock(schedule.nextRunAt + 120_000, async () => {
-				const cappedConfig = { ...config, maxOccurrencesPerSchedule: 2 };
+				const cappedConfig = { ...config, maxOccurrencesCaughtUpPerSchedulePerPass: 2 };
 				await processImminentRecurringRuns(context, { repos }, cappedConfig);
 				await processImminentRecurringRuns(context, { repos }, cappedConfig);
 			});
@@ -301,7 +301,7 @@ describe("processImminentRecurringRuns", () => {
 				processImminentRecurringRuns(
 					context,
 					{ repos, timerPriorityQueue },
-					{ ...config, maxOccurrencesPerSchedule: 2, lookaheadWindowMs: 0 }
+					{ ...config, maxOccurrencesCaughtUpPerSchedulePerPass: 2, lookaheadWindowMs: 0 }
 				)
 			);
 

@@ -231,11 +231,12 @@ function createEventSender<Data, Context>(
 		const options = optionsBuilder.build();
 		const { codec: clientCodec } = client[INTERNAL];
 		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const jsonData: unknown = data !== undefined ? JSON.parse(JSON.stringify(data)) : data;
 
 		await client.api.workflowRun.sendEventV1({
 			id: workflowRunId,
 			eventName,
-			data: await codec.encode(data),
+			data: await codec.encode(jsonData),
 			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
@@ -310,11 +311,12 @@ function createEventMulticaster<Data>(
 		const options = optionsBuilder.build();
 		const { codec: clientCodec } = client[INTERNAL];
 		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const jsonData: unknown = data !== undefined ? JSON.parse(JSON.stringify(data)) : data;
 
 		const result = await client.api.workflowRun.multicastEventV1({
 			ids: runIds,
 			eventName,
-			data: await codec.encode(data),
+			data: await codec.encode(jsonData),
 			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});
@@ -360,6 +362,7 @@ function createEventMulticaster<Data>(
 		const options = optionsBuilder.build();
 		const { codec: clientCodec } = client[INTERNAL];
 		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const jsonData: unknown = data !== undefined ? JSON.parse(JSON.stringify(data)) : data;
 
 		const result = await client.api.workflowRun.multicastEventByReferenceV1({
 			references: referenceIds.map((referenceId) => ({
@@ -368,7 +371,7 @@ function createEventMulticaster<Data>(
 				referenceId,
 			})),
 			eventName,
-			data: await codec.encode(data),
+			data: await codec.encode(jsonData),
 			clientCodecApplied: clientCodec !== undefined,
 			options,
 		});

@@ -181,12 +181,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const attempts = 1;
 		const retryStrategy = startOptions.retry ?? { type: "never" };
+		const codec = handle[INTERNAL].codec.client;
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			input: await handle[INTERNAL].codec.encode(input),
+			input: await codec.encode(input),
 			inputHash,
 		});
 
@@ -211,7 +212,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
+			state: { status: "completed", output: await codec.encode(output) },
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 
@@ -229,7 +230,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return (await handle[INTERNAL].codec.decode(existingTaskState.output)) as Output;
+			return (await handle[INTERNAL].codec.client.decode(existingTaskState.output)) as Output;
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -316,7 +317,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: await handle[INTERNAL].codec.encode(output) },
+			state: { status: "completed", output: await handle[INTERNAL].codec.client.encode(output) },
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 

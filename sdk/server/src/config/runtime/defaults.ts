@@ -62,7 +62,7 @@ export const defaultServerRuntimeConfig: ServerRuntimeConfig = {
 			intervalMs: 10_000,
 			pageSize: 1_000,
 			lookaheadWindowMs: 30_000,
-			maxOccurrencesPerSchedule: 3,
+			maxOccurrencesCaughtUpPerSchedulePerPass: 3,
 			chunk: {
 				size: 100,
 				maxConcurrency: 10,

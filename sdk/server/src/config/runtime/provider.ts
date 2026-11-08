@@ -2,6 +2,7 @@ import { asConfigProvider, type CreateConfigProvider, dynamicConfigProvider } fr
 import { merge } from "@aikirun/lib/object";
 
 import { defaultServerRuntimeConfig } from "./defaults";
+import { migrateDeprecatedConfigKeys, serverRuntimeConfigDeprecations } from "./deprecated-config";
 import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./schema";
 
 /**
@@ -11,24 +12,46 @@ import type { ServerRuntimeConfig, ServerRuntimeConfigOverrides } from "./schema
 export function staticRuntimeConfigProvider(
 	overrides?: ServerRuntimeConfigOverrides
 ): CreateConfigProvider<ServerRuntimeConfig> {
-	const config = merge(defaultServerRuntimeConfig, overrides);
-	return () => asConfigProvider(() => config);
+	return ({ logger }) => {
+		const config = merge(
+			defaultServerRuntimeConfig,
+			migrateDeprecatedConfigKeys({ overrides, deprecations: serverRuntimeConfigDeprecations, logger })
+		);
+		return asConfigProvider(() => config);
+	};
 }
 
 /**
  * Config that reloads on a timer, letting an operator retune a running server
- * without redeploying. `refresh` receives the current config and returns the next.
- * The server starts on defaults with `initial` overrided applied.
+ * without redeploying. The server starts on defaults with `initial` overrides applied.
+ * `refresh` returns overrides too, and each refresh applies them on top of `initial`,
+ * so a setting that `refresh` stops returning goes back to its `initial` or default value.
  * Every refresh runs in the background, and a failed refresh keeps the current snapshot.
  */
 export function dynamicRuntimeConfigProvider(params: {
 	initial?: ServerRuntimeConfigOverrides;
-	refresh: (current: ServerRuntimeConfig) => ServerRuntimeConfig | Promise<ServerRuntimeConfig>;
+	refresh: () => ServerRuntimeConfigOverrides | Promise<ServerRuntimeConfigOverrides>;
 	refreshIntervalMs: number;
 }): CreateConfigProvider<ServerRuntimeConfig> {
-	return dynamicConfigProvider({
-		initial: merge(defaultServerRuntimeConfig, params.initial),
-		refresh: params.refresh,
-		refreshIntervalMs: params.refreshIntervalMs,
-	});
+	return (context) => {
+		const { logger } = context;
+		const initialConfig = merge(
+			defaultServerRuntimeConfig,
+			migrateDeprecatedConfigKeys({
+				overrides: params.initial,
+				deprecations: serverRuntimeConfigDeprecations,
+				logger,
+			})
+		);
+		return dynamicConfigProvider({
+			initial: initialConfig,
+			refresh: params.refresh,
+			applyOverrides: (overrides) =>
+				merge(
+					initialConfig,
+					migrateDeprecatedConfigKeys({ overrides, deprecations: serverRuntimeConfigDeprecations, logger })
+				),
+			refreshIntervalMs: params.refreshIntervalMs,
+		})(context);
+	};
 }

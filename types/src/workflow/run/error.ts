@@ -95,30 +95,43 @@ export class ClientCodecMissingError extends Error {
 }
 
 /**
- * The client's codec threw while encoding a payload. The codec's error is the `cause`. In a
- * workflow, this error ends the execution even when the workflow code catches it. When the cause is
- * a `CodecPermanentError`, the run fails at once; otherwise the run is left for a worker whose
- * codec can encode the payload.
+ * A codec factory threw while creating a codec. The factory's error is the `cause`.
+ * In a workflow, this error ends the execution even when the workflow code catches it, and the run
+ * is left for a worker whose codec can be created.
  */
-export class ClientCodecEncodeFailedError extends Error {
-	public override readonly name = "ClientCodecEncodeFailedError";
+export class CodecInitFailedError extends Error {
+	public override readonly name = "CodecInitFailedError";
 
 	constructor(cause: unknown) {
-		super("The client codec failed to encode a payload", { cause });
+		super("Codec failed to initialize", { cause });
 	}
 }
 
 /**
- * The client's codec threw while decoding a payload. The codec's error is the `cause`. In a
- * workflow, this error ends the execution even when the workflow code catches it. When the cause is
- * a `CodecPermanentError`, the run fails at once; otherwise the run is left for a worker whose
- * codec can decode the payload.
+ * A codec (client or definition) threw while encoding a payload. The codec's error is the `cause`.
+ * In a workflow, this error ends the execution even when the workflow code catches it. When the
+ * cause is a `CodecPermanentError`, the run fails at once; otherwise the run is left for a worker
+ * whose codec can encode the payload.
  */
-export class ClientCodecDecodeFailedError extends Error {
-	public override readonly name = "ClientCodecDecodeFailedError";
+export class CodecEncodeFailedError extends Error {
+	public override readonly name = "CodecEncodeFailedError";
 
 	constructor(cause: unknown) {
-		super("The client codec failed to decode a payload", { cause });
+		super("Codec failed to encode a payload", { cause });
+	}
+}
+
+/**
+ * A codec (client or definition) threw while decoding a payload. The codec's error is the `cause`.
+ * In a workflow, this error ends the execution even when the workflow code catches it. When the
+ * cause is a `CodecPermanentError`, the run fails at once; otherwise the run is left for a worker
+ * whose codec can decode the payload.
+ */
+export class CodecDecodeFailedError extends Error {
+	public override readonly name = "CodecDecodeFailedError";
+
+	constructor(cause: unknown) {
+		super("Codec failed to decode a payload", { cause });
 	}
 }
 

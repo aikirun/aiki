@@ -29,7 +29,7 @@ interface DueTimerConsumerConfig {
 	pageSize: number;
 	overshootMs: number;
 	republishBackoff: RepublishBackoff;
-	maxOccurrencesPerSchedule: number;
+	maxOccurrencesCaughtUpPerSchedulePerPass: number;
 	lookaheadWindowMs: number;
 	chunkByTimerType: Record<TimerType, PageProcessingConfig["chunk"]>;
 }
@@ -175,7 +175,7 @@ export async function processDueTimers(
 			}
 			promises.push(
 				queueRecurringRuns(context, deps, schedules, configProvider.config.republishBackoff, {
-					maxOccurrencesPerSchedule: configProvider.config.maxOccurrencesPerSchedule,
+					maxOccurrencesCaughtUpPerSchedulePerPass: configProvider.config.maxOccurrencesCaughtUpPerSchedulePerPass,
 					lookaheadWindowMs: configProvider.config.lookaheadWindowMs,
 					overshootMs: configProvider.config.overshootMs,
 					chunk: chunkConfig,

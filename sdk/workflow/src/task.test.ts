@@ -20,9 +20,10 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
+	CodecInitFailedError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -39,15 +40,16 @@ import type { WorkflowRun } from "./run";
 import type { ControlFlowError } from "./run/execution/control-flow-error";
 import { createReplayManifest } from "./run/execution/replay-manifest";
 import { taskExecutionTracker } from "./run/execution/task-execution-tracker";
+import type { WorkflowDefinitionCodec } from "./run/handle/bound-codec";
 import { workflowRunHandle } from "./run/handle/workflow-run";
 import { type Task, task } from "./task";
 
 function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
-	options: { maxInlineWaitMs?: number } = {}
+	options: { maxInlineWaitMs?: number; workflowCodec?: WorkflowDefinitionCodec } = {}
 ): WorkflowRun<null, Record<string, never>> {
-	const handle = workflowRunHandle(client, record);
+	const handle = workflowRunHandle(client, record, { workflowCodec: options.workflowCodec });
 	return {
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
@@ -189,6 +191,201 @@ describe("task", () => {
 					);
 
 				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
+
+		test("does not apply the workflow definition codec to task input or output", () =>
+			withFakeClient(async (client) => {
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord, {
+					workflowCodec: {
+						input: {
+							encode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+						},
+						output: {
+							encode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+						},
+					},
+				});
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output: asOpaquePayload(output) },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: sendEmail.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: completedTaskInfo.state,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
+
+		test("does not apply the workflow definition codec when replaying a completed task", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const output = "previously-sent";
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: asOpaquePayload(output) },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord, {
+					workflowCodec: {
+						input: {
+							encode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+						},
+						output: {
+							encode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+						},
+					},
+				});
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+				});
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
+		test("does not apply the workflow definition codec when completing a retried task", () =>
+			withFakeClient(async (client) => {
+				const input = { cardId: "card-1" };
+				const output = "charged";
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "charge-card", referenceId: inputHash });
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: "charge-card",
+					options: { retry },
+					state: { nextAttemptAt: 1 },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [awaitingRetryTaskInfo] },
+				});
+				const run = createTestWorkflowRun(client, runRecord, {
+					workflowCodec: {
+						input: {
+							encode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition input codec must not run for tasks");
+							},
+						},
+						output: {
+							encode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+							decode: async () => {
+								throw new Error("definition output codec must not run for tasks");
+							},
+						},
+					},
+				});
+
+				const chargeCard = task<{ cardId: string }, string>({
+					name: "charge-card",
+					handler: async () => output,
+				});
+
+				const retriedTaskInfo = runningTaskInfoFactory.build({
+					id: awaitingRetryTaskInfo.id,
+					name: chargeCard.name,
+					attempts: 2,
+				});
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: retriedTaskInfo }
+					)
+					.once(
+						{
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							state: { status: "completed", output: asOpaquePayload(output) },
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: awaitingRetryTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 2,
+								state: { output: asOpaquePayload(output) },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe(output);
 			}));
 
 		test("retries in-memory when the delay is within the max inline wait, recording no extra transition", () =>
@@ -1691,8 +1888,9 @@ describe("a control-flow error the task handler throws itself", () => {
 		WorkflowRunNotExecutableError: (id) => new WorkflowRunNotExecutableError(id, "paused"),
 		NonDeterminismError: (id) => new NonDeterminismError(id, 1, { taskIds: [], childWorkflowRunIds: [] }),
 		ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
-		ClientCodecEncodeFailedError: () => new ClientCodecEncodeFailedError(new Error("Key 2025-06 not found")),
-		ClientCodecDecodeFailedError: () => new ClientCodecDecodeFailedError(new Error("No codec named aes-v1")),
+		CodecInitFailedError: () => new CodecInitFailedError(new Error("No keyring available")),
+		CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
+		CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
 	};
 
 	for (const [name, createControlFlowError] of Object.entries(createControlFlowErrorByName)) {

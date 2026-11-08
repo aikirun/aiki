@@ -9,9 +9,10 @@ import type { BoundHasher } from "@aikirun/types/infra/hasher";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import {
-	ClientCodecDecodeFailedError,
-	ClientCodecEncodeFailedError,
 	ClientCodecMissingError,
+	CodecDecodeFailedError,
+	CodecEncodeFailedError,
+	CodecInitFailedError,
 	type NonDeterminismError,
 	type WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -27,6 +28,7 @@ import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
 import { createEventWaiters } from "../event";
+import { instantiateWorkflowDefinitionCodec } from "../handle/bound-codec";
 import { type WorkflowRunHandle, workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
 
@@ -102,12 +104,16 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-		handle = workflowRunHandle(client, workflowRun, eventsDefinition, logger);
+		handle = workflowRunHandle(client, workflowRun, {
+			eventsDefinition,
+			logger,
+			workflowCodec: instantiateWorkflowDefinitionCodec(workflowVersion[INTERNAL].codec, logger),
+		});
 		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
 		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
-		const codec = handle[INTERNAL].codec;
+		const codec = handle[INTERNAL].codec.workflowInput;
 
 		// Every hash inside the run must come from the hasher that made the run's own hash.
 		let hasher: BoundHasher;
@@ -120,7 +126,17 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			const boundHasher = await clientHasher.for(workflowRun.inputHash);
+			let boundHasher: BoundHasher | null;
+			try {
+				boundHasher = await clientHasher.for(workflowRun.inputHash);
+			} catch (err) {
+				logger.error("Cannot get hasher that produced the run's input hash", {
+					workflowRunId,
+					"aiki.inputHash": workflowRun.inputHash,
+					err,
+				});
+				return false;
+			}
 			if (!boundHasher) {
 				logger.error("The client's hasher cannot hash under the rotation that produced the run's input hash", {
 					workflowRunId,
@@ -160,20 +176,24 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			if (err instanceof ClientCodecEncodeFailedError || err instanceof ClientCodecDecodeFailedError) {
+			if (err instanceof CodecInitFailedError) {
+				logger.error("Codec failed to initialize for the workflow run", { err });
+				return false;
+			}
+
+			if (err instanceof CodecEncodeFailedError || err instanceof CodecDecodeFailedError) {
 				if (err.cause instanceof CodecPermanentError && handle !== undefined) {
-					logger.error("The client codec permanently failed on a payload of the workflow run", { err });
+					logger.error("The codec permanently failed on a payload of the workflow run", { err });
 
 					return await failRun(handle, err.cause, logger);
 				}
 
 				logger.error(
-					err instanceof ClientCodecEncodeFailedError
-						? "The client codec failed to encode a payload of the workflow run"
-						: "The client codec failed to decode a payload of the workflow run",
+					err instanceof CodecEncodeFailedError
+						? "Codec failed to encode a payload of the workflow run"
+						: "Codec failed to decode a payload of the workflow run",
 					{ err }
 				);
-
 				return false;
 			}
 
