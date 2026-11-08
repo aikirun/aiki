@@ -1,6 +1,5 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { NonEmptyArray } from "@aikirun/lib/collection/array";
-import { sha256 } from "@aikirun/lib/crypto";
 import type { Cache } from "@aikirun/types/infra/cache";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
@@ -25,6 +24,12 @@ function generateKey(): { key: string; keyPrefix: string } {
 	const secret = randomBytes(SECRET_LENGTH).toString("base64url");
 	const key = `${PLATFORM}_${prefix}_${secret}`;
 	return { key, keyPrefix: prefix };
+}
+
+// The secret is SECRET_LENGTH random bytes, so a fast unsalted hash is enough. A secret a person
+// chose would need a slow KDF such as scrypt.
+function hashKey(key: string): string {
+	return createHash("sha256").update(key).digest("hex");
 }
 
 function isValidKeyFormat(key: string): boolean {
@@ -55,7 +60,7 @@ export const createApiKeyService = ({ repos, cache }: ApiKeyServiceDeps) => ({
 		input: Pick<ApiKeyRowInsert, "organizationId" | "namespaceId" | "createdByUserId" | "name" | "expiresAt">
 	) {
 		const { key, keyPrefix } = generateKey();
-		const keyHash = sha256(key);
+		const keyHash = hashKey(key);
 
 		const keyInfo = await repos.apiKey.create({
 			id: ulid(),
@@ -76,7 +81,7 @@ export const createApiKeyService = ({ repos, cache }: ApiKeyServiceDeps) => ({
 			return null;
 		}
 
-		const keyHash = sha256(key);
+		const keyHash = hashKey(key);
 
 		if (cache) {
 			const cachedKeyInfo = await cache.get(keyHash);

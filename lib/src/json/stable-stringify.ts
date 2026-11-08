@@ -10,8 +10,8 @@
  *
  * @example
  * ```ts
- * const hash1 = await sha256(stableStringify({ b: 2, a: 1 }));
- * const hash2 = await sha256(stableStringify({ a: 1, b: 2 }));
+ * const hash1 = await sha256Async(stableStringify({ b: 2, a: 1 }));
+ * const hash2 = await sha256Async(stableStringify({ a: 1, b: 2 }));
  * assert(hash1 === hash2); // true - same hash despite different key order
  * ```
  */
