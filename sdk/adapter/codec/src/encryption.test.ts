@@ -321,6 +321,23 @@ describe("encryption codec", () => {
 		expect(resolveCount).toBe(1);
 	});
 
+	test("shares the AES key cache across codec contexts", async () => {
+		let resolveCount = 0;
+		const { codec: createCodec } = encryption({
+			algorithm: "AES-256-GCM",
+			key: (keyId) => {
+				resolveCount += 1;
+				return resolveKey(keyId);
+			},
+			config: { keyId: "a" },
+		});
+
+		await createCodec(context).encode({ n: 1 });
+		expect(resolveCount).toBe(1);
+		await createCodec({ logger: noopLogger }).encode({ n: 2 });
+		expect(resolveCount).toBe(1);
+	});
+
 	test("deduplicates concurrent resolves for the same key id", async () => {
 		let resolveCount = 0;
 		let release!: () => void;
@@ -590,6 +607,23 @@ describe("encryption hasher", () => {
 			return;
 		}
 		expect(await bound(input)).toBe(hash.value);
+		expect(resolveCount).toBe(1);
+	});
+
+	test("shares the HMAC key cache across hasher contexts", async () => {
+		let resolveCount = 0;
+		const { hasher: createHasher } = encryption({
+			algorithm: "AES-256-GCM",
+			key: (keyId) => {
+				resolveCount += 1;
+				return resolveKey(keyId);
+			},
+			config: { keyId: "a" },
+		});
+
+		await createHasher(context)({ orderId: "1" });
+		expect(resolveCount).toBe(1);
+		await createHasher({ logger: noopLogger })({ orderId: "2" });
 		expect(resolveCount).toBe(1);
 	});
 

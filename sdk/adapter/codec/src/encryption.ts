@@ -48,7 +48,8 @@ export interface EncryptionParams {
 	key: ResolveEncryptionKey;
 	config: EncryptionConfig | CreatePassiveConfigProvider<EncryptionConfig>;
 	/**
-	 * Derived CryptoKey cache. Pass `false` to re-resolve and re-derive on every use.
+	 * Derived CryptoKey cache shared across all codec and hasher contexts from this
+	 * `encryption()` call. Pass `false` to re-resolve and re-derive on every use.
 	 * Default: enabled with 64 entries and no TTL.
 	 */
 	keyCache?: false | EncryptionKeyCacheConfig;
@@ -206,10 +207,10 @@ function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefine
  * never used as raw key material for both primitives.
  *
  * To revoke a key, introduce a new `keyId`, re-encode any values still under the old id, then stop
- * serving the old material (`key` returns `null` for it). Derived CryptoKeys are cached: for
- * revocation to take effect without a process restart, pass `keyCache: false` or a finite
- * `keyCache.ttlMs`. Mutating the material in place leaves ciphertext undecryptable and hashes
- * unverifiable.
+ * serving the old material (`key` returns `null` for it). Derived CryptoKeys are cached per
+ * `encryption()` instance: for revocation to take effect without a process restart, pass
+ * `keyCache: false` or a finite `keyCache.ttlMs`. Mutating the material in place leaves ciphertext
+ * undecryptable and hashes unverifiable.
  */
 export function encryption(params: EncryptionParams): {
 	codec: NamedCreateCodec<EncodedValue<EncryptedBody>>;
@@ -217,11 +218,13 @@ export function encryption(params: EncryptionParams): {
 } {
 	const { algorithm, key: resolveKey, keyCache: keyCacheConfig } = params;
 	const cipher = createCipher(algorithm);
+	// Per encryption() instance, not per context: contexts are often short-lived (per run / handle).
+	const aesKeys = toDerivedKeyCache(keyCacheConfig);
+	const hmacKeys = toDerivedKeyCache(keyCacheConfig);
 
 	const createCodec: NamedCreateCodec<EncodedValue<EncryptedBody>> = Object.assign(
 		(context: CodecContext) => {
 			const configProvider = toConfigProvider(params.config, context);
-			const aesKeys = toDerivedKeyCache(keyCacheConfig);
 
 			const aesKeyFor = async (keyId: string): Promise<CryptoKey> => {
 				return aesKeys.getOrCreate(keyId, async () => {
@@ -258,7 +261,6 @@ export function encryption(params: EncryptionParams): {
 
 	const createHasher: CreateHasher = (context) => {
 		const configProvider = toConfigProvider(params.config, context);
-		const hmacKeys = toDerivedKeyCache(keyCacheConfig);
 
 		const resolveHmacKey = async (keyId: string): Promise<CryptoKey | null> => {
 			try {
