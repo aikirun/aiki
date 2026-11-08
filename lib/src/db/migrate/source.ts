@@ -1,7 +1,6 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-
-import { sha256 } from "../../crypto";
 
 const STATEMENT_BREAKPOINT = "--> statement-breakpoint";
 const PREVIOUS_HASHES_FILE = "previous-hashes.json";
@@ -33,7 +32,7 @@ function buildMigration(params: {
 	return {
 		tag: params.entry.tag,
 		sql: params.rawSql.split(STATEMENT_BREAKPOINT),
-		hash: sha256(params.rawSql),
+		hash: createHash("sha256").update(params.rawSql).digest("hex"),
 		previousHashes: params.previousHashes,
 		folderMillis: params.entry.when,
 	};

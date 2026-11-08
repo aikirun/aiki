@@ -1,7 +1,7 @@
+import { createHash } from "node:crypto";
 import { describe, expect, test } from "vitest";
 
 import { migrateApply } from "./apply";
-import { sha256 } from "../../../crypto";
 import { type Logger, noopLogger } from "../../../logger";
 import { loadDatabaseConfig } from "../../config";
 import { type Migrations, migrationSource } from "../source";
@@ -13,6 +13,10 @@ import {
 } from "../testing/migrations-fixture";
 
 const dbConfig = loadDatabaseConfig();
+
+function sha256(sql: string): string {
+	return createHash("sha256").update(sql).digest("hex");
+}
 
 describe("migrateApply", () => {
 	test("applies each migration once, and nothing when run again", () =>
