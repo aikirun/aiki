@@ -40,10 +40,6 @@ function aesGcmParams(iv: Uint8Array, additionalData: Uint8Array) {
 	};
 }
 
-async function importAesGcmKey(material: Uint8Array): Promise<CryptoKey> {
-	return crypto.subtle.importKey("raw", new Uint8Array(material), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
-}
-
 function decodePackedCiphertext(ciphertext: string): Uint8Array {
 	const packed = Buffer.from(ciphertext, "base64");
 	// Buffer.from ignores non-alphabet characters; require an exact standard-base64 spelling.
@@ -96,7 +92,6 @@ async function decryptAes256Gcm(
 }
 
 export interface Cipher {
-	importKey(material: Uint8Array): Promise<CryptoKey>;
 	encrypt(payload: unknown, key: CryptoKey, keyId: string): Promise<string>;
 	decrypt(ciphertext: string, key: CryptoKey, keyId: string): Promise<unknown>;
 }
@@ -105,7 +100,6 @@ export function createCipher(algorithm: EncryptionAlgorithm): Cipher {
 	switch (algorithm) {
 		case "AES-256-GCM":
 			return {
-				importKey: importAesGcmKey,
 				encrypt: (payload, key, keyId) => encryptAes256Gcm(payload, key, algorithm, keyId),
 				decrypt: (ciphertext, key, keyId) => decryptAes256Gcm(ciphertext, key, algorithm, keyId),
 			};
