@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { hashInput, sha256Async } from "./hash";
+import { hashInput, sha256 } from "./hash";
 
 const helloHash = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
 
-describe("sha256Async", () => {
+describe("sha256", () => {
 	test("matches known hash for 'hello'", async () => {
-		expect(await sha256Async("hello")).toBe(helloHash);
+		expect(await sha256("hello")).toBe(helloHash);
 	});
 });
 
