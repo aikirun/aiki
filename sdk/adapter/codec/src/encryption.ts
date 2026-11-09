@@ -5,8 +5,8 @@ import {
 	type CreatePassiveConfigProvider,
 	type PassiveConfigProviderContext,
 } from "@aikirun/lib/config";
-import { createCipher, type EncryptionAlgorithm, InvalidEncryptedValueError, stableText } from "@aikirun/lib/crypto";
-import { type CodecContext, CodecPermanentError } from "@aikirun/types/infra/codec";
+import { createCipher, type EncryptionAlgorithm, EncryptionDecryptFailedError, stableText } from "@aikirun/lib/crypto";
+import type { CodecContext } from "@aikirun/types/infra/codec";
 import type { BoundHasher, CreateHasher, Hash, Hasher } from "@aikirun/types/infra/hasher";
 
 import { codec, type EncodedValue, type NamedCreateCodec } from "./codec";
@@ -19,7 +19,7 @@ const AES_256_GCM_HKDF_INFO = textEncoder.encode("aiki:codec:AES-256-GCM");
 const HMAC_SHA_256_HKDF_INFO = textEncoder.encode("aiki:hasher:HMAC-SHA-256");
 const HKDF_SALT = new Uint8Array();
 
-export type EncryptedBody = {
+export type EncryptedValue = {
 	keyId: string;
 	ciphertext: string;
 };
@@ -39,14 +39,17 @@ export type EncryptionKeyCacheConfig = {
 
 export interface EncryptionParams {
 	algorithm: EncryptionAlgorithm;
+
 	/**
-	 * Resolves master key material for a `keyId`. Returning `null` fails the run immediately via
-	 * {@link CodecPermanentError} ({@link EncryptionKeyNotFoundError}), so new keys must be
-	 * deployed to every worker's resolver (and listed in `previousKeyIds` / the key store as needed)
-	 * before any producer activates that `keyId` for encoding.
+	 * Resolves master key material for a `keyId`. Resolvers must return `null` for unknown ids
+	 * (do not throw); that throws {@link EncryptionKeyNotFoundError}, so the run is left for
+	 * redelivery. Deploy new keys to every worker's resolver (and list them in `previousKeyIds` /
+	 * the key store as needed) before any producer activates that `keyId` for encoding.
 	 */
 	key: ResolveEncryptionKey;
+
 	config: EncryptionConfig | CreatePassiveConfigProvider<EncryptionConfig>;
+
 	/**
 	 * Derived CryptoKey cache shared across all codec and hasher contexts from this
 	 * `encryption()` call. Pass `false` to re-resolve and re-derive on every use.
@@ -55,40 +58,37 @@ export interface EncryptionParams {
 	keyCache?: false | EncryptionKeyCacheConfig;
 }
 
-export class EncryptionKeyNotFoundError extends CodecPermanentError {
+export class EncryptionKeyNotFoundError extends Error {
 	public override readonly name = "EncryptionKeyNotFoundError";
 	public readonly keyId: string;
 
 	constructor(keyId: string) {
-		super(`Encryption key "${keyId}" was not found`, { keyId });
+		super(`Encryption key "${keyId}" was not found`);
 		this.keyId = keyId;
 	}
 }
 
-export class InvalidEncryptionKeyError extends CodecPermanentError {
+export class InvalidEncryptionKeyError extends Error {
 	public override readonly name = "InvalidEncryptionKeyError";
 	public readonly keyId: string;
 	public readonly byteLength: number;
 
 	constructor(keyId: string, byteLength: number) {
-		super(`Encryption key "${keyId}" must be ${AES_256_KEY_BYTE_LENGTH} bytes, got ${byteLength}`, {
-			keyId,
-			byteLength,
-		});
+		super(`Encryption key "${keyId}" must be ${AES_256_KEY_BYTE_LENGTH} bytes, got ${byteLength}`);
 		this.keyId = keyId;
 		this.byteLength = byteLength;
 	}
 }
 
-function isEncryptedBody(value: unknown): value is EncryptedBody {
+function isEncryptedBody(value: unknown): value is EncryptedValue {
 	return (
 		typeof value === "object" &&
 		value !== null &&
 		"keyId" in value &&
 		"ciphertext" in value &&
-		typeof (value as EncryptedBody).keyId === "string" &&
-		(value as EncryptedBody).keyId.length > 0 &&
-		typeof (value as EncryptedBody).ciphertext === "string"
+		typeof (value as EncryptedValue).keyId === "string" &&
+		(value as EncryptedValue).keyId.length > 0 &&
+		typeof (value as EncryptedValue).ciphertext === "string"
 	);
 }
 
@@ -166,24 +166,6 @@ function parseHashKeyId(hash: string): string | null {
 	return hash.slice(0, separatorIndex);
 }
 
-function isAesGcmAuthFailure(err: unknown): boolean {
-	return err instanceof Error && err.name === "OperationError";
-}
-
-function asPermanentDecryptError(err: unknown, details: Record<string, unknown> = {}): never {
-	if (err instanceof CodecPermanentError) {
-		throw err;
-	}
-
-	if (err instanceof InvalidEncryptedValueError || isAesGcmAuthFailure(err)) {
-		const message = err instanceof Error ? err.message : "Encrypted value could not be decrypted";
-
-		throw new CodecPermanentError(message, details, { cause: err });
-	}
-
-	throw err;
-}
-
 function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefined): AsyncLruCache<CryptoKey> {
 	if (keyCache === false) {
 		return {
@@ -206,14 +188,15 @@ function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefine
  * derived from that material with HKDF-SHA-256 under distinct info labels, so the same bytes are
  * never used as raw key material for both primitives.
  *
- * To revoke a key, introduce a new `keyId`, re-encode any values still under the old id, then stop
- * serving the old material (`key` returns `null` for it). Derived CryptoKeys are cached per
- * `encryption()` instance: for revocation to take effect without a process restart, pass
- * `keyCache: false` or a finite `keyCache.ttlMs`. Mutating the material in place leaves ciphertext
- * undecryptable and hashes unverifiable.
+ * To rotate, announce the new id in `nextKeyId`, flip it into `keyId` (the old id moves to
+ * `previousKeyIds`), then drop the old id from the config once no stored hash uses it. Old values
+ * keep decoding because each names its key id, and a run keeps the key its hash was made under for
+ * as long as it lives — unless history is later rewritten and re-encoded. The resolver must keep
+ * serving every key id a stored value or hash still names. Mutating material in place leaves
+ * ciphertext undecryptable and hashes unverifiable.
  */
 export function encryption(params: EncryptionParams): {
-	codec: NamedCreateCodec<EncodedValue<EncryptedBody>>;
+	codec: NamedCreateCodec<EncodedValue<EncryptedValue>>;
 	hasher: CreateHasher;
 } {
 	const { algorithm, key: resolveKey, keyCache: keyCacheConfig } = params;
@@ -222,13 +205,14 @@ export function encryption(params: EncryptionParams): {
 	const aesKeys = toDerivedKeyCache(keyCacheConfig);
 	const hmacKeys = toDerivedKeyCache(keyCacheConfig);
 
-	const createCodec: NamedCreateCodec<EncodedValue<EncryptedBody>> = Object.assign(
+	const createCodec: NamedCreateCodec<EncodedValue<EncryptedValue>> = Object.assign(
 		(context: CodecContext) => {
 			const configProvider = toConfigProvider(params.config, context);
 
 			const aesKeyFor = async (keyId: string): Promise<CryptoKey> => {
 				return aesKeys.getOrCreate(keyId, async () => {
 					const material = await requireKeyMaterial(resolveKey, keyId);
+
 					return deriveAesGcmKey(material);
 				});
 			};
@@ -242,17 +226,15 @@ export function encryption(params: EncryptionParams): {
 
 					return { keyId, ciphertext };
 				},
-				decode: async (body) => {
-					try {
-						if (!isEncryptedBody(body)) {
-							throw new InvalidEncryptedValueError();
-						}
-						const key = await aesKeyFor(body.keyId);
-
-						return await cipher.decrypt(body.ciphertext, key, body.keyId);
-					} catch (err) {
-						asPermanentDecryptError(err, isEncryptedBody(body) ? { keyId: body.keyId } : {});
+				decode: async (encoded) => {
+					if (!isEncryptedBody(encoded)) {
+						throw new EncryptionDecryptFailedError({
+							message: "Encrypted body does not fit { keyId, ciphertext }",
+						});
 					}
+
+					const key = await aesKeyFor(encoded.keyId);
+					return await cipher.decrypt(encoded.ciphertext, key, encoded.keyId);
 				},
 			})(context);
 		},
@@ -307,11 +289,9 @@ export function encryption(params: EncryptionParams): {
 				const hash: Hash = { value };
 
 				if (config.previousKeyIds !== undefined && config.previousKeyIds.length > 0) {
-					const deprecatedValues: string[] = [];
-					for (const previousKeyId of config.previousKeyIds) {
-						deprecatedValues.push(await hashUnderKey(input, previousKeyId));
-					}
-					hash.deprecatedValues = deprecatedValues;
+					hash.deprecatedValues = await Promise.all(
+						config.previousKeyIds.map((previousKeyId) => hashUnderKey(input, previousKeyId))
+					);
 				}
 
 				if (config.nextKeyId !== undefined) {

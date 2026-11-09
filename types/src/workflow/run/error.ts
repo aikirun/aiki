@@ -109,9 +109,8 @@ export class CodecInitFailedError extends Error {
 
 /**
  * A codec (client or definition) threw while encoding a payload. The codec's error is the `cause`.
- * In a workflow, this error ends the execution even when the workflow code catches it. When the
- * cause is a `CodecPermanentError`, the run fails at once; otherwise the run is left for a worker
- * whose codec can encode the payload.
+ * In a workflow, this error ends the execution even when the workflow code catches it, and the run
+ * is left for a worker whose codec can encode the payload.
  */
 export class CodecEncodeFailedError extends Error {
 	public override readonly name = "CodecEncodeFailedError";
@@ -123,9 +122,8 @@ export class CodecEncodeFailedError extends Error {
 
 /**
  * A codec (client or definition) threw while decoding a payload. The codec's error is the `cause`.
- * In a workflow, this error ends the execution even when the workflow code catches it. When the
- * cause is a `CodecPermanentError`, the run fails at once; otherwise the run is left for a worker
- * whose codec can decode the payload.
+ * In a workflow, this error ends the execution even when the workflow code catches it, and the run
+ * is left for a worker whose codec can decode the payload.
  */
 export class CodecDecodeFailedError extends Error {
 	public override readonly name = "CodecDecodeFailedError";

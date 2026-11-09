@@ -1,5 +1,5 @@
 import type { Serializable } from "@aikirun/lib/serializable";
-import { type Codec, CodecPermanentError, type CreateCodec } from "@aikirun/types/infra/codec";
+import type { Codec, CreateCodec } from "@aikirun/types/infra/codec";
 
 export type CodecParams<Encoded> = {
 	name: string;
@@ -11,12 +11,12 @@ export type NamedCreateCodec<Encoded = unknown> = CreateCodec<Encoded> & {
 	readonly codecName: string;
 };
 
-export class InvalidEncodedValueError extends CodecPermanentError {
+export class InvalidEncodedValueError extends Error {
 	public override readonly name = "InvalidEncodedValueError";
 	public readonly codecName: string;
 
 	constructor(codecName: string) {
-		super(`Codec "${codecName}" received a value that was not produced by encode`, { codecName });
+		super(`Codec "${codecName}" received a value that was not produced by encode`);
 		this.codecName = codecName;
 	}
 }

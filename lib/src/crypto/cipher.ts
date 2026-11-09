@@ -1,4 +1,4 @@
-import { InvalidStableTextError, stableText } from "./stable-text";
+import { stableText } from "./stable-text";
 
 const AES_GCM_IV_BYTE_LENGTH = 12;
 const AES_GCM_TAG_BYTE_LENGTH = 16;
@@ -9,21 +9,25 @@ const textEncoder = new TextEncoder();
 export const ENCRYPTION_ALGORITHMS = ["AES-256-GCM"] as const;
 export type EncryptionAlgorithm = (typeof ENCRYPTION_ALGORITHMS)[number];
 
-export class InvalidEncryptedValueError extends Error {
-	public override readonly name = "InvalidEncryptedValueError";
+export class EncryptionDecryptFailedError extends Error {
+	public override readonly name = "EncryptionDecryptFailedError";
+	public readonly keyId?: string;
 
-	constructor() {
-		super("Encrypted value is not { keyId: string, ciphertext: string }");
-	}
-}
+	constructor(options: { keyId?: string; cause?: unknown; message?: string } = {}) {
+		const message =
+			options.message ??
+			(options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted");
+		const errorOptions: ErrorOptions = {};
 
-export class UnsupportedEncryptionAlgorithmError extends Error {
-	public override readonly name = "UnsupportedEncryptionAlgorithmError";
-	public readonly algorithm: string;
+		if ("cause" in options) {
+			errorOptions.cause = options.cause;
+		}
 
-	constructor(algorithm: string) {
-		super(`Unsupported encryption algorithm "${algorithm}"`);
-		this.algorithm = algorithm;
+		super(message, errorOptions);
+
+		if (options.keyId !== undefined) {
+			this.keyId = options.keyId;
+		}
 	}
 }
 
@@ -40,15 +44,16 @@ function aesGcmParams(iv: Uint8Array, additionalData: Uint8Array) {
 	};
 }
 
-function decodePackedCiphertext(ciphertext: string): Uint8Array {
+function decodePackedCiphertext(ciphertext: string, keyId: string): Uint8Array {
 	const packed = Buffer.from(ciphertext, "base64");
 	// Buffer.from ignores non-alphabet characters; require an exact standard-base64 spelling.
 	if (packed.toString("base64") !== ciphertext) {
-		throw new InvalidEncryptedValueError();
+		throw new EncryptionDecryptFailedError({ keyId });
 	}
 	if (packed.byteLength < AES_GCM_MIN_PACKED_BYTE_LENGTH) {
-		throw new InvalidEncryptedValueError();
+		throw new EncryptionDecryptFailedError({ keyId });
 	}
+
 	return new Uint8Array(packed);
 }
 
@@ -76,18 +81,21 @@ async function decryptAes256Gcm(
 	algorithm: EncryptionAlgorithm,
 	keyId: string
 ): Promise<unknown> {
-	const packed = decodePackedCiphertext(ciphertext);
-	const iv = new Uint8Array(packed.subarray(0, AES_GCM_IV_BYTE_LENGTH));
-	const encrypted = new Uint8Array(packed.subarray(AES_GCM_IV_BYTE_LENGTH));
-	const plaintext = await crypto.subtle.decrypt(aesGcmParams(iv, additionalDataFor(algorithm, keyId)), key, encrypted);
-
 	try {
+		const packed = decodePackedCiphertext(ciphertext, keyId);
+		const iv = new Uint8Array(packed.subarray(0, AES_GCM_IV_BYTE_LENGTH));
+		const encrypted = new Uint8Array(packed.subarray(AES_GCM_IV_BYTE_LENGTH));
+		const plaintext = await crypto.subtle.decrypt(
+			aesGcmParams(iv, additionalDataFor(algorithm, keyId)),
+			key,
+			encrypted
+		);
 		return stableText.decode(plaintext);
 	} catch (err) {
-		if (err instanceof InvalidStableTextError) {
-			throw new InvalidEncryptedValueError();
+		if (err instanceof EncryptionDecryptFailedError) {
+			throw err;
 		}
-		throw err;
+		throw new EncryptionDecryptFailedError({ keyId, cause: err });
 	}
 }
 
@@ -104,6 +112,6 @@ export function createCipher(algorithm: EncryptionAlgorithm): Cipher {
 				decrypt: (ciphertext, key, keyId) => decryptAes256Gcm(ciphertext, key, algorithm, keyId),
 			};
 		default:
-			throw new UnsupportedEncryptionAlgorithmError(algorithm satisfies never);
+			return algorithm satisfies never;
 	}
 }

@@ -3,10 +3,8 @@ export {
 	createCipher,
 	ENCRYPTION_ALGORITHMS,
 	type EncryptionAlgorithm,
-	InvalidEncryptedValueError,
-	UnsupportedEncryptionAlgorithmError,
+	EncryptionDecryptFailedError,
 } from "@aikirun/lib/crypto";
-export { CodecPermanentError } from "@aikirun/types/infra/codec";
 
 export {
 	CodecNameMismatchError,
@@ -16,7 +14,7 @@ export {
 	type NamedCreateCodec,
 } from "./codec";
 export {
-	type EncryptedBody,
+	type EncryptedValue as EncryptedBody,
 	type EncryptionConfig,
 	type EncryptionKeyCacheConfig,
 	EncryptionKeyNotFoundError,

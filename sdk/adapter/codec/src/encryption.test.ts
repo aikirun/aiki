@@ -1,12 +1,11 @@
 import { asConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
-import { InvalidEncryptedValueError, stableText } from "@aikirun/lib/crypto";
+import { EncryptionDecryptFailedError, stableText } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
-import { CodecPermanentError } from "@aikirun/types/infra/codec";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import type { EncodedValue, NamedCreateCodec } from "./codec";
 import {
-	type EncryptedBody,
+	type EncryptedValue,
 	type EncryptionConfig,
 	EncryptionKeyNotFoundError,
 	encryption,
@@ -93,11 +92,9 @@ describe("encryption codec", () => {
 		await expect(createCodec(context).encode({ x: 1 })).rejects.toMatchObject({
 			name: "EncryptionKeyNotFoundError",
 			keyId: "missing",
-			details: { keyId: "missing" },
 			message: 'Encryption key "missing" was not found',
 		});
 		await expect(createCodec(context).encode({ x: 1 })).rejects.toBeInstanceOf(EncryptionKeyNotFoundError);
-		await expect(createCodec(context).encode({ x: 1 })).rejects.toBeInstanceOf(CodecPermanentError);
 	});
 
 	test("throws EncryptionKeyNotFoundError when the resolver returns null on decode", async () => {
@@ -146,7 +143,7 @@ describe("encryption codec", () => {
 		).rejects.toBe(vaultError);
 	});
 
-	test("rejects an invalid encrypted body as CodecPermanentError", async () => {
+	test("rejects an invalid encrypted body as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
 			algorithm: "AES-256-GCM",
 			key: resolveKey,
@@ -157,15 +154,15 @@ describe("encryption codec", () => {
 				codecName: "AES-256-GCM",
 				body: { keyId: "a" },
 			})
-		).rejects.toBeInstanceOf(CodecPermanentError);
+		).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
 		await expect(
 			createCodec(context).decode({
 				codecName: "AES-256-GCM",
 				body: { keyId: "a" },
 			})
 		).rejects.toMatchObject({
-			details: {},
-			cause: expect.any(InvalidEncryptedValueError),
+			name: "EncryptionDecryptFailedError",
+			message: "Encrypted body does not fit { keyId, ciphertext }",
 		});
 		await expect(
 			createCodec(context).decode({
@@ -173,8 +170,8 @@ describe("encryption codec", () => {
 				body: { keyId: "", ciphertext: "AAAA" },
 			})
 		).rejects.toMatchObject({
-			details: {},
-			cause: expect.any(InvalidEncryptedValueError),
+			name: "EncryptionDecryptFailedError",
+			message: "Encrypted body does not fit { keyId, ciphertext }",
 		});
 	});
 
@@ -192,7 +189,7 @@ describe("encryption codec", () => {
 		});
 	});
 
-	test("rejects ciphertext shorter than IV plus tag as CodecPermanentError", async () => {
+	test("rejects ciphertext shorter than IV plus tag as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
 			algorithm: "AES-256-GCM",
 			key: resolveKey,
@@ -203,15 +200,14 @@ describe("encryption codec", () => {
 				codecName: "AES-256-GCM",
 				body: { keyId: "a", ciphertext: "AAAA" },
 			})
-		).rejects.toBeInstanceOf(CodecPermanentError);
+		).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
 		await expect(
 			createCodec(context).decode({
 				codecName: "AES-256-GCM",
 				body: { keyId: "a", ciphertext: "AAAA" },
 			})
 		).rejects.toMatchObject({
-			details: { keyId: "a" },
-			cause: expect.any(InvalidEncryptedValueError),
+			keyId: "a",
 		});
 		await expect(
 			createCodec(context).decode({
@@ -219,12 +215,11 @@ describe("encryption codec", () => {
 				body: { keyId: "a", ciphertext: Buffer.alloc(27).toString("base64") },
 			})
 		).rejects.toMatchObject({
-			details: { keyId: "a" },
-			cause: expect.any(InvalidEncryptedValueError),
+			keyId: "a",
 		});
 	});
 
-	test("rejects a tampered ciphertext as CodecPermanentError", async () => {
+	test("rejects a tampered ciphertext as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
 			algorithm: "AES-256-GCM",
 			key: resolveKey,
@@ -239,9 +234,9 @@ describe("encryption codec", () => {
 			codecName: encoded.codecName,
 			body: { keyId: encoded.body.keyId, ciphertext: packed.toString("base64") },
 		};
-		await expect(instance.decode(tampered)).rejects.toBeInstanceOf(CodecPermanentError);
+		await expect(instance.decode(tampered)).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
 		await expect(instance.decode(tampered)).rejects.toMatchObject({
-			details: { keyId: "a" },
+			keyId: "a",
 			cause: expect.objectContaining({ name: "OperationError" }),
 		});
 	});
@@ -263,9 +258,9 @@ describe("encryption codec", () => {
 			codecName: encoded.codecName,
 			body: { keyId: "b", ciphertext: encoded.body.ciphertext },
 		};
-		await expect(instance.decode(swapped)).rejects.toBeInstanceOf(CodecPermanentError);
+		await expect(instance.decode(swapped)).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
 		await expect(instance.decode(swapped)).rejects.toMatchObject({
-			details: { keyId: "b" },
+			keyId: "b",
 			cause: expect.objectContaining({ name: "OperationError" }),
 		});
 	});
@@ -280,10 +275,8 @@ describe("encryption codec", () => {
 			name: "InvalidEncryptionKeyError",
 			keyId: "a",
 			byteLength: 16,
-			details: { keyId: "a", byteLength: 16 },
 		});
 		await expect(createCodec(context).encode({ x: 1 })).rejects.toBeInstanceOf(InvalidEncryptionKeyError);
-		await expect(createCodec(context).encode({ x: 1 })).rejects.toBeInstanceOf(CodecPermanentError);
 	});
 
 	test("reads config from a provider on each encode", async () => {
@@ -671,6 +664,6 @@ describe("encryption codec output must survive a JSON round trip", () => {
 			key: () => randomKey(),
 			config: { keyId: "a" },
 		});
-		expectTypeOf(createCodec).toEqualTypeOf<NamedCreateCodec<EncodedValue<EncryptedBody>>>();
+		expectTypeOf(createCodec).toEqualTypeOf<NamedCreateCodec<EncodedValue<EncryptedValue>>>();
 	});
 });

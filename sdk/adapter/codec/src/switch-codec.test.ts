@@ -1,5 +1,4 @@
 import { noopLogger } from "@aikirun/lib/logger";
-import { CodecPermanentError } from "@aikirun/types/infra/codec";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { codec, type EncodedValue, InvalidEncodedValueError, type NamedCreateCodec } from "./codec";
@@ -68,7 +67,6 @@ describe("switchCodecs", () => {
 			codecName: "v2",
 		});
 		await expect(switched.decode({ name: "alice" })).rejects.toBeInstanceOf(InvalidEncodedValueError);
-		await expect(switched.decode({ name: "alice" })).rejects.toBeInstanceOf(CodecPermanentError);
 	});
 
 	test("rejects duplicate member names at construction", () => {
