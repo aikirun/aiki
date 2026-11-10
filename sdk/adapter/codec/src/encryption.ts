@@ -5,7 +5,8 @@ import {
 	type CreatePassiveConfigProvider,
 	type PassiveConfigProviderContext,
 } from "@aikirun/lib/config";
-import { createCipher, stableText } from "@aikirun/lib/crypto";
+import { createCipher } from "@aikirun/lib/crypto";
+import { stableStringify } from "@aikirun/lib/json";
 import type { CodecContext } from "@aikirun/types/infra/codec";
 import type { BoundHasher, CreateHasher, Hash, Hasher } from "@aikirun/types/infra/hasher";
 
@@ -360,7 +361,9 @@ export function encryption(params: EncryptionParams): {
 		};
 
 		const signWithHmacKey = async (input: unknown, keyId: string, cryptoKey: CryptoKey): Promise<string> => {
-			const digest = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, stableText.encode(input)));
+			const digest = new Uint8Array(
+				await crypto.subtle.sign("HMAC", cryptoKey, textEncoder.encode(stableStringify({ input })))
+			);
 
 			return formatHash(keyId, digest);
 		};

@@ -1,5 +1,5 @@
 import { asConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
-import { stableText } from "@aikirun/lib/crypto";
+import { stableStringify } from "@aikirun/lib/json";
 import { noopLogger } from "@aikirun/lib/logger";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
@@ -692,7 +692,9 @@ describe("encryption hasher", () => {
 			false,
 			["sign"]
 		);
-		const digest = new Uint8Array(await crypto.subtle.sign("HMAC", rawHmacKey, stableText.encode(input)));
+		const digest = new Uint8Array(
+			await crypto.subtle.sign("HMAC", rawHmacKey, new TextEncoder().encode(stableStringify({ input })))
+		);
 		const rawHash = `a:${Buffer.from(digest).toString("base64url")}`;
 
 		expect(hash.value).not.toBe(rawHash);
