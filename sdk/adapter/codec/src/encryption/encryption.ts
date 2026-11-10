@@ -41,6 +41,28 @@ export type EncryptionKeyCacheConfig = {
 
 type DerivedKeys = { aesKey: CryptoKey; hmacKey: CryptoKey };
 
+export class EncryptionDecryptFailedError extends Error {
+	public override readonly name = "EncryptionDecryptFailedError";
+	public readonly keyId?: string;
+
+	constructor(options: { keyId?: string; cause?: unknown; message?: string } = {}) {
+		const message =
+			options.message ??
+			(options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted");
+		const errorOptions: ErrorOptions = {};
+
+		if ("cause" in options) {
+			errorOptions.cause = options.cause;
+		}
+
+		super(message, errorOptions);
+
+		if (options.keyId !== undefined) {
+			this.keyId = options.keyId;
+		}
+	}
+}
+
 const AES_256_GCM_CIPHER = createCipher("AES-256-GCM");
 const HASH_KEY_ID_SEPARATOR = ":";
 const DEFAULT_KEY_CACHE_MAX_ENTRIES = 64;
@@ -62,6 +84,10 @@ function encodePayload(payload: unknown): Uint8Array<ArrayBuffer> {
 	return textEncoder.encode(JSON.stringify(envelope));
 }
 
+function encodeHashInput(input: unknown): Uint8Array<ArrayBuffer> {
+	return textEncoder.encode(stableStringify({ input }));
+}
+
 function decodePayload(bytes: Uint8Array): unknown {
 	const parsed: unknown = JSON.parse(textDecoder.decode(bytes));
 
@@ -72,17 +98,8 @@ function decodePayload(bytes: Uint8Array): unknown {
 	return parsed.input;
 }
 
-function encodeCiphertext(encrypted: Uint8Array): string {
-	return bytesToBase64(encrypted);
-}
-
 function decodeCiphertext(ciphertext: string): Uint8Array {
-	let bytes: Uint8Array;
-	try {
-		bytes = base64ToBytes(ciphertext);
-	} catch {
-		throw new Error("Ciphertext is not valid standard base64");
-	}
+	const bytes = base64ToBytes(ciphertext);
 
 	// Decoders may accept non-canonical forms; require an exact standard-base64 spelling.
 	if (bytesToBase64(bytes) !== ciphertext) {
@@ -107,37 +124,15 @@ function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefine
 	});
 }
 
-export class EncryptionDecryptFailedError extends Error {
-	public override readonly name = "EncryptionDecryptFailedError";
-	public readonly keyId?: string;
-
-	constructor(options: { keyId?: string; cause?: unknown; message?: string } = {}) {
-		const message =
-			options.message ??
-			(options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted");
-		const errorOptions: ErrorOptions = {};
-
-		if ("cause" in options) {
-			errorOptions.cause = options.cause;
-		}
-
-		super(message, errorOptions);
-
-		if (options.keyId !== undefined) {
-			this.keyId = options.keyId;
-		}
-	}
-}
-
-function isEncryptedBody(value: unknown): value is EncryptedValue {
+function isEncryptedValue(value: unknown): value is EncryptedValue {
 	return (
 		typeof value === "object" &&
 		value !== null &&
 		"keyId" in value &&
 		"ciphertext" in value &&
-		typeof (value as EncryptedValue).keyId === "string" &&
-		(value as EncryptedValue).keyId.length > 0 &&
-		typeof (value as EncryptedValue).ciphertext === "string"
+		typeof value.keyId === "string" &&
+		value.keyId.length > 0 &&
+		typeof value.ciphertext === "string"
 	);
 }
 
@@ -157,6 +152,12 @@ function toConfigProvider(
 
 function formatHash(keyId: string, digest: Uint8Array): string {
 	return `${keyId}${HASH_KEY_ID_SEPARATOR}${bytesToBase64Url(digest)}`;
+}
+
+async function signPayload(payload: Uint8Array<ArrayBuffer>, keyId: string, hmacKey: CryptoKey): Promise<string> {
+	const digest = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, payload));
+
+	return formatHash(keyId, digest);
 }
 
 function parseHashKeyId(hash: string): string | null {
@@ -213,6 +214,7 @@ export function encryption(params: EncryptionParams): {
 		derivedKeyCache.getOrCreate(keyId, async () => {
 			const material = await requireKeyMaterial(resolveKey, keyId);
 			const hkdfKey = await importHkdfKey(material);
+
 			return { aesKey: await deriveAesGcmKey(hkdfKey), hmacKey: await deriveHmacKey(hkdfKey) };
 		});
 
@@ -233,11 +235,11 @@ export function encryption(params: EncryptionParams): {
 
 					return {
 						keyId,
-						ciphertext: encodeCiphertext(encrypted),
+						ciphertext: bytesToBase64(encrypted),
 					};
 				},
 				decode: async (encoded) => {
-					if (!isEncryptedBody(encoded)) {
+					if (!isEncryptedValue(encoded)) {
 						throw new EncryptionDecryptFailedError({
 							message: "Encrypted body does not fit { keyId, ciphertext }",
 						});
@@ -266,34 +268,34 @@ export function encryption(params: EncryptionParams): {
 	const createHasher: CreateHasher = (context) => {
 		const configProvider = toConfigProvider(params.config, context);
 
-		const signWithHmacKey = async (input: unknown, keyId: string, hmacKey: CryptoKey): Promise<string> => {
-			const digest = new Uint8Array(
-				await crypto.subtle.sign("HMAC", hmacKey, textEncoder.encode(stableStringify({ input })))
-			);
-
-			return formatHash(keyId, digest);
-		};
-
-		const hashUnderKey = async (input: unknown, keyId: string): Promise<string> => {
+		const hashUnderKey = async (payload: Uint8Array<ArrayBuffer>, keyId: string): Promise<string> => {
 			const { hmacKey } = await derivedKeysFor(keyId);
-			return signWithHmacKey(input, keyId, hmacKey);
+
+			return signPayload(payload, keyId, hmacKey);
 		};
 
 		const hasher = Object.assign(
 			async (input: unknown): Promise<Hash> => {
 				const config = configProvider.config;
-				const value = await hashUnderKey(input, config.keyId);
+				const payload = encodeHashInput(input);
+				const { previousKeyIds, nextKeyId, keyId } = config;
+
+				const [value, nextValue, deprecatedValues] = await Promise.all([
+					hashUnderKey(payload, keyId),
+					nextKeyId !== undefined ? hashUnderKey(payload, nextKeyId) : undefined,
+					previousKeyIds !== undefined && previousKeyIds.length > 0
+						? Promise.all(previousKeyIds.map((previousKeyId) => hashUnderKey(payload, previousKeyId)))
+						: undefined,
+				]);
 
 				const hash: Hash = { value };
 
-				if (config.previousKeyIds !== undefined && config.previousKeyIds.length > 0) {
-					hash.deprecatedValues = await Promise.all(
-						config.previousKeyIds.map((previousKeyId) => hashUnderKey(input, previousKeyId))
-					);
+				if (deprecatedValues !== undefined) {
+					hash.deprecatedValues = deprecatedValues;
 				}
 
-				if (config.nextKeyId !== undefined) {
-					hash.nextValue = await hashUnderKey(input, config.nextKeyId);
+				if (nextValue !== undefined) {
+					hash.nextValue = nextValue;
 				}
 
 				return hash;
@@ -309,7 +311,7 @@ export function encryption(params: EncryptionParams): {
 					try {
 						const { hmacKey } = await derivedKeysFor(keyId);
 
-						return async (input: unknown) => signWithHmacKey(input, keyId, hmacKey);
+						return async (input: unknown) => signPayload(encodeHashInput(input), keyId, hmacKey);
 					} catch (err) {
 						if (err instanceof EncryptionKeyNotFoundError && err.keyId === keyId) {
 							return null;
