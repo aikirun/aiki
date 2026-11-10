@@ -458,6 +458,8 @@ table.is-dense td { padding: 13px 24px 13px 0; }
 	grid-column: 1 / span 2;
 	margin-top: 6px;
 }
+/* A box right under another, on any slide, close enough to read as one pair. It comes after the race rule so it wins there too. */
+.outcome + .outcome { margin-top: 12px; }
 .stores {
 	grid-column: 3;
 	display: flex;
@@ -662,7 +664,7 @@ html.is-camera .timeline { overflow: visible; }
 
 	kind "race": each step is one row. `lane` picks the column, and `stores` says what a store holds
 	from that step on, as [label, value] pairs. `outcome` is where the race ends up; `fix`, when
-	present, is revealed after it.
+	present, is revealed with it. `firstStepFromStart` shows the first step as the slide appears.
 -->
 <script>
 const SLIDES = [
@@ -729,42 +731,22 @@ setInterval(async () => {
 			["500 ms", "500 ms", "2"],
 			["100 ms", "100 ms", "10"],
 		],
-		say: "Poll faster and the database pays; poll slower and the rider waits.",
+		say: "Poll faster and the database pays; poll slower and the rider waits. You could back off when nothing turns up. It is cheaper when idle, but the first offer after a quiet spell still waits up to a second.",
 		why: "Names the problem. The poll interval is one knob for two things: how late a timer fires and how hard the database is hit.",
-	},
-	{
-		kind: "code",
-		title: "Second try: back off when idle",
-		code: `let waitMs = 125;
-while (true) {
-  const expiredOffers = await findExpiredOffers();
-  if (expiredOffers.length > 0) {
-    await offerToNextDrivers(expiredOffers);
-    waitMs = 125;
-  } else {
-    waitMs = Math.min(waitMs * 2, 1000);
-  }
-  await sleep(waitMs);
-}`,
-		outcomes: [
-			{ tone: "late", text: "Cheaper when idle, but the first offer after a quiet spell still waits up to a second." },
-		],
-		say: "Cheap when idle, late when idle. And it guesses at what every row already states: when it is due.",
-		why: "The obvious improvement, and why it falls short: it gives up precision exactly when the system is quiet.",
 		asked: [
 			["Isn't backoff good enough in practice?", "For a job queue, often, because work arriving predicts more work. A timer's due time is already written in its row, so there is nothing to guess."],
 		],
 	},
 	{
 		kind: "code",
-		title: "Third try: hold the timers in memory",
+		title: "Second try: hold the timers in memory",
 		code: `// one timer per offer, held in the process
 setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 		outcomes: [
 			{ tone: "on-time", text: "Precise, and nothing is polled." },
 			{ tone: "late", text: "A restart loses every timer, and every booking for next month sits in memory." },
 		],
-		say: "Precise and free, until a restart.",
+		say: "Every row already says when it is due. So set a timer for it. Precise and free, until a restart.",
 		why: "The opposite extreme. Precise and free, but it does not survive a restart, and memory grows with every timer that is set.",
 	},
 	{
@@ -778,7 +760,7 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 			name: "Memory: due soon",
 			entries: [["driver offer", "15 s"]],
 		},
-		scan: ["a scan lifts", "what is due soon"],
+		scan: ["a poll lifts", "what is due soon"],
 		conclusion: "Only timers about to fire need precision. Tomorrow's ride waits in the database.",
 		say: "The poll comes back with a smaller job: it feeds memory, and its interval no longer sets how late a timer fires.",
 		why: "The design, reached by asking which timers need precision: only the ones about to fire.",
@@ -788,35 +770,13 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 	},
 	{
 		kind: "lookahead",
-		title: "How far ahead should the scan look?",
+		title: "How far ahead should the poll look?",
 		timeline: { scanEveryS: 10, lookaheadS: 30, dueAtS: 34, spanS: 60 },
-		conclusion: "Three scans see the timer before it is due, so two of them can fail.",
+		conclusion: "Three polls see the timer before it is due, so two of them can fail.",
 		say: "One interval ahead gives one chance. I gave each timer three. That is an engineer's bet, not a measurement.",
-		why: "The first design question the split raises: how the scan interval and the lookahead relate.",
+		why: "The first design question the split raises: how the poll interval and the lookahead relate.",
 		asked: [
-			["Why three times the interval?", "Each timer is seen by three scans before it is due, so two can fail or run slow. It was a judgement call, not a measured optimum. The price is that each timer is read about three times on every replica."],
-		],
-	},
-	{
-		kind: "race",
-		title: "A short timer misses the scan",
-		lanes: ["Producer", "Scan"],
-		stores: [
-			{ id: "database", name: "Database" },
-			{ id: "timers", name: "Timer queue" },
-		],
-		initial: { database: [], timers: [] },
-		steps: [
-			{ lane: 1, text: "Runs. Nothing is due in the next 30s." },
-			{ lane: 0, text: "Creates timer C, due in 2s.", stores: { database: [["C", "2s"]] } },
-			{ lane: 1, text: "Runs again 10s later and finds C overdue.", stores: { database: [["C", "fired"]] } },
-		],
-		outcome: { tone: "late", text: "C fires 8 seconds late." },
-		fix: "So a timer due soon is also added to the queue when it is created.",
-		say: "The scan is too slow for a short timer, so the producer puts it in memory itself, right after it is saved.",
-		why: "The hole in the split: a timer shorter than the scan interval. The producer closes it by adding the timer to the queue itself.",
-		asked: [
-			["What if the process dies between saving the timer and adding it to the queue?", "The add happens after the database commit and is best effort. If it is lost, the next scan finds the timer. It costs lateness, never the timer."],
+			["Why three times the interval?", "Each timer is seen by three polls before it is due, so two can fail or run slow. It was a judgement call, not a measured optimum. The price is that each timer is read about three times on every replica."],
 		],
 	},
 
@@ -836,12 +796,37 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 				lines: ["A timer in the queue is not work yet.", "The consumer sleeps until the earliest one is due."],
 			},
 		],
+		conclusion: "Ordered by due time: the consumer peeks at the earliest and takes what is due.",
 		say: "A worker wakes when a job arrives. The consumer wakes when the clock says so.",
-		why: "Introduces the consumer. A worker can block on a job queue, but a timer in a queue is not work until its time comes, so the consumer sleeps on the clock.",
+		why: "Introduces the consumer and the timer queue. A worker can block on a job queue, but a timer in a queue is not work until its time comes, so the consumer sleeps on the clock.",
+	},
+	{
+		kind: "race",
+		title: "The poll finds a short timer too late",
+		firstStepFromStart: true,
+		lanes: ["Producer", "Poll"],
+		stores: [
+			{ id: "database", name: "Database" },
+			{ id: "timers", name: "Timer queue" },
+		],
+		initial: { database: [], timers: [] },
+		steps: [
+			{ lane: 1, text: "Runs. Nothing is due in the next 30s." },
+			{ lane: 0, text: "Creates timer C, due in 2s.", stores: { database: [["C", "2s"]] } },
+			{ lane: 1, text: "Runs again 10s later and finds C overdue.", stores: { database: [["C", "fired"]] } },
+		],
+		outcome: { tone: "late", text: "C fires 8 seconds late." },
+		fix: "So a timer due soon is also added to the queue when it is created.",
+		say: "The poll is too slow for a short timer, so the producer puts it in the queue itself, right after it is saved.",
+		why: "The hole in the split: a timer shorter than the poll interval. The producer closes it by adding the timer to the queue itself.",
+		asked: [
+			["What if the process dies between saving the timer and adding it to the queue?", "The add happens after the database commit and is best effort. If it is lost, the next poll finds the timer. It costs lateness, never the timer."],
+		],
 	},
 	{
 		kind: "race",
 		title: "The consumer sleeps until the earliest timer",
+		firstStepFromStart: true,
 		lanes: ["Producer", "Consumer"],
 		stores: [{ id: "timers", name: "Timer queue" }],
 		initial: { timers: [["A", "20s"]] },
@@ -850,13 +835,28 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 			{ lane: 0, text: "Adds timer B, due in 2s.", stores: { timers: [["B", "2s"], ["A", "20s"]] } },
 		],
 		outcome: { tone: "late", text: "The consumer wakes at 20s. B is 18 seconds late." },
-		fix: "So it also needs news of an earlier timer, kept until it is picked up.",
+		fix: "So it also has to wake on news of an earlier timer.",
 		say: "Who wakes it? The clock is a timeout. The news is a signal.",
-		why: "The consumer's first race: it is asleep when an earlier timer arrives, so it needs news of earlier timers that waits until it is picked up.",
+		why: "The consumer's first race: it is asleep when an earlier timer arrives, so it has to wake on news of an earlier timer too.",
+	},
+	{
+		kind: "entries",
+		title: "Wait for news, until the earliest timer is due",
+		entries: [
+			["News of an earlier timer", "wakes it now"],
+			["No news", "wakes it when A is due"],
+		],
+		conclusion: "A blocking pop on a list, with the earliest due time as the timeout.",
+		say: "A worker blocks on its job queue. We can't block on the timer queue, so we give the consumer a list it can block on. The timeout is the clock.",
+		why: "Says what the consumer's wait has to do before the list appears: end on news of an earlier timer, or when the earliest timer is due. That is a blocking pop with a timeout.",
+		asked: [
+			["What gives you a blocking pop with a timeout?", "Redis has one: BRPOP on a list. In one process, Aiki keeps the signals in an array, and a wait is a promise that a push resolves or a setTimeout ends."],
+		],
 	},
 	{
 		kind: "race",
 		title: "A signal in a list waits for the consumer",
+		firstStepFromStart: true,
 		lanes: ["Producer", "Consumer"],
 		stores: [
 			{ id: "timers", name: "Timer queue" },
@@ -901,72 +901,26 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 		title: "One number became three",
 		columns: ["Knob", "What it sets", "Aiki's default"],
 		rows: [
-			["Scan interval", "Database load, and how late a timer fires when the fast path fails", "10 s"],
+			["Poll interval", "Database load, and how late a timer fires when the fast path fails", "10 s"],
 			["Lookahead", "How many timers are held in memory", "30 s"],
 			["Overshoot", "How late a timer fires, and how many wake-ups", "30 ms"],
 		],
-		say: "The only link between them: the scan interval has to be shorter than the lookahead.",
+		say: "The only link between them: the poll interval has to be shorter than the lookahead.",
 		why: "The payoff of the first half. Lateness, database load and memory now have a knob each.",
 	},
 	{
-		kind: "race",
-		title: "The timer was never only in the queue",
-		lanes: ["Consumer", "Scan"],
-		stores: [
-			{ id: "timers", name: "Timer queue" },
-			{ id: "database", name: "Database" },
-		],
-		initial: { timers: [["A", "2s"]], database: [["A", "2s"]] },
-		steps: [
-			{ lane: 0, text: "Wakes and takes A out of the queue.", stores: { timers: [] } },
-			{ lane: 0, text: "Fails before it fires A." },
-			{ lane: 1, text: "Runs, finds A overdue in the database, and fires it.", stores: { database: [["A", "fired"]] } },
-		],
-		outcome: { tone: "on-time", text: "A is late by at most one scan interval. It is not lost." },
-		say: "The queue only ever held a copy.",
-		why: "The first failure case. The queue only ever held a copy, so losing an entry costs lateness and not the timer.",
-	},
-	{
-		kind: "race",
+		kind: "wiped",
 		title: "Polling is a backstop, not a clock",
-		lanes: ["Consumer", "Scan"],
-		stores: [
-			{ id: "timers", name: "Timer queue" },
-			{ id: "database", name: "Database" },
-		],
-		initial: { timers: [["A", "2s"], ["B", "15s"]], database: [["A", "2s"], ["B", "15s"]] },
-		steps: [
-			{ lane: 0, text: "Waits for A. Then the queue is wiped.", stores: { timers: [] } },
-			{ lane: 0, text: "Wakes for A and finds the queue empty." },
-			{
-				lane: 1,
-				text: "Runs. Fires A, which is overdue, and puts B back in the queue.",
-				stores: { timers: [["B", "15s"]], database: [["A", "fired"], ["B", "15s"]] },
-			},
-			{
-				lane: 0,
-				text: "Gets a signal for B and fires it on time.",
-				stores: { timers: [], database: [["A", "fired"], ["B", "fired"]] },
-			},
-		],
-		outcome: { tone: "on-time", text: "Nothing is lost. The worst case is one scan interval late." },
-		say: "Delete the whole fast path, in memory or in a shared store, and it still works. That is what lets the fast path be simple.",
-		why: "The title of the talk. Lose the whole fast path and every timer still fires.",
+		conclusion: "All 1,000 timers fired. The worst was 7 seconds late.",
+		say: "Delete the whole fast path, in memory or in a shared store, and it still works. That is what lets the fast path be simple. Here the queue is emptied in the middle of a run of 1,000 timers. Before the wipe, timers fire about 32 ms late. Timers due before the next poll wait for it. The poll fires them and refills the queue, and lateness is back where it was. Nothing errors while the fast path is down. The backstop hides it, so measure how late your timers fire.",
+		why: "The title of the talk, measured. Empty the whole fast path and every timer still fires.",
 		asked: [
+			["Why seven seconds and not ten?", "The queue happened to be emptied 6.9 seconds before the next poll. The bound is one poll interval."],
+			["How would you notice if the fast path broke?", "There would be no error. Every timer would still fire through the poll, up to one poll interval late. That is why you measure lateness."],
+			["What if the consumer dies after taking a timer but before firing it?", "The queue only held a copy. The row is still due in the database, so the next poll fires it, at most one poll interval late."],
 			["Has this been done before?", "In a kernel: firm timers in Time-Sensitive Linux, 2002. A periodic tick is the backstop, a one-shot timer wakes for the earliest deadline, soft timers let one wake-up take every timer that is due, and there is an overshoot. This design rebuilds it one layer up."],
 			["Was this ever in Linux itself?", "No. Time-Sensitive Linux was a research kernel built on Linux 2.4.16, and firm timers were never merged into mainline."],
 			["How close is the soft-timer parallel?", "Loosely. Their checks ride on any work the kernel is already doing. Ours ride only on another timer's wake-up."],
-		],
-	},
-	{
-		kind: "wiped",
-		title: "Empty the queue mid-run",
-		conclusion: "All 1,000 timers fired. The worst was 7 seconds late.",
-		say: "Before the wipe, timers fire about 32 ms late. Timers due before the next scan wait for it. The scan fires them and refills the queue, and lateness is back where it was. Nothing errors while the fast path is down. The backstop hides it, so measure how late your timers fire.",
-		why: "The same claim, measured.",
-		asked: [
-			["Why seven seconds and not ten?", "The queue happened to be emptied 6.9 seconds before the next scan. The bound is one scan interval."],
-			["How would you notice if the fast path broke?", "There would be no error. Every timer would still fire through the scan, up to one scan interval late. That is why you measure lateness."],
 		],
 	},
 	{
@@ -974,17 +928,17 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 		title: "Fire with one conditional write",
 		columns: [
 			{
-				name: "The consumer was only slow",
-				lines: ["The scan fires the timer.", "Then the consumer fires it too."],
+				name: "The consumer is slow",
+				lines: ["The poll fires the timer.", "Then the consumer fires it too."],
 			},
 			{
-				name: "The entry is left over",
-				lines: ["The wait it was set for has ended, and a new one has begun.", "Firing it cuts the new wait short."],
+				name: "The rider cancelled",
+				lines: ["The timer's entry is still in the queue.", "Firing it offers a cancelled ride to a new driver."],
 			},
 		],
-		conclusion: "Compare and swap: update the row only if this timer is still due.",
-		say: "The queue is a hint, so firing is a compare-and-swap. The update carries its own condition and the database applies it or refuses it in one step, so there is no gap between checking and firing. The condition has to be that the timer is still due, not only that nobody else has fired it.",
-		why: "What makes duplicates and leftover entries harmless: firing is a compare-and-swap in the database.",
+		conclusion: "Update the row only if the timer is still due.",
+		say: "The queue is a hint, so firing is one conditional write: the database changes the row only if the timer is still due, and refuses otherwise. 'Not fired yet' isn't enough, because a cancelled offer never fired.",
+		why: "What makes duplicates and leftover entries harmless: firing is one conditional write in the database.",
 		asked: [
 			["Why is there still a read before the write?", "The read builds the write. It stays safe because the write is conditional on the row's revision, so anything that changed after the read makes it fail."],
 		],
@@ -999,19 +953,21 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 		stores: [{ id: "database", name: "Database" }],
 		initial: { database: [["A", "2s"]] },
 		steps: [
-			{ lane: 0, text: "Its scan lifts A into its own memory." },
-			{ lane: 1, text: "Its scan lifts A into its own memory too." },
-			{ lane: 0, text: "Fires A. The database accepts.", stores: { database: [["A", "fired"]] } },
-			{ lane: 1, text: "Fires A. The database refuses." },
+			{
+				lane: 0,
+				text: "Its poll lifts A into memory. It fires A, and the database accepts.",
+				stores: { database: [["A", "fired"]] },
+			},
+			{ lane: 1, text: "Its poll lifts A too. It fires A, and the database refuses." },
 		],
 		outcome: { tone: "late", text: "Every replica does the work for every timer." },
 		fix: "So the replicas share one queue.",
-		say: "Correct, but the load we removed is back, multiplied by replicas. So the replicas share one queue, and each timer is taken from it once. Redis is one way to do it, not the design. If the one replica told about a timer dies, the scan fires it.",
+		say: "Correct, but the load we removed is back, multiplied by replicas. So the replicas share one queue, and each timer is taken from it once. Redis is one way to do it, not the design. If the one replica told about a timer dies, the poll fires it.",
 		why: "The second half in one slide. Memory on each replica is correct, but every replica repeats the work, so the replicas share one queue.",
 		asked: [
 			["What does the shared queue have to do?", "Four things: add timers, take every timer that is due in one step, peek at the earliest, and wait for a signal. Aiki ships a heap for one process and Redis for many."],
 			["Why Redis?", "It has a sorted set and a blocking list pop, which cover the four operations. Anything that provides them would do."],
-			["What if the replica that took the signal dies?", "The others never hear about that timer, so the scan finds it overdue and fires it. There is a backup slide for this."],
+			["What if the replica that took the signal dies?", "The others never hear about that timer, so the poll finds it overdue and fires it. There is a backup slide for this."],
 		],
 	},
 	{
@@ -1019,7 +975,7 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 		title: "How late a timer fires",
 		panels: [
 			{ data: "pollingOnly", name: "Polling every 500 ms" },
-			{ data: "fastPath", name: "Fast path, with a scan every 10 s" },
+			{ data: "fastPath", name: "Fast path, with a poll every 10 s" },
 		],
 		note: "1,000 timers in each run, on a laptop.",
 		say: "Polling spreads the lateness across the whole half second. The fast path puts it at the overshoot, while querying the database twenty times less often.",
@@ -1031,7 +987,7 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 	{
 		kind: "statement",
 		text: "If a second late is fine, poll.",
-		detail: "The scan, the queue and the signals earn their place only when lateness matters, or the polling load does.",
+		detail: "The queue and the signals earn their place only when lateness matters, or the polling load does.",
 		say: "When a plain poll is enough.",
 		why: "Honest about the cost. This design has more moving parts, and many systems do not need it.",
 	},
@@ -1060,8 +1016,8 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 			["The queue across replicas, on Redis", "sdk/adapter/redis/src/timer/priority-queue.ts"],
 			["The queue in one process, a heap", "sdk/adapter/memory/src/timer/priority-queue.ts"],
 			["Adding a timer when it is created", "sdk/server/src/infra/timer/imminent-timer-queue.ts"],
-			["The scans", "sdk/server/src/daemon/imminent-*.ts"],
-			["Scan interval, lookahead, overshoot", "sdk/server/src/config/runtime.ts"],
+			["The polls", "sdk/server/src/daemon/imminent-*.ts"],
+			["Poll interval, lookahead, overshoot", "sdk/server/src/config/runtime.ts"],
 		],
 		dense: true,
 		pathColumn: 1,
@@ -1088,13 +1044,13 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 			},
 			{
 				lane: 0,
-				text: "The scan adds B and C again, with a signal each.",
+				text: "The poll adds B and C again, with a signal each.",
 				stores: { signals: [["due", "20s"], ["due", "9s"], ["due", "14s"]] },
 			},
 			{ lane: 1, text: "Wakes three times. None is earlier than A.", stores: { signals: [] } },
 		],
 		outcome: { tone: "late", text: "Nearly every signal is for a timer the consumer already plans to wake for." },
-		say: "The scan adds every timer in its window again on every pass, so this never stops.",
+		say: "The poll adds every timer in its window again on every pass, so this never stops.",
 		why: "The cost of the signal list. A signal for every add wakes the consumer for timers it already plans to wake for.",
 	},
 	{
@@ -1165,12 +1121,12 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 				stores: { timers: [["A", "2s"], ["B", "9s"], ["C", "20s"]] },
 			},
 		],
-		outcome: { tone: "late", text: "No signal ever comes. Every timer waits for the scan." },
+		outcome: { tone: "late", text: "No signal ever comes. Every timer waits for the poll." },
 		fix: "So the consumer looks at the queue before its first wait.",
 		say: "Nothing errors. The backstop hides a dead fast path, so measure how late your timers fire.",
 		why: "A consequence of quiet producers: timers already in the queue are never announced again, so the consumer looks before its first wait.",
 		asked: [
-			["How would you notice if this broke?", "There would be no error. Every timer would still fire through the scan, about ten seconds late. That is why you measure lateness."],
+			["How would you notice if this broke?", "There would be no error. Every timer would still fire through the poll, about ten seconds late. That is why you measure lateness."],
 		],
 	},
 	{
@@ -1205,11 +1161,11 @@ setTimeout(() => offerToNextDriver(offer), offer.expiresAt - Date.now());`,
 			{ lane: 0, text: "Dies." },
 		],
 		outcome: { tone: "late", text: "Nobody wakes for A." },
-		fix: "The scan again: it finds A overdue and fires it.",
-		say: "The others sleep on. The scan again.",
-		why: "The case where one consumer holds the only plan to wake, and dies. The scan covers it.",
+		fix: "The poll again: it finds A overdue and fires it.",
+		say: "The others sleep on. The poll again.",
+		why: "The case where one consumer holds the only plan to wake, and dies. The poll covers it.",
 		asked: [
-			["What happens after that?", "A is still in the queue. The next add, from a new timer or from the scan, sees that the earliest timer is overdue and sends a signal, so a surviving consumer wakes and the fast path carries on."],
+			["What happens after that?", "A is still in the queue. The next add, from a new timer or from the poll, sees that the earliest timer is overdue and sends a signal, so a surviving consumer wakes and the fast path carries on."],
 		],
 	},
 ];
@@ -1254,8 +1210,8 @@ const stateCounters = {
 	// The bare line, then one state for each scan that runs before the timer is due.
 	lookahead: (slide) => 1 + Math.ceil(slide.timeline.dueAtS / slide.timeline.scanEveryS),
 	burst: () => 3,
-	// The empty scene, one state per step, the outcome, then the fix.
-	race: (slide) => slide.steps.length + 2 + (slide.fix ? 1 : 0),
+	// The scene, one state per step, then the outcome and the fix together. The first step can arrive with the scene.
+	race: (slide) => slide.steps.length + 2 - (slide.firstStepFromStart ? 1 : 0),
 };
 
 function stateCount(slide) {
@@ -1523,7 +1479,7 @@ function renderLookahead(slide, state, isEntering) {
 		const isChance = activeScanAtS !== undefined && seconds <= activeScanAtS && reaches(seconds);
 		const chance = isChance ? " is-chance" : "";
 		scans += `<line class="mark${chance}" x1="${x(seconds)}" y1="${axisY - 16}" x2="${x(seconds)}" y2="${axisY + 16}"/>`;
-		scans += `<text class="mark-label${chance}" x="${x(seconds)}" y="${axisY + 78}">scan at ${seconds}s</text>`;
+		scans += `<text class="mark-label${chance}" x="${x(seconds)}" y="${axisY + 78}">poll at ${seconds}s</text>`;
 	}
 
 	let lookahead = "";
@@ -1531,8 +1487,8 @@ function renderLookahead(slide, state, isEntering) {
 		const classes = (reaches(activeScanAtS) ? "" : " is-miss") + (isEntering ? " is-entering" : "");
 		const endS = Math.min(activeScanAtS + lookaheadS, spanS);
 		const label = reaches(activeScanAtS)
-			? `the scan at ${activeScanAtS}s lifts it into memory`
-			: `the scan at ${activeScanAtS}s looks ${lookaheadS}s ahead, and the timer is out of reach`;
+			? `the poll at ${activeScanAtS}s lifts it into memory`
+			: `the poll at ${activeScanAtS}s looks ${lookaheadS}s ahead, and the timer is out of reach`;
 		lookahead = `
 			<rect class="window${classes}" x="${x(activeScanAtS)}" y="${axisY - 46}"
 				width="${x(endS) - x(activeScanAtS)}" height="92" rx="10"/>
@@ -1542,7 +1498,7 @@ function renderLookahead(slide, state, isEntering) {
 	return `
 		${heading(slide)}
 		<svg class="timeline" viewBox="0 0 ${width} 230" width="${width}" height="230" role="img"
-			aria-label="Scans every ${scanEveryS}s, each looking ${lookaheadS}s ahead, and a timer due at ${dueAtS}s">
+			aria-label="Polls every ${scanEveryS}s, each looking ${lookaheadS}s ahead, and a timer due at ${dueAtS}s">
 			${lookahead}
 			<line class="axis" x1="${left}" y1="${axisY}" x2="${right}" y2="${axisY}"/>
 			${scans}
@@ -1692,7 +1648,7 @@ function renderWiped(slide, state, isEntering) {
 	return `
 		${heading(slide)}
 		<svg class="timeline chart" viewBox="0 0 ${width} 360" width="${width}" height="360" role="img"
-			aria-label="Sleeps fire about ${medianMs} ms late until the queue is emptied at ${wipedAtS}s. Those due before the next scan at ${scanAtS}s fire up to ${(worstMs / 1_000).toFixed(1)}s late, and then lateness returns to ${medianMs} ms.">
+			aria-label="Sleeps fire about ${medianMs} ms late until the queue is emptied at ${wipedAtS}s. Those due before the next poll at ${scanAtS}s fire up to ${(worstMs / 1_000).toFixed(1)}s late, and then lateness returns to ${medianMs} ms.">
 			${grid}
 			<text class="chart-note" text-anchor="end" x="${left - 12}" y="${top - 20}">late by</text>
 			<text class="chart-note" text-anchor="end" x="${right}" y="${bottom + 56}">seconds into the run</text>
@@ -1700,7 +1656,7 @@ function renderWiped(slide, state, isEntering) {
 				<line class="wipe-mark" x1="${x(wipedAtS)}" y1="${top - 12}" x2="${x(wipedAtS)}" y2="${bottom}"/>
 				<text class="chart-label" text-anchor="end" x="${x(wipedAtS) - 10}" y="${top + 4}">queue emptied</text>
 				<line class="scan-mark" x1="${x(scanAtS)}" y1="${top - 12}" x2="${x(scanAtS)}" y2="${bottom}"/>
-				<text class="chart-label" text-anchor="start" x="${x(scanAtS) + 10}" y="${top + 4}">next scan</text>
+				<text class="chart-label" text-anchor="start" x="${x(scanAtS) + 10}" y="${top + 4}">next poll</text>
 			</g>
 			${dots}
 		</svg>
@@ -1731,8 +1687,11 @@ function renderStore(slide, store, revealedSteps, isEntering) {
 
 function renderRace(slide, state, isEntering) {
 	const stepCount = slide.steps.length;
-	const revealedSteps = Math.min(state, stepCount);
-	const isStepLatest = state >= 1 && state <= stepCount;
+	// A first step shown with the scene brings every later reveal one press sooner.
+	const stepsFromStart = slide.firstStepFromStart ? 1 : 0;
+	const revealedSteps = Math.min(state + stepsFromStart, stepCount);
+	const outcomeAt = stepCount + 1 - stepsFromStart;
+	const isStepLatest = revealedSteps >= 1 && state < outcomeAt;
 	const rowCount = stepCount + 2 + (slide.fix ? 1 : 0);
 
 	const lanes = slide.lanes
@@ -1748,16 +1707,16 @@ function renderRace(slide, state, isEntering) {
 			const current = isStepLatest && index === revealedSteps - 1 ? " is-current" : "";
 			const aside = step.aside ? `<span class="aside">${escapeHtml(step.aside)}</span>` : "";
 			return `
-				<div class="step${current}${revealClasses(state, index + 1, isEntering)}"
+				<div class="step${current}${revealClasses(state, index + 1 - stepsFromStart, isEntering)}"
 					style="grid-column:${step.lane + 1};grid-row:${index + 2}">${escapeHtml(step.text)}${aside}</div>`;
 		})
 		.join("");
 
 	const outcome = `
-		<div class="outcome outcome-${slide.outcome.tone}${revealClasses(state, stepCount + 1, isEntering)}"
+		<div class="outcome outcome-${slide.outcome.tone}${revealClasses(state, outcomeAt, isEntering)}"
 			style="grid-row:${stepCount + 2}">${escapeHtml(slide.outcome.text)}</div>`;
 	const fix = slide.fix
-		? `<div class="outcome outcome-on-time${revealClasses(state, stepCount + 2, isEntering)}"
+		? `<div class="outcome outcome-on-time${revealClasses(state, outcomeAt, isEntering)}"
 				style="grid-row:${stepCount + 3}">${escapeHtml(slide.fix)}</div>`
 		: "";
 
