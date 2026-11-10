@@ -3,15 +3,9 @@ import { stableStringify } from "@aikirun/lib/json";
 import { noopLogger } from "@aikirun/lib/logger";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import type { EncodedValue, NamedCreateCodec } from "./codec";
-import {
-	type EncryptedValue,
-	type EncryptionConfig,
-	EncryptionDecryptFailedError,
-	EncryptionKeyNotFoundError,
-	encryption,
-	InvalidEncryptionKeyError,
-} from "./encryption";
+import { type EncryptedValue, type EncryptionConfig, EncryptionDecryptFailedError, encryption } from "./encryption";
+import { EncryptionKeyNotFoundError, InvalidEncryptionKeyError } from "./key-material";
+import type { EncodedValue, NamedCreateCodec } from "../codec";
 
 const context = { logger: noopLogger };
 

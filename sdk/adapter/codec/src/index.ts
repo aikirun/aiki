@@ -10,12 +10,14 @@ export {
 	type EncryptionConfig,
 	EncryptionDecryptFailedError,
 	type EncryptionKeyCacheConfig,
-	EncryptionKeyNotFoundError,
 	type EncryptionParams,
 	encryption,
+} from "./encryption/encryption";
+export {
+	EncryptionKeyNotFoundError,
 	InvalidEncryptionKeyError,
 	type ResolveEncryptionKey,
-} from "./encryption";
+} from "./encryption/key-material";
 export { pipeCodecs } from "./pipe-codec";
 export {
 	DuplicateCodecNameError,
