@@ -5,19 +5,23 @@ import {
 	type CreatePassiveConfigProvider,
 	type PassiveConfigProviderContext,
 } from "@aikirun/lib/config";
-import { createCipher, type EncryptionAlgorithm, EncryptionDecryptFailedError, stableText } from "@aikirun/lib/crypto";
+import { createCipher, stableText } from "@aikirun/lib/crypto";
 import type { CodecContext } from "@aikirun/types/infra/codec";
 import type { BoundHasher, CreateHasher, Hash, Hasher } from "@aikirun/types/infra/hasher";
 
 import { codec, type EncodedValue, type NamedCreateCodec } from "./codec";
 
+const AES_256_GCM_CIPHER = createCipher("AES-256-GCM");
 const AES_256_KEY_BYTE_LENGTH = 32;
 const HASH_KEY_ID_SEPARATOR = ":";
 const DEFAULT_KEY_CACHE_MAX_ENTRIES = 64;
 const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 const AES_256_GCM_HKDF_INFO = textEncoder.encode("aiki:codec:AES-256-GCM");
 const HMAC_SHA_256_HKDF_INFO = textEncoder.encode("aiki:hasher:HMAC-SHA-256");
 const HKDF_SALT = new Uint8Array();
+
+type PlaintextEnvelope = { input: unknown };
 
 export type EncryptedValue = {
 	keyId: string;
@@ -38,7 +42,7 @@ export type EncryptionKeyCacheConfig = {
 };
 
 export interface EncryptionParams {
-	algorithm: EncryptionAlgorithm;
+	name: string;
 
 	/**
 	 * Resolves master key material for a `keyId`. Resolvers must return `null` for unknown ids
@@ -56,6 +60,28 @@ export interface EncryptionParams {
 	 * Default: enabled with 64 entries and no TTL.
 	 */
 	keyCache?: false | EncryptionKeyCacheConfig;
+}
+
+export class EncryptionDecryptFailedError extends Error {
+	public override readonly name = "EncryptionDecryptFailedError";
+	public readonly keyId?: string;
+
+	constructor(options: { keyId?: string; cause?: unknown; message?: string } = {}) {
+		const message =
+			options.message ??
+			(options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted");
+		const errorOptions: ErrorOptions = {};
+
+		if ("cause" in options) {
+			errorOptions.cause = options.cause;
+		}
+
+		super(message, errorOptions);
+
+		if (options.keyId !== undefined) {
+			this.keyId = options.keyId;
+		}
+	}
 }
 
 export class EncryptionKeyNotFoundError extends Error {
@@ -90,6 +116,49 @@ function isEncryptedBody(value: unknown): value is EncryptedValue {
 		(value as EncryptedValue).keyId.length > 0 &&
 		typeof (value as EncryptedValue).ciphertext === "string"
 	);
+}
+
+function isPlaintextEnvelope(value: unknown): value is PlaintextEnvelope {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return false;
+	}
+	const keys = Object.keys(value);
+	// JSON.stringify({ input: undefined }) yields {} because undefined values are omitted.
+	return keys.length === 0 || (keys.length === 1 && keys[0] === "input");
+}
+
+function encodePayload(payload: unknown): Uint8Array<ArrayBuffer> {
+	const envelope: PlaintextEnvelope = { input: payload };
+
+	return textEncoder.encode(JSON.stringify(envelope));
+}
+
+function decodePayload(bytes: Uint8Array): unknown {
+	const parsed: unknown = JSON.parse(textDecoder.decode(bytes));
+
+	if (!isPlaintextEnvelope(parsed)) {
+		throw new Error("Encrypted plaintext is not { input: unknown }");
+	}
+
+	return parsed.input;
+}
+
+function additionalDataFor(keyId: string): Uint8Array {
+	return textEncoder.encode(keyId);
+}
+
+function encodeCiphertext(encrypted: Uint8Array): string {
+	return Buffer.from(encrypted).toString("base64");
+}
+
+function decodeCiphertext(ciphertext: string, keyId: string): Uint8Array {
+	const bytes = Buffer.from(ciphertext, "base64");
+	// Buffer.from ignores non-alphabet characters; require an exact standard-base64 spelling.
+	if (bytes.toString("base64") !== ciphertext) {
+		throw new EncryptionDecryptFailedError({ keyId });
+	}
+
+	return new Uint8Array(bytes);
 }
 
 function toConfigProvider(
@@ -182,7 +251,7 @@ function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefine
 }
 
 /**
- * Builds a codec for selected `EncryptionAlgorithm` and a matching keyed hasher. Each stored value and hash names the
+ * Builds an AES-256-GCM codec and a matching keyed hasher. Each stored value and hash names the
  * `keyId` that produced it; `key` must resolve that id to the same 32-byte master material every
  * time — never overwrite or rotate bytes under an existing id. AES-GCM and HMAC-SHA-256 keys are
  * derived from that material with HKDF-SHA-256 under distinct info labels, so the same bytes are
@@ -192,15 +261,14 @@ function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefine
  * `previousKeyIds`), then drop the old id from the config once no stored hash uses it. Old values
  * keep decoding because each names its key id, and a run keeps the key its hash was made under for
  * as long as it lives — unless history is later rewritten and re-encoded. The resolver must keep
- * serving every key id a stored value or hash still names. Mutating material in place leaves
- * ciphertext undecryptable and hashes unverifiable.
+ * serving every key id a stored value or hash still names.
+ * Mutating key material in place leaves ciphertext undecryptable and hashes unverifiable.
  */
 export function encryption(params: EncryptionParams): {
 	codec: NamedCreateCodec<EncodedValue<EncryptedValue>>;
 	hasher: CreateHasher;
 } {
-	const { algorithm, key: resolveKey, keyCache: keyCacheConfig } = params;
-	const cipher = createCipher(algorithm);
+	const { name, key: resolveKey, keyCache: keyCacheConfig } = params;
 	// Per encryption() instance, not per context: contexts are often short-lived (per run / handle).
 	const aesKeys = toDerivedKeyCache(keyCacheConfig);
 	const hmacKeys = toDerivedKeyCache(keyCacheConfig);
@@ -218,13 +286,20 @@ export function encryption(params: EncryptionParams): {
 			};
 
 			return codec({
-				name: algorithm,
+				name,
 				encode: async (payload) => {
 					const { keyId } = configProvider.config;
 					const key = await aesKeyFor(keyId);
-					const ciphertext = await cipher.encrypt(payload, key, keyId);
+					const encrypted = await AES_256_GCM_CIPHER.encrypt({
+						key,
+						data: encodePayload(payload),
+						additionalData: additionalDataFor(keyId),
+					});
 
-					return { keyId, ciphertext };
+					return {
+						keyId,
+						ciphertext: encodeCiphertext(encrypted),
+					};
 				},
 				decode: async (encoded) => {
 					if (!isEncryptedBody(encoded)) {
@@ -233,12 +308,25 @@ export function encryption(params: EncryptionParams): {
 						});
 					}
 
-					const key = await aesKeyFor(encoded.keyId);
-					return await cipher.decrypt(encoded.ciphertext, key, encoded.keyId);
+					const { keyId, ciphertext } = encoded;
+					const key = await aesKeyFor(keyId);
+					const encrypted = decodeCiphertext(ciphertext, keyId);
+
+					try {
+						const decrypted = await AES_256_GCM_CIPHER.decrypt({
+							key,
+							encrypted,
+							additionalData: additionalDataFor(keyId),
+						});
+
+						return decodePayload(decrypted);
+					} catch (err) {
+						throw new EncryptionDecryptFailedError({ keyId, cause: err });
+					}
 				},
 			})(context);
 		},
-		{ codecName: algorithm }
+		{ codecName: name }
 	);
 
 	const createHasher: CreateHasher = (context) => {

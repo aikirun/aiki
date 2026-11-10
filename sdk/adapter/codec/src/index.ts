@@ -1,12 +1,4 @@
 export {
-	type Cipher,
-	createCipher,
-	ENCRYPTION_ALGORITHMS,
-	type EncryptionAlgorithm,
-	EncryptionDecryptFailedError,
-} from "@aikirun/lib/crypto";
-
-export {
 	CodecNameMismatchError,
 	type CodecParams,
 	codec,
@@ -16,6 +8,7 @@ export {
 export {
 	type EncryptedValue as EncryptedBody,
 	type EncryptionConfig,
+	EncryptionDecryptFailedError,
 	type EncryptionKeyCacheConfig,
 	EncryptionKeyNotFoundError,
 	type EncryptionParams,

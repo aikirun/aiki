@@ -67,7 +67,7 @@ import { encryption } from "@aikirun/codec";
 const keys = new Map<string, Uint8Array>([["2025-01", rawKey]]);
 
 const { codec, hasher } = encryption({
-	algorithm: "AES-256-GCM",
+	name: "AES-256-GCM",
 	key: (keyId) => keys.get(keyId) ?? null,
 	config: { keyId: "2025-01" },
 });

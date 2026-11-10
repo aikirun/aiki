@@ -1,5 +1,5 @@
 import { asConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
-import { EncryptionDecryptFailedError, stableText } from "@aikirun/lib/crypto";
+import { stableText } from "@aikirun/lib/crypto";
 import { noopLogger } from "@aikirun/lib/logger";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
@@ -7,6 +7,7 @@ import type { EncodedValue, NamedCreateCodec } from "./codec";
 import {
 	type EncryptedValue,
 	type EncryptionConfig,
+	EncryptionDecryptFailedError,
 	EncryptionKeyNotFoundError,
 	encryption,
 	InvalidEncryptionKeyError,
@@ -32,7 +33,7 @@ describe("encryption codec", () => {
 
 	test("round-trips a payload", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -47,10 +48,22 @@ describe("encryption codec", () => {
 		expect(await instance.decode(encoded)).toEqual(payload);
 	});
 
+	test("round-trips undefined", async () => {
+		const { codec: createCodec } = encryption({
+			name: "AES-256-GCM",
+			key: resolveKey,
+			config: { keyId: "a" },
+		});
+		const instance = createCodec(context);
+
+		const encoded = await instance.encode(undefined);
+		expect(await instance.decode(encoded)).toBeUndefined();
+	});
+
 	test("decrypts a value written under an old key after config advances", async () => {
 		const config: EncryptionConfig = { keyId: "a" };
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config,
 		});
@@ -69,12 +82,12 @@ describe("encryption codec", () => {
 
 	test("decodes a key id that is absent from every config field but resolved by key fn", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "b" },
 		});
 		const writer = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		}).codec(context);
@@ -85,7 +98,7 @@ describe("encryption codec", () => {
 
 	test("throws EncryptionKeyNotFoundError when the resolver returns null on encode", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "missing" },
 		});
@@ -99,7 +112,7 @@ describe("encryption codec", () => {
 
 	test("throws EncryptionKeyNotFoundError when the resolver returns null on decode", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: () => null,
 			config: { keyId: "a" },
 		});
@@ -117,7 +130,7 @@ describe("encryption codec", () => {
 	test("propagates a thrown resolver error on encode and does not treat it as missing", async () => {
 		const vaultError = new Error("vault unreachable");
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: () => {
 				throw vaultError;
 			},
@@ -129,7 +142,7 @@ describe("encryption codec", () => {
 	test("propagates a rejected resolver promise on decode", async () => {
 		const vaultError = new Error("vault unreachable");
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: async () => {
 				throw vaultError;
 			},
@@ -145,7 +158,7 @@ describe("encryption codec", () => {
 
 	test("rejects an invalid encrypted body as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -177,7 +190,7 @@ describe("encryption codec", () => {
 
 	test("rejects an empty keyId without calling the key resolver", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: () => {
 				throw new Error("resolver should not be called");
 			},
@@ -191,7 +204,7 @@ describe("encryption codec", () => {
 
 	test("rejects ciphertext shorter than IV plus tag as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -219,9 +232,38 @@ describe("encryption codec", () => {
 		});
 	});
 
+	test("rejects ciphertext that is not exact standard base64 as EncryptionDecryptFailedError", async () => {
+		const { codec: createCodec } = encryption({
+			name: "AES-256-GCM",
+			key: resolveKey,
+			config: { keyId: "a" },
+		});
+		const instance = createCodec(context);
+		const encoded = await instance.encode({ n: 1 });
+
+		await expect(
+			instance.decode({
+				codecName: encoded.codecName,
+				body: { keyId: "a", ciphertext: ` ${encoded.body.ciphertext}` },
+			})
+		).rejects.toMatchObject({
+			name: "EncryptionDecryptFailedError",
+			keyId: "a",
+		});
+		await expect(
+			instance.decode({
+				codecName: encoded.codecName,
+				body: { keyId: "a", ciphertext: `${encoded.body.ciphertext}!` },
+			})
+		).rejects.toMatchObject({
+			name: "EncryptionDecryptFailedError",
+			keyId: "a",
+		});
+	});
+
 	test("rejects a tampered ciphertext as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -248,7 +290,7 @@ describe("encryption codec", () => {
 			["b", sharedKey],
 		]);
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => sharedKeys.get(keyId) ?? null,
 			config: { keyId: "a" },
 		});
@@ -267,7 +309,7 @@ describe("encryption codec", () => {
 
 	test("rejects key material that is not 32 bytes", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: () => new Uint8Array(16),
 			config: { keyId: "a" },
 		});
@@ -283,7 +325,7 @@ describe("encryption codec", () => {
 		let keyId = "a";
 		const configProvider: CreatePassiveConfigProvider<EncryptionConfig> = () => asConfigProvider(() => ({ keyId }));
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: configProvider,
 		});
@@ -297,7 +339,7 @@ describe("encryption codec", () => {
 	test("resolves key material only on a cache miss", async () => {
 		let resolveCount = 0;
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				resolveCount += 1;
 				return resolveKey(keyId);
@@ -317,7 +359,7 @@ describe("encryption codec", () => {
 	test("shares the AES key cache across codec contexts", async () => {
 		let resolveCount = 0;
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				resolveCount += 1;
 				return resolveKey(keyId);
@@ -338,7 +380,7 @@ describe("encryption codec", () => {
 			release = resolve;
 		});
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: async (keyId) => {
 				resolveCount += 1;
 				await gate;
@@ -358,7 +400,7 @@ describe("encryption codec", () => {
 	test("re-resolves on every use when keyCache is false", async () => {
 		let resolveCount = 0;
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				resolveCount += 1;
 				return resolveKey(keyId);
@@ -376,7 +418,7 @@ describe("encryption codec", () => {
 	test("ttlMs 0 re-resolves so a revoked key fails on the next decode", async () => {
 		const liveKeys = new Map(keys);
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => liveKeys.get(keyId) ?? null,
 			config: { keyId: "a" },
 			keyCache: { ttlMs: 0 },
@@ -394,14 +436,14 @@ describe("encryption codec", () => {
 	test("evicts the oldest ready key when maxEntries is exceeded", async () => {
 		let resolveCount = 0;
 		const encodedUnderA = await encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		})
 			.codec(context)
 			.encode({ n: 1 });
 		const encodedUnderB = await encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "b" },
 		})
@@ -409,7 +451,7 @@ describe("encryption codec", () => {
 			.encode({ n: 2 });
 
 		const instance = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				resolveCount += 1;
 				return resolveKey(keyId);
@@ -429,7 +471,7 @@ describe("encryption codec", () => {
 	test("does not retain a null resolve so a later material succeeds", async () => {
 		const liveKeys = new Map<string, Uint8Array>();
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => liveKeys.get(keyId) ?? null,
 			config: { keyId: "a" },
 		});
@@ -442,7 +484,7 @@ describe("encryption codec", () => {
 
 	test("does not use the master key bytes as a raw AES-GCM key", async () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -472,7 +514,7 @@ describe("encryption hasher", () => {
 
 	test("hashes under keyId and announces previous and next rotations", async () => {
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "b", previousKeyIds: ["a"], nextKeyId: "next" },
 		});
@@ -489,13 +531,13 @@ describe("encryption hasher", () => {
 
 	test("for binds to the stamped key id even when absent from config", async () => {
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "b" },
 		});
 		const hasher = createHasher(context);
 		const written = await encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "orphan" },
 		}).hasher(context)({ orderId: "7" });
@@ -513,7 +555,7 @@ describe("encryption hasher", () => {
 		const kmsKeyId = "arn:aws:kms:us-east-1:123456789012:key/abcd";
 		keys.set(kmsKeyId, randomKey());
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: kmsKeyId },
 		});
@@ -531,7 +573,7 @@ describe("encryption hasher", () => {
 
 	test("for returns null when the resolver returns null", async () => {
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -541,7 +583,7 @@ describe("encryption hasher", () => {
 
 	test("for returns null for an unparsable hash", async () => {
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -553,7 +595,7 @@ describe("encryption hasher", () => {
 	test("for propagates a thrown resolver error instead of returning null", async () => {
 		const vaultError = new Error("vault unreachable");
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				if (keyId === "a") {
 					return keys.get("a") ?? null;
@@ -567,7 +609,7 @@ describe("encryption hasher", () => {
 
 	test("throws EncryptionKeyNotFoundError when hashing and a listed key is missing", async () => {
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a", previousKeyIds: ["gone"] },
 		});
@@ -581,7 +623,7 @@ describe("encryption hasher", () => {
 	test("resolves key material only on a cache miss", async () => {
 		let resolveCount = 0;
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				resolveCount += 1;
 				return resolveKey(keyId);
@@ -606,7 +648,7 @@ describe("encryption hasher", () => {
 	test("shares the HMAC key cache across hasher contexts", async () => {
 		let resolveCount = 0;
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => {
 				resolveCount += 1;
 				return resolveKey(keyId);
@@ -623,7 +665,7 @@ describe("encryption hasher", () => {
 	test("ttlMs 0 re-resolves so a revoked key fails on hasher.for", async () => {
 		const liveKeys = new Map(keys);
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: (keyId) => liveKeys.get(keyId) ?? null,
 			config: { keyId: "a" },
 			keyCache: { ttlMs: 0 },
@@ -637,7 +679,7 @@ describe("encryption hasher", () => {
 
 	test("does not use the master key bytes as a raw HMAC-SHA-256 key", async () => {
 		const { hasher: createHasher } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
@@ -660,7 +702,7 @@ describe("encryption hasher", () => {
 describe("encryption codec output must survive a JSON round trip", () => {
 	test("accepts the encrypted body shape", () => {
 		const { codec: createCodec } = encryption({
-			algorithm: "AES-256-GCM",
+			name: "AES-256-GCM",
 			key: () => randomKey(),
 			config: { keyId: "a" },
 		});

@@ -1,39 +1,10 @@
-import { stableText } from "./stable-text";
-
 const AES_GCM_IV_BYTE_LENGTH = 12;
 const AES_GCM_TAG_BYTE_LENGTH = 16;
 const AES_GCM_TAG_BIT_LENGTH = AES_GCM_TAG_BYTE_LENGTH * 8;
-const AES_GCM_MIN_PACKED_BYTE_LENGTH = AES_GCM_IV_BYTE_LENGTH + AES_GCM_TAG_BYTE_LENGTH;
-const textEncoder = new TextEncoder();
+const AES_GCM_MIN_ENCRYPTED_BYTE_LENGTH = AES_GCM_IV_BYTE_LENGTH + AES_GCM_TAG_BYTE_LENGTH;
 
 export const ENCRYPTION_ALGORITHMS = ["AES-256-GCM"] as const;
 export type EncryptionAlgorithm = (typeof ENCRYPTION_ALGORITHMS)[number];
-
-export class EncryptionDecryptFailedError extends Error {
-	public override readonly name = "EncryptionDecryptFailedError";
-	public readonly keyId?: string;
-
-	constructor(options: { keyId?: string; cause?: unknown; message?: string } = {}) {
-		const message =
-			options.message ??
-			(options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted");
-		const errorOptions: ErrorOptions = {};
-
-		if ("cause" in options) {
-			errorOptions.cause = options.cause;
-		}
-
-		super(message, errorOptions);
-
-		if (options.keyId !== undefined) {
-			this.keyId = options.keyId;
-		}
-	}
-}
-
-function additionalDataFor(algorithm: EncryptionAlgorithm, keyId: string): Uint8Array {
-	return textEncoder.encode(`${algorithm}:${keyId}`);
-}
 
 function aesGcmParams(iv: Uint8Array, additionalData: Uint8Array) {
 	return {
@@ -44,72 +15,53 @@ function aesGcmParams(iv: Uint8Array, additionalData: Uint8Array) {
 	};
 }
 
-function decodePackedCiphertext(ciphertext: string, keyId: string): Uint8Array {
-	const packed = Buffer.from(ciphertext, "base64");
-	// Buffer.from ignores non-alphabet characters; require an exact standard-base64 spelling.
-	if (packed.toString("base64") !== ciphertext) {
-		throw new EncryptionDecryptFailedError({ keyId });
-	}
-	if (packed.byteLength < AES_GCM_MIN_PACKED_BYTE_LENGTH) {
-		throw new EncryptionDecryptFailedError({ keyId });
-	}
-
-	return new Uint8Array(packed);
-}
-
-async function encryptAes256Gcm(
-	payload: unknown,
-	key: CryptoKey,
-	algorithm: EncryptionAlgorithm,
-	keyId: string
-): Promise<string> {
+export async function encryptAesGcm(params: {
+	key: CryptoKey;
+	data: Uint8Array;
+	additionalData: Uint8Array;
+}): Promise<Uint8Array> {
+	const { key, data, additionalData } = params;
 	const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTE_LENGTH));
-	const plaintext = stableText.encode(payload);
-	const encrypted = new Uint8Array(
-		await crypto.subtle.encrypt(aesGcmParams(iv, additionalDataFor(algorithm, keyId)), key, plaintext)
+	const ciphertext = new Uint8Array(
+		await crypto.subtle.encrypt(aesGcmParams(iv, additionalData), key, new Uint8Array(data))
 	);
-	const packed = new Uint8Array(iv.byteLength + encrypted.byteLength);
-	packed.set(iv, 0);
-	packed.set(encrypted, iv.byteLength);
+	const encrypted = new Uint8Array(iv.byteLength + ciphertext.byteLength);
+	encrypted.set(iv, 0);
+	encrypted.set(ciphertext, iv.byteLength);
 
-	return Buffer.from(packed).toString("base64");
+	return encrypted;
 }
 
-async function decryptAes256Gcm(
-	ciphertext: string,
-	key: CryptoKey,
-	algorithm: EncryptionAlgorithm,
-	keyId: string
-): Promise<unknown> {
-	try {
-		const packed = decodePackedCiphertext(ciphertext, keyId);
-		const iv = new Uint8Array(packed.subarray(0, AES_GCM_IV_BYTE_LENGTH));
-		const encrypted = new Uint8Array(packed.subarray(AES_GCM_IV_BYTE_LENGTH));
-		const plaintext = await crypto.subtle.decrypt(
-			aesGcmParams(iv, additionalDataFor(algorithm, keyId)),
-			key,
-			encrypted
+export async function decryptAesGcm(params: {
+	key: CryptoKey;
+	encrypted: Uint8Array;
+	additionalData: Uint8Array;
+}): Promise<Uint8Array> {
+	const { key, encrypted, additionalData } = params;
+	if (encrypted.byteLength < AES_GCM_MIN_ENCRYPTED_BYTE_LENGTH) {
+		throw new Error(
+			`Encrypted data must be at least ${AES_GCM_MIN_ENCRYPTED_BYTE_LENGTH} bytes, got ${encrypted.byteLength}`
 		);
-		return stableText.decode(plaintext);
-	} catch (err) {
-		if (err instanceof EncryptionDecryptFailedError) {
-			throw err;
-		}
-		throw new EncryptionDecryptFailedError({ keyId, cause: err });
 	}
+
+	const iv = new Uint8Array(encrypted.subarray(0, AES_GCM_IV_BYTE_LENGTH));
+	const ciphertext = new Uint8Array(encrypted.subarray(AES_GCM_IV_BYTE_LENGTH));
+	const decrypted = await crypto.subtle.decrypt(aesGcmParams(iv, additionalData), key, ciphertext);
+
+	return new Uint8Array(decrypted);
 }
 
 export interface Cipher {
-	encrypt(payload: unknown, key: CryptoKey, keyId: string): Promise<string>;
-	decrypt(ciphertext: string, key: CryptoKey, keyId: string): Promise<unknown>;
+	encrypt(params: { key: CryptoKey; data: Uint8Array; additionalData: Uint8Array }): Promise<Uint8Array>;
+	decrypt(params: { key: CryptoKey; encrypted: Uint8Array; additionalData: Uint8Array }): Promise<Uint8Array>;
 }
 
 export function createCipher(algorithm: EncryptionAlgorithm): Cipher {
 	switch (algorithm) {
 		case "AES-256-GCM":
 			return {
-				encrypt: (payload, key, keyId) => encryptAes256Gcm(payload, key, algorithm, keyId),
-				decrypt: (ciphertext, key, keyId) => decryptAes256Gcm(ciphertext, key, algorithm, keyId),
+				encrypt: encryptAesGcm,
+				decrypt: decryptAesGcm,
 			};
 		default:
 			return algorithm satisfies never;

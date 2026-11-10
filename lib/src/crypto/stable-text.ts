@@ -24,6 +24,7 @@ function isStableTextEnvelope(value: unknown): value is StableTextEnvelope {
 
 function encode(input: unknown): Uint8Array<ArrayBuffer> {
 	const envelope: StableTextEnvelope = { input };
+
 	return encoder.encode(stableStringify(envelope));
 }
 
