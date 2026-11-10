@@ -356,7 +356,7 @@ describe("encryption codec", () => {
 		expect(resolveCount).toBe(1);
 	});
 
-	test("shares the AES key cache across codec contexts", async () => {
+	test("shares the derived key cache across codec contexts", async () => {
 		let resolveCount = 0;
 		const { codec: createCodec } = encryption({
 			name: "AES-256-GCM",
@@ -370,6 +370,23 @@ describe("encryption codec", () => {
 		await createCodec(context).encode({ n: 1 });
 		expect(resolveCount).toBe(1);
 		await createCodec({ logger: noopLogger }).encode({ n: 2 });
+		expect(resolveCount).toBe(1);
+	});
+
+	test("shares the derived key cache between codec and hasher", async () => {
+		let resolveCount = 0;
+		const { codec: createCodec, hasher: createHasher } = encryption({
+			name: "AES-256-GCM",
+			key: (keyId) => {
+				resolveCount += 1;
+				return resolveKey(keyId);
+			},
+			config: { keyId: "a" },
+		});
+
+		await createCodec(context).encode({ n: 1 });
+		expect(resolveCount).toBe(1);
+		await createHasher(context)({ orderId: "1" });
 		expect(resolveCount).toBe(1);
 	});
 
@@ -645,7 +662,7 @@ describe("encryption hasher", () => {
 		expect(resolveCount).toBe(1);
 	});
 
-	test("shares the HMAC key cache across hasher contexts", async () => {
+	test("shares the derived key cache across hasher contexts", async () => {
 		let resolveCount = 0;
 		const { hasher: createHasher } = encryption({
 			name: "AES-256-GCM",

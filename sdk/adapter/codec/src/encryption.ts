@@ -203,25 +203,27 @@ async function importHkdfKey(material: Uint8Array): Promise<CryptoKey> {
 	return crypto.subtle.importKey("raw", new Uint8Array(material), "HKDF", false, ["deriveKey"]);
 }
 
-async function deriveAesGcmKey(material: Uint8Array): Promise<CryptoKey> {
+async function deriveAesGcmKey(hkdfKey: CryptoKey): Promise<CryptoKey> {
 	return crypto.subtle.deriveKey(
 		{ name: "HKDF", hash: "SHA-256", salt: HKDF_SALT, info: AES_256_GCM_HKDF_INFO },
-		await importHkdfKey(material),
+		hkdfKey,
 		{ name: "AES-GCM", length: 256 },
 		false,
 		["encrypt", "decrypt"]
 	);
 }
 
-async function deriveHmacKey(material: Uint8Array): Promise<CryptoKey> {
+async function deriveHmacKey(hkdfKey: CryptoKey): Promise<CryptoKey> {
 	return crypto.subtle.deriveKey(
 		{ name: "HKDF", hash: "SHA-256", salt: HKDF_SALT, info: HMAC_SHA_256_HKDF_INFO },
-		await importHkdfKey(material),
+		hkdfKey,
 		{ name: "HMAC", hash: "SHA-256", length: 256 },
 		false,
 		["sign"]
 	);
 }
+
+type DerivedKeys = { aesKey: CryptoKey; hmacKey: CryptoKey };
 
 function formatHash(keyId: string, digest: Uint8Array): string {
 	return `${keyId}${HASH_KEY_ID_SEPARATOR}${Buffer.from(digest).toString("base64url")}`;
@@ -236,7 +238,7 @@ function parseHashKeyId(hash: string): string | null {
 	return hash.slice(0, separatorIndex);
 }
 
-function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefined): AsyncLruCache<CryptoKey> {
+function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefined): AsyncLruCache<DerivedKeys> {
 	if (keyCache === false) {
 		return {
 			getOrCreate(_keyId, create) {
@@ -270,29 +272,25 @@ export function encryption(params: EncryptionParams): {
 	hasher: CreateHasher;
 } {
 	const { name, key: resolveKey, keyCache: keyCacheConfig } = params;
-	// Per encryption() instance, not per context: contexts are often short-lived (per run / handle).
-	const aesKeys = toDerivedKeyCache(keyCacheConfig);
-	const hmacKeys = toDerivedKeyCache(keyCacheConfig);
+	const derivedKeyCache = toDerivedKeyCache(keyCacheConfig);
+	const derivedKeysFor = (keyId: string) =>
+		derivedKeyCache.getOrCreate(keyId, async () => {
+			const material = await requireKeyMaterial(resolveKey, keyId);
+			const hkdfKey = await importHkdfKey(material);
+			return { aesKey: await deriveAesGcmKey(hkdfKey), hmacKey: await deriveHmacKey(hkdfKey) };
+		});
 
 	const createCodec: NamedCreateCodec<EncodedValue<EncryptedValue>> = Object.assign(
 		(context: CodecContext) => {
 			const configProvider = toConfigProvider(params.config, context);
 
-			const aesKeyFor = async (keyId: string): Promise<CryptoKey> => {
-				return aesKeys.getOrCreate(keyId, async () => {
-					const material = await requireKeyMaterial(resolveKey, keyId);
-
-					return deriveAesGcmKey(material);
-				});
-			};
-
 			return codec({
 				name,
 				encode: async (payload) => {
 					const { keyId } = configProvider.config;
-					const key = await aesKeyFor(keyId);
+					const { aesKey } = await derivedKeysFor(keyId);
 					const encrypted = await AES_256_GCM_CIPHER.encrypt({
-						key,
+						key: aesKey,
 						data: encodePayload(payload),
 						additionalData: additionalDataFor(keyId),
 					});
@@ -310,12 +308,12 @@ export function encryption(params: EncryptionParams): {
 					}
 
 					const { keyId, ciphertext } = encoded;
-					const key = await aesKeyFor(keyId);
+					const { aesKey } = await derivedKeysFor(keyId);
 					const encrypted = decodeCiphertext(ciphertext, keyId);
 
 					try {
 						const decrypted = await AES_256_GCM_CIPHER.decrypt({
-							key,
+							key: aesKey,
 							encrypted,
 							additionalData: additionalDataFor(keyId),
 						});
@@ -333,43 +331,17 @@ export function encryption(params: EncryptionParams): {
 	const createHasher: CreateHasher = (context) => {
 		const configProvider = toConfigProvider(params.config, context);
 
-		const resolveHmacKey = async (keyId: string): Promise<CryptoKey | null> => {
-			try {
-				return await hmacKeys.getOrCreate(keyId, async () => {
-					const material = await resolveKeyMaterial(resolveKey, keyId);
-					if (material === null) {
-						throw new EncryptionKeyNotFoundError(keyId);
-					}
-					return deriveHmacKey(material);
-				});
-			} catch (err) {
-				if (err instanceof EncryptionKeyNotFoundError && err.keyId === keyId) {
-					return null;
-				}
-				throw err;
-			}
-		};
-
-		const hmacKeyFor = async (keyId: string): Promise<CryptoKey> => {
-			const cryptoKey = await resolveHmacKey(keyId);
-
-			if (cryptoKey === null) {
-				throw new EncryptionKeyNotFoundError(keyId);
-			}
-
-			return cryptoKey;
-		};
-
-		const signWithHmacKey = async (input: unknown, keyId: string, cryptoKey: CryptoKey): Promise<string> => {
+		const signWithHmacKey = async (input: unknown, keyId: string, hmacKey: CryptoKey): Promise<string> => {
 			const digest = new Uint8Array(
-				await crypto.subtle.sign("HMAC", cryptoKey, textEncoder.encode(stableStringify({ input })))
+				await crypto.subtle.sign("HMAC", hmacKey, textEncoder.encode(stableStringify({ input })))
 			);
 
 			return formatHash(keyId, digest);
 		};
 
 		const hashUnderKey = async (input: unknown, keyId: string): Promise<string> => {
-			return signWithHmacKey(input, keyId, await hmacKeyFor(keyId));
+			const { hmacKey } = await derivedKeysFor(keyId);
+			return signWithHmacKey(input, keyId, hmacKey);
 		};
 
 		const hasher = Object.assign(
@@ -398,12 +370,15 @@ export function encryption(params: EncryptionParams): {
 						return null;
 					}
 
-					const cryptoKey = await resolveHmacKey(keyId);
-					if (cryptoKey === null) {
-						return null;
+					try {
+						const { hmacKey } = await derivedKeysFor(keyId);
+						return async (input: unknown) => signWithHmacKey(input, keyId, hmacKey);
+					} catch (err) {
+						if (err instanceof EncryptionKeyNotFoundError && err.keyId === keyId) {
+							return null;
+						}
+						throw err;
 					}
-
-					return async (input: unknown) => signWithHmacKey(input, keyId, cryptoKey);
 				},
 			}
 		) satisfies Hasher;
