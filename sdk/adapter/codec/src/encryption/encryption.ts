@@ -183,7 +183,7 @@ export interface EncryptionParams {
 	config: EncryptionConfig | CreatePassiveConfigProvider<EncryptionConfig>;
 
 	/**
-	 * Derived CryptoKey cache shared across all codec and hasher contexts from this
+	 * Controls the crypto key cache shared across all codec and hasher contexts from this
 	 * `encryption()` call. Pass `false` to re-resolve and re-derive on every use.
 	 * Default: enabled with 64 entries and no TTL.
 	 */
@@ -192,7 +192,7 @@ export interface EncryptionParams {
 
 /**
  * Builds an AES-256-GCM codec and a matching keyed hasher. Each stored value and hash names the
- * `keyId` that produced it; `key` must resolve that id to the same 32-byte master material every
+ * `keyId` that produced it; `key` fn must resolve that id to the same 32-byte master material every
  * time — never overwrite or rotate bytes under an existing id. AES-GCM and HMAC-SHA-256 keys are
  * derived from that material with HKDF-SHA-256 under distinct info labels, so the same bytes are
  * never used as raw key material for both primitives.
