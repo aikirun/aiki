@@ -1,19 +1,17 @@
 import { describe, expect, test } from "vitest";
 
 import { createAsyncLruCache } from "./async-lru";
+import { createBinaryLatch } from "../async";
 
 describe("createAsyncLruCache", () => {
 	test("deduplicates concurrent creates for the same key", async () => {
 		let createCount = 0;
-		let release!: () => void;
-		const gate = new Promise<void>((resolve) => {
-			release = resolve;
-		});
+		const gate = createBinaryLatch();
 		const cache = createAsyncLruCache<number>({ maxEntries: 8, ttlMs: null });
 
 		const first = cache.getOrCreate("a", async () => {
 			createCount += 1;
-			await gate;
+			await gate.wait();
 			return 1;
 		});
 		const second = cache.getOrCreate("a", async () => {
@@ -21,7 +19,7 @@ describe("createAsyncLruCache", () => {
 			return 2;
 		});
 
-		release();
+		gate.signal();
 		const [valueA, valueB] = await Promise.all([first, second]);
 		expect(createCount).toBe(1);
 		expect(valueA).toBe(1);
@@ -65,6 +63,54 @@ describe("createAsyncLruCache", () => {
 		});
 
 		expect(creates).toEqual(["a", "b", "a"]);
+	});
+
+	test("evicts the oldest in-flight entry so the limit holds and the newest finish is cached", async () => {
+		const cache = createAsyncLruCache<string>({ maxEntries: 2, ttlMs: null });
+		const creates: string[] = [];
+		const gateA = createBinaryLatch();
+		const gateB = createBinaryLatch();
+		const gateC = createBinaryLatch();
+
+		const promiseA = cache.getOrCreate("a", async () => {
+			creates.push("a");
+			await gateA.wait();
+			return "a";
+		});
+		const promiseB = cache.getOrCreate("b", async () => {
+			creates.push("b");
+			await gateB.wait();
+			return "b";
+		});
+		const promiseC = cache.getOrCreate("c", async () => {
+			creates.push("c");
+			await gateC.wait();
+			return "c";
+		});
+
+		gateC.signal();
+		await expect(promiseC).resolves.toBe("c");
+
+		await expect(
+			cache.getOrCreate("c", async () => {
+				creates.push("c-again");
+				return "c-again";
+			})
+		).resolves.toBe("c");
+
+		gateA.signal();
+		gateB.signal();
+		await expect(promiseA).resolves.toBe("a");
+		await expect(promiseB).resolves.toBe("b");
+
+		await expect(
+			cache.getOrCreate("a", async () => {
+				creates.push("a-again");
+				return "a-again";
+			})
+		).resolves.toBe("a-again");
+
+		expect(creates).toEqual(["a", "b", "c", "a-again"]);
 	});
 
 	test("ttlMs 0 treats every subsequent get as a miss", async () => {

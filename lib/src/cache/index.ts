@@ -1,5 +1,5 @@
 export {
 	type AsyncLruCache,
-	type AsyncLruCacheOptions,
+	type AsyncLruCacheParams,
 	createAsyncLruCache,
 } from "./async-lru";

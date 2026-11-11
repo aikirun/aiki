@@ -1,3 +1,4 @@
+import { createBinaryLatch } from "@aikirun/lib/async";
 import { asConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
 import { stableStringify } from "@aikirun/lib/json";
 import { noopLogger } from "@aikirun/lib/logger";
@@ -386,15 +387,12 @@ describe("encryption codec", () => {
 
 	test("deduplicates concurrent resolves for the same key id", async () => {
 		let resolveCount = 0;
-		let release!: () => void;
-		const gate = new Promise<void>((resolve) => {
-			release = resolve;
-		});
+		const gate = createBinaryLatch();
 		const { codec: createCodec } = encryption({
 			name: "AES-256-GCM",
 			key: async (keyId) => {
 				resolveCount += 1;
-				await gate;
+				await gate.wait();
 				return resolveKey(keyId);
 			},
 			config: { keyId: "a" },
@@ -403,7 +401,7 @@ describe("encryption codec", () => {
 
 		const first = instance.encode({ n: 1 });
 		const second = instance.encode({ n: 2 });
-		release();
+		gate.signal();
 		await Promise.all([first, second]);
 		expect(resolveCount).toBe(1);
 	});
