@@ -5,11 +5,11 @@ import {
 	type CreatePassiveConfigProvider,
 	type PassiveConfigProviderContext,
 } from "@aikirun/lib/config";
-import { createCipher } from "@aikirun/lib/crypto";
 import { stableStringify } from "@aikirun/lib/json";
 import type { CodecContext } from "@aikirun/types/infra/codec";
 import type { BoundHasher, CreateHasher, Hash, Hasher } from "@aikirun/types/infra/hasher";
 
+import { createCipher } from "./cipher";
 import { base64ToBytes, bytesToBase64, bytesToBase64Url } from "./encoding";
 import {
 	deriveAesGcmKey,

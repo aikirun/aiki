@@ -6,7 +6,7 @@ export {
 	type NamedCreateCodec,
 } from "./codec";
 export {
-	type EncryptedValue as EncryptedBody,
+	type EncryptedValue,
 	type EncryptionConfig,
 	EncryptionDecryptFailedError,
 	type EncryptionKeyCacheConfig,
