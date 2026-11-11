@@ -27,7 +27,7 @@ import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
 import { createEventWaiters } from "../event";
 import { instantiateWorkflowDefinitionCodec } from "../handle/bound-codec";
-import { type WorkflowRunHandle, workflowRunHandle } from "../handle/workflow-run";
+import { workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
 
 export interface ExecuteWorkflowParams<Context> {
@@ -74,7 +74,6 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 
 	const intervals: Array<{ stop: () => void }> = [];
 	let flushTaskExecutions: (() => Promise<void>) | undefined;
-	let handle: WorkflowRunHandle<unknown, Context> | undefined;
 	try {
 		intervals.push(
 			runOnInterval(() => client.api.workflowRun.claimRefreshV1({ id: workflowRunId }), {
@@ -102,7 +101,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		}
 
 		const eventsDefinition = workflowVersion[INTERNAL].eventsDefinition;
-		handle = workflowRunHandle(client, workflowRun, {
+		const handle = workflowRunHandle(client, workflowRun, {
 			eventsDefinition,
 			logger,
 			workflowCodec: instantiateWorkflowDefinitionCodec(workflowVersion[INTERNAL].codec, logger),
@@ -160,7 +159,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 					createTaskExecutionTracker,
 					configProvider,
 					hasher,
-					createContext: () => (createContext !== undefined && handle !== undefined ? createContext(handle.run) : null),
+					createContext: () => (createContext ? createContext(handle.run) : null),
 				},
 			},
 			await codec.decode(workflowRun.input)
@@ -179,13 +178,13 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 				return false;
 			}
 
-			if (err instanceof CodecEncodeFailedError || err instanceof CodecDecodeFailedError) {
-				logger.error(
-					err instanceof CodecEncodeFailedError
-						? "Codec failed to encode a payload of the workflow run"
-						: "Codec failed to decode a payload of the workflow run",
-					{ err }
-				);
+			if (err instanceof CodecEncodeFailedError) {
+				logger.error("Codec failed to encode a payload of the workflow run", { err });
+				return false;
+			}
+
+			if (err instanceof CodecDecodeFailedError) {
+				logger.error("Codec failed to decode a payload of the workflow run", { err });
 				return false;
 			}
 
