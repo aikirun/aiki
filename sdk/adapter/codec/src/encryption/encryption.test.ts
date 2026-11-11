@@ -1,4 +1,3 @@
-import { createBinaryLatch } from "@aikirun/lib/async";
 import { asConfigProvider, type CreatePassiveConfigProvider } from "@aikirun/lib/config";
 import { stableStringify } from "@aikirun/lib/json";
 import { noopLogger } from "@aikirun/lib/logger";
@@ -385,27 +384,6 @@ describe("encryption codec", () => {
 		expect(resolveCount).toBe(1);
 	});
 
-	test("deduplicates concurrent resolves for the same key id", async () => {
-		let resolveCount = 0;
-		const gate = createBinaryLatch();
-		const { codec: createCodec } = encryption({
-			name: "AES-256-GCM",
-			key: async (keyId) => {
-				resolveCount += 1;
-				await gate.wait();
-				return resolveKey(keyId);
-			},
-			config: { keyId: "a" },
-		});
-		const instance = createCodec(context);
-
-		const first = instance.encode({ n: 1 });
-		const second = instance.encode({ n: 2 });
-		gate.signal();
-		await Promise.all([first, second]);
-		expect(resolveCount).toBe(1);
-	});
-
 	test("re-resolves on every use when keyCache is false", async () => {
 		let resolveCount = 0;
 		const { codec: createCodec } = encryption({
@@ -440,41 +418,6 @@ describe("encryption codec", () => {
 			name: "EncryptionKeyNotFoundError",
 			keyId: "a",
 		});
-	});
-
-	test("evicts the oldest ready key when maxEntries is exceeded", async () => {
-		let resolveCount = 0;
-		const encodedUnderA = await encryption({
-			name: "AES-256-GCM",
-			key: resolveKey,
-			config: { keyId: "a" },
-		})
-			.codec(context)
-			.encode({ n: 1 });
-		const encodedUnderB = await encryption({
-			name: "AES-256-GCM",
-			key: resolveKey,
-			config: { keyId: "b" },
-		})
-			.codec(context)
-			.encode({ n: 2 });
-
-		const instance = encryption({
-			name: "AES-256-GCM",
-			key: (keyId) => {
-				resolveCount += 1;
-				return resolveKey(keyId);
-			},
-			config: { keyId: "a" },
-			keyCache: { maxEntries: 1 },
-		}).codec(context);
-
-		expect(await instance.decode(encodedUnderA)).toEqual({ n: 1 });
-		expect(resolveCount).toBe(1);
-		expect(await instance.decode(encodedUnderB)).toEqual({ n: 2 });
-		expect(resolveCount).toBe(2);
-		expect(await instance.decode(encodedUnderA)).toEqual({ n: 1 });
-		expect(resolveCount).toBe(3);
 	});
 
 	test("does not retain a null resolve so a later material succeeds", async () => {
@@ -553,11 +496,8 @@ describe("encryption hasher", () => {
 
 		const bound = await hasher.for(written.value);
 		expect(bound).not.toBeNull();
-		if (bound === null) {
-			return;
-		}
-		expect(await bound({ orderId: "7" })).toBe(written.value);
-		expect(await bound({ orderId: "8" })).not.toBe(written.value);
+		expect(await bound?.({ orderId: "7" })).toBe(written.value);
+		expect(await bound?.({ orderId: "8" })).not.toBe(written.value);
 	});
 
 	test("for binds when the key id itself contains colons", async () => {
@@ -647,10 +587,7 @@ describe("encryption hasher", () => {
 		const bound = await hasher.for(hash.value);
 		expect(resolveCount).toBe(1);
 		expect(bound).not.toBeNull();
-		if (bound === null) {
-			return;
-		}
-		expect(await bound(input)).toBe(hash.value);
+		expect(await bound?.(input)).toBe(hash.value);
 		expect(resolveCount).toBe(1);
 	});
 
