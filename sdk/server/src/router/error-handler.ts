@@ -9,8 +9,20 @@ export function handleError<T extends RequestContext>({ logger }: T, err: unknow
 		throw new ORPCError("BAD_REQUEST", { message: `Input validation failed: ${problems}`, status: 400 });
 	}
 
+	if (err instanceof ORPCError && err.cause instanceof ValidationError) {
+		const problems = err.cause.issues.map((issue) => issue.message).join("; ");
+		logger.error("Output validation failed", {
+			err,
+			"aiki.validationIssues": err.cause.issues,
+		});
+		throw new ORPCError(err.code, { message: `Output validation failed: ${problems}`, status: err.status });
+	}
+
 	const aikiError = asAikiError(err);
 	if (aikiError) {
+		if (aikiError.status >= 500) {
+			logger.error("Request error occurred", { err });
+		}
 		throw new ORPCError(aikiError.code, { message: aikiError.message, status: aikiError.status });
 	}
 
