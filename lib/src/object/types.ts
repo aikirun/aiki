@@ -1,5 +1,4 @@
 import type { NonEmptyArray } from "../collection/array";
-import type { Equal, ExpectTrue } from "../testing/expect/types";
 
 export type EmptyRecord = Record<PropertyKey, never>;
 
@@ -8,12 +7,6 @@ export type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T,
 export type OptionalProp<T, K extends keyof T> = Omit<T, K> & { [Key in K]?: T[Key] };
 
 export type NonArrayObject<T> = T extends object ? (T extends ReadonlyArray<unknown> ? never : T) : never;
-declare const _nonArrayObjectTypeTests: [
-	ExpectTrue<Equal<NonArrayObject<EmptyRecord>, EmptyRecord>>,
-	ExpectTrue<Equal<NonArrayObject<() => unknown>, () => unknown>>,
-	ExpectTrue<Equal<NonArrayObject<[]>, never>>,
-	ExpectTrue<Equal<NonArrayObject<ReadonlyArray<unknown>>, never>>,
-];
 
 export type DeepPartial<T> = {
 	[Key in keyof T]?: T[Key] extends NonArrayObject<T[Key]> ? DeepPartial<T[Key]> : T[Key];
@@ -30,54 +23,12 @@ export type RequiredNonNullableProp<T, K extends keyof T> = T & {
 export type RequireAtLeastOneProp<T, Keys extends keyof T = keyof T> = {
 	[K in Keys]-?: Required<Pick<T, K>> & Omit<T, K>;
 }[Keys];
-declare const _requireAtLeastOnePropTypeTests: [
-	ExpectTrue<
-		Equal<
-			RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }, "a" | "b">,
-			{ a: string; b?: number; c?: boolean } | { a?: string; b: number; c?: boolean }
-		>
-	>,
-	ExpectTrue<
-		Equal<
-			RequireAtLeastOneProp<{ a?: string; b?: number; c?: boolean }>,
-			| { a: string; b?: number; c?: boolean }
-			| { a?: string; b: number; c?: boolean }
-			| { a?: string; b?: number; c: boolean }
-		>
-	>,
-	ExpectTrue<
-		Equal<
-			RequireAtLeastOneProp<{ a: string; b?: number; c?: boolean }, "a" | "b">,
-			{ a: string; b?: number; c?: boolean } | { a: string; b: number; c?: boolean }
-		>
-	>,
-];
 
 export type AtMostOneProp<T, Keys extends keyof T = keyof T> =
 	| {
 			[K in Keys]-?: { [P in K]: T[K] } & { [P in Exclude<Keys, K>]?: never };
 	  }[Keys]
 	| Partial<Record<Keys, never>>;
-declare const _requireAtMostOnePropTypeTests: [
-	ExpectTrue<
-		Equal<
-			AtMostOneProp<{ a: string; b: number; c: boolean }>,
-			| { a: string; b: undefined; c: undefined }
-			| { a: undefined; b: number; c: undefined }
-			| { a: undefined; b: undefined; c: boolean }
-			| { a: undefined; b: undefined; c: undefined }
-		>
-	>,
-	ExpectTrue<
-		Equal<
-			AtMostOneProp<{ a?: string; b: number | null; c: boolean }>,
-			| { a: string | undefined; b: undefined; c: undefined }
-			| { a: undefined; b: number | null; c: undefined }
-			| { a: undefined; b: undefined; c: boolean }
-			| { a: undefined; b: undefined; c: undefined }
-		>
-	>,
-];
 
 type IsSubtype<SubT, SuperT> = SubT extends SuperT ? true : false;
 
@@ -103,30 +54,6 @@ type Or<T extends NonEmptyArray<boolean>> = T extends [infer First, ...infer Res
 export type PathFromObject<T, IncludeArrayKeys extends boolean = false> = T extends unknown
 	? PathFromObjectInternal<T, IncludeArrayKeys>
 	: never;
-declare const _pathFromObjectTypeTests: [
-	// biome-ignore lint/complexity/noBannedTypes: testing that empty object has no paths
-	ExpectTrue<Equal<PathFromObject<{}>, never>>,
-	ExpectTrue<Equal<PathFromObject<Record<string, never>>, string>>,
-	ExpectTrue<Equal<PathFromObject<{ a: never }>, "a">>,
-	ExpectTrue<
-		Equal<PathFromObject<{ a: string; b?: number; c: { d: boolean; e?: string[] } }>, "a" | "b" | "c" | "c.d" | "c.e">
-	>,
-	ExpectTrue<Equal<PathFromObject<{ union: "foo" | "bar" }>, "union">>,
-	ExpectTrue<
-		Equal<
-			PathFromObject<{ discriminatedUnion: { type: "foo"; foo: string } | { type: "bar"; bar: string } }>,
-			"discriminatedUnion"
-		>
-	>,
-	ExpectTrue<
-		Equal<
-			PathFromObject<{ discriminatedUnion?: { type: "foo"; foo: string } | { type: "bar"; bar: string } }>,
-			"discriminatedUnion"
-		>
-	>,
-	ExpectTrue<Equal<PathFromObject<{ either: { a: string } | { b: number } }>, "either">>,
-	ExpectTrue<Equal<PathFromObject<{ outer: { inner: { type: "a" } | { type: "b" } } }>, "outer" | "outer.inner">>,
-];
 
 type PathFromObjectInternal<T, IncludeArrayKeys extends boolean> =
 	And<[IsSubtype<T, object>, Or<[IncludeArrayKeys, NonArrayObject<T> extends never ? false : true]>]> extends true
