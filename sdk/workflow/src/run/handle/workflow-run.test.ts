@@ -12,6 +12,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
 	ClientCodecMissingError,
+	DefinitionCodecMissingError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
@@ -40,6 +41,13 @@ describe("workflowRunHandle", () => {
 				expect(() => workflowRunHandle(client, record)).toThrow(ClientCodecMissingError);
 			}));
 
+		test("throws DefinitionCodecMissingError for a run that expects a definition input codec when the version has none", () =>
+			withFakeClient((client) => {
+				const record = runningWorkflowRunRecordFactory.build({ definitionCodecApplied: true });
+
+				expect(() => workflowRunHandle(client, record)).toThrow(DefinitionCodecMissingError);
+			}));
+
 		test("the id overload fetches the run via getByIdV1", () =>
 			withFakeClient(async (client) => {
 				const record = runningWorkflowRunRecordFactory.build();
@@ -59,7 +67,7 @@ describe("workflowRunHandle", () => {
 
 				const refreshed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: initial.id }),
-					state: { status: "completed", output: asOpaquePayload("done") },
+					state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: initial.id }, { run: refreshed });
 
@@ -470,7 +478,7 @@ describe("workflowRunHandle", () => {
 				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
-					state: { status: "completed", output: asOpaquePayload("done") },
+					state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
@@ -495,7 +503,7 @@ describe("workflowRunHandle", () => {
 				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
-					state: { status: "completed", output: storedOutput },
+					state: { status: "completed", output: storedOutput, definitionCodecApplied: false },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
@@ -530,13 +538,32 @@ describe("workflowRunHandle", () => {
 				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
-					state: { status: "completed", output: storedOutput },
+					state: { status: "completed", output: storedOutput, definitionCodecApplied: true },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
 				const result = await handle.wait();
 
 				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
+			}));
+
+		test("throws DefinitionCodecMissingError when the completed output expects a definition codec the version lacks", () =>
+			withFakeClient(async (client) => {
+				const record = runningWorkflowRunRecordFactory.build();
+				const handle = workflowRunHandle(client, record);
+
+				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
+				const completed: WorkflowRunRecord = {
+					...baseWorkflowRunRecordFactory.build({ id: record.id }),
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ def: "done" }),
+						definitionCodecApplied: true,
+					},
+				};
+				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
+
+				await expect(handle.wait()).rejects.toBeInstanceOf(DefinitionCodecMissingError);
 			}));
 
 		test("resolves with whatever terminal state the run reached", () =>
@@ -569,7 +596,7 @@ describe("workflowRunHandle", () => {
 					.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id }),
-					state: { status: "completed", output: asOpaquePayload(42) },
+					state: { status: "completed", output: asOpaquePayload(42), definitionCodecApplied: false },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 

@@ -32,7 +32,7 @@ async function completeChildRun(
 	await stateMachine.transitionState(context, {
 		type: "optimistic",
 		id: params.runId,
-		state: { status: "completed", output: asOpaquePayload(params.output) },
+		state: { status: "completed", output: asOpaquePayload(params.output), definitionCodecApplied: false },
 		expectedRevision: params.expectedRevision,
 	});
 }
@@ -77,7 +77,7 @@ describe("child workflow run wait repository listByParentRunIdWithChildState", (
 					timedOutAt: null,
 					childWorkflowRunStatus: "completed",
 					signalSequence: 1,
-					childWorkflowRunState: { status: "completed", output: { receiptId: "rcp-1" } },
+					childWorkflowRunState: { status: "completed", output: { receiptId: "rcp-1", definitionCodecApplied: false } },
 				}),
 				expect.objectContaining({
 					parentWorkflowRunId: parent.runId,
@@ -87,7 +87,7 @@ describe("child workflow run wait repository listByParentRunIdWithChildState", (
 					timedOutAt: null,
 					childWorkflowRunStatus: "completed",
 					signalSequence: 2,
-					childWorkflowRunState: { status: "completed", output: { receiptId: "rcp-2" } },
+					childWorkflowRunState: { status: "completed", output: { receiptId: "rcp-2", definitionCodecApplied: false } },
 				}),
 			]);
 		}));
@@ -107,7 +107,7 @@ describe("child workflow run wait repository listByParentRunIdWithChildState", (
 
 			const childState = waits.find((wait) => wait.childWorkflowRunId === child.runId)?.childWorkflowRunState;
 			expect(childState).toHaveProperty("output");
-			expect(childState).toEqual({ status: "completed", output: undefined });
+			expect(childState).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
 		}));
 
 	test("a wait without a child transition has no child state", () =>

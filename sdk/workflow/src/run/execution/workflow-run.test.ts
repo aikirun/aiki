@@ -24,6 +24,7 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -59,12 +60,14 @@ function fakeWorkflowVersion(
 
 describe("executeWorkflowRun", () => {
 	describe("error classification", () => {
-		// ClientCodecMissingError, CodecInitFailedError, CodecEncodeFailedError, CodecDecodeFailedError and
-		// WorkflowRunStateUnknownError return false, and have their own tests below.
+		// ClientCodecMissingError, DefinitionCodecMissingError, CodecInitFailedError,
+		// CodecEncodeFailedError, CodecDecodeFailedError and WorkflowRunStateUnknownError return
+		// false, and have their own tests below.
 		const createControlFlowErrorByName: {
 			[Member in Exclude<
 				ControlFlowError,
 				| ClientCodecMissingError
+				| DefinitionCodecMissingError
 				| CodecInitFailedError
 				| CodecEncodeFailedError
 				| CodecDecodeFailedError
@@ -104,6 +107,24 @@ describe("executeWorkflowRun", () => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
 					throw new ClientCodecMissingError(workflowRun.id as WorkflowRunId);
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("returns false when the handler throws DefinitionCodecMissingError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new DefinitionCodecMissingError(workflowRun.id as WorkflowRunId);
 				});
 
 				const result = await executeWorkflowRun({
@@ -558,12 +579,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							expectedRevision: workflowRun.revision,
 						},
 						{
 							revision: workflowRun.revision,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -604,12 +625,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							expectedRevision: workflowRun.revision,
 						},
 						{
 							revision: workflowRun.revision,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -650,12 +671,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							expectedRevision: workflowRun.revision,
 						},
 						{
 							revision: workflowRun.revision,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -698,12 +719,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							expectedRevision: runningRevision,
 						},
 						{
 							revision: runningRevision + 1,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -930,7 +951,11 @@ describe("executeWorkflowRun", () => {
 					return { def: { orderId: "o1" } };
 				},
 			};
-			const workflowRun = runningWorkflowRunRecordFactory.build({ input: encodedInput, clientCodecApplied: true });
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				input: encodedInput,
+				clientCodecApplied: true,
+				definitionCodecApplied: true,
+			});
 			let capturedInput: unknown;
 			const workflowVersion = fakeWorkflowVersion(
 				async (_run, input) => {
@@ -998,12 +1023,12 @@ describe("executeWorkflowRun", () => {
 					{
 						type: "optimistic",
 						id: workflowRun.id,
-						state: { status: "completed", output: encodedOutput },
+						state: { status: "completed", output: encodedOutput, definitionCodecApplied: true },
 						expectedRevision: workflowRun.revision,
 					},
 					{
 						revision: workflowRun.revision,
-						state: { status: "completed", output: encodedOutput },
+						state: { status: "completed", output: encodedOutput, definitionCodecApplied: true },
 						attempts: workflowRun.attempts,
 					}
 				);
@@ -1126,6 +1151,7 @@ describe("executeWorkflowRun", () => {
 		withFakeClient(async (client) => {
 			const workflowRun = runningWorkflowRunRecordFactory.build({
 				input: asOpaquePayload({ def: "order-1" }),
+				definitionCodecApplied: true,
 			});
 			let handlerCalled = false;
 			const workflowVersion = fakeWorkflowVersion(

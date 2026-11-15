@@ -95,6 +95,20 @@ export class ClientCodecMissingError extends Error {
 }
 
 /**
+ * A stored record declares that a definition codec was applied, but the version has no codec
+ * for that slot.
+ */
+export class DefinitionCodecMissingError extends Error {
+	public override readonly name = "DefinitionCodecMissingError";
+	public readonly id: WorkflowRunId;
+
+	constructor(id: WorkflowRunId) {
+		super(`Workflow ${id} expects a definition codec, but none present`);
+		this.id = id;
+	}
+}
+
+/**
  * A codec factory threw while creating a codec. The factory's error is the `cause`.
  * In a workflow, this error ends the execution even when the workflow code catches it, and the run
  * is left for a worker whose codec can be created.

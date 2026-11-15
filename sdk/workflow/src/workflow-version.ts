@@ -79,9 +79,10 @@ export interface WorkflowVersionParams<
 	 * Each handle and each execution builds its own codec from these factories, so keep any state
 	 * that should outlive a handle or an execution outside the factory.
 	 *
-	 * Adding or removing a codec on a version that has stored runs or schedules breaks those runs:
-	 * they will decode with the wrong layer, either returning still-encoded data or
-	 * throwing inside your codec.
+	 * Every payload a definition codec writes records whether it did (`definitionCodecApplied`).
+	 * Adding or removing a codec on a version that has stored runs or schedules is safe: readers
+	 * honour the stored declaration, and refuse with `DefinitionCodecMissingError` when a payload
+	 * was written with a definition codec that is no longer present.
 	 */
 	codec?: CreateWorkflowDefinitionCodec<EncodedInput, EncodedOutput>;
 }
@@ -218,7 +219,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		let input = args[0];
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger);
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
 			definitionCodec: workflowCodec?.input,
 			clientCodec,
 			policy: startOptions.clientCodecPolicy,
@@ -242,6 +243,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			inputHash,
 			clientHasherApplied: clientHasher !== undefined,
 			clientCodecApplied,
+			definitionCodecApplied,
 			options: startOptions,
 		});
 
@@ -336,7 +338,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			return this.failRun(parentRunHandle, { attempts: parentRunHandle.run.attempts, err }, parentRunLogger);
 		}
 
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
 			definitionCodec: workflowCodec?.input,
 			clientCodec: client[INTERNAL].codec,
 			policy: startOptions.clientCodecPolicy,
@@ -352,6 +354,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 				inputHash,
 				clientHasherApplied: parentRunHandle.run.clientHasherApplied,
 				clientCodecApplied,
+				definitionCodecApplied,
 				parent: { workflowRunId: parentRun.id, expectedRevision: parentRunHandle.run.revision },
 				options: {
 					...startOptions,
@@ -470,6 +473,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		await transitionStateOptimistic({
 			status: "completed",
 			output: await codec.workflowOutput.encode(jsonOutput),
+			definitionCodecApplied: codec.workflowOutput.definitionCodecSupplied,
 		});
 		logger.debug("Workflow complete");
 	}

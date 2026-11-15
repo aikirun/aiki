@@ -10,12 +10,21 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 
 export interface OpaquePayloadCodec {
 	encode(payload: unknown): Promise<OpaquePayload>;
 	decode(payload: OpaquePayload | undefined): Promise<unknown>;
+}
+
+/**
+ * A codec composed from an optional definition layer and an optional client layer.
+ * `definitionCodecSupplied` is true when the definition layer was present at compose time.
+ */
+export interface ComposedCodec extends OpaquePayloadCodec {
+	definitionCodecSupplied: boolean;
 }
 
 export type WorkflowDefinitionCodec = {
@@ -94,45 +103,62 @@ export const toOpaquePayloadCodec = (codec: Codec<unknown>): OpaquePayloadCodec 
 });
 
 /**
- * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`. Absent layers are
- * skipped; the result is wrapped once.
+ * Encodes through `definition` then `client`. Decodes through `client` then `definition`. Absent
+ * layers are skipped; the result is wrapped once. `definitionCodecSupplied` tracks whether
+ * `definition` was present.
  */
 export function composeCodecs(
-	inner: Codec<unknown> | undefined,
-	outer: Codec<unknown> | undefined
-): OpaquePayloadCodec {
-	if (inner && outer) {
-		return toOpaquePayloadCodec({
-			encode: async (payload) => outer.encode(await inner.encode(payload)),
-			decode: async (encoded) => inner.decode(await outer.decode(encoded)),
-		});
+	definition: Codec<unknown> | undefined,
+	client: Codec<unknown> | undefined
+): ComposedCodec {
+	const definitionCodecSupplied = definition !== undefined;
+
+	if (definition && client) {
+		return {
+			...toOpaquePayloadCodec({
+				encode: async (payload) => client.encode(await definition.encode(payload)),
+				decode: async (encoded) => definition.decode(await client.decode(encoded)),
+			}),
+			definitionCodecSupplied,
+		};
 	}
 
-	if (inner) {
-		return toOpaquePayloadCodec(inner);
+	if (definition) {
+		return {
+			...toOpaquePayloadCodec(definition),
+			definitionCodecSupplied,
+		};
 	}
 
-	if (outer) {
-		return toOpaquePayloadCodec(outer);
+	if (client) {
+		return {
+			...toOpaquePayloadCodec(client),
+			definitionCodecSupplied,
+		};
 	}
 
-	return noopCodec;
+	return {
+		...noopCodec,
+		definitionCodecSupplied,
+	};
 }
 
 /**
- * Composes the definition input codec (inner) with the client codec (outer) chosen by policy.
- * `clientCodecApplied` reflects only the client layer.
+ * Composes the definition input codec with the client codec chosen by policy.
+ * `clientCodecApplied` reflects only the client layer; `definitionCodecApplied` only the definition.
  */
 export function resolveWorkflowInputCodec(params: {
 	definitionCodec: Codec<unknown> | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
-}): { codec: OpaquePayloadCodec; clientCodecApplied: boolean } {
+}): { codec: ComposedCodec; clientCodecApplied: boolean; definitionCodecApplied: boolean } {
 	const clientCodecApplied = params.policy !== "skip" && params.clientCodec !== undefined;
+	const codec = composeCodecs(params.definitionCodec, clientCodecApplied ? params.clientCodec : undefined);
 
 	return {
-		codec: composeCodecs(params.definitionCodec, clientCodecApplied ? params.clientCodec : undefined),
+		codec,
 		clientCodecApplied,
+		definitionCodecApplied: codec.definitionCodecSupplied,
 	};
 }
 
@@ -154,4 +180,23 @@ export function resolveAppliedClientCodec<Context>(
 	}
 
 	return codec;
+}
+
+/**
+ * Returns the definition codec when a stored record declares it was applied, undefined otherwise.
+ * Throws when the record expects a definition codec that is absent.
+ */
+export function resolveDeclaredDefinitionCodec(
+	definitionCodec: Codec<unknown> | undefined,
+	declaration: { runId: WorkflowRunId; definitionCodecApplied: boolean }
+): Codec<unknown> | undefined {
+	if (!declaration.definitionCodecApplied) {
+		return undefined;
+	}
+
+	if (!definitionCodec) {
+		throw new DefinitionCodecMissingError(declaration.runId);
+	}
+
+	return definitionCodec;
 }

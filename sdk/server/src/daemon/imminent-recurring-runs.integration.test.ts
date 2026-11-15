@@ -56,6 +56,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 				workflowRunOptions: { priority: 2 },
 			});
@@ -85,6 +86,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: "client-hash" },
 				clientHasherApplied: true,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 			});
 			const occurrence = schedule.nextRunAt;
@@ -114,6 +116,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
 			});
 
@@ -139,6 +142,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
 			});
 
@@ -171,6 +175,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
 			});
 
@@ -206,6 +211,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 				workflowRunOptions: { priority: 2 },
 			});
@@ -233,6 +239,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 			});
 
@@ -267,6 +274,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 			});
 
@@ -291,6 +299,7 @@ describe("processImminentRecurringRuns", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "allow" },
 			});
 
