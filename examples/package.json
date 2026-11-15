@@ -7,7 +7,7 @@
 		"@aikirun/memory": "workspace:*",
 		"@aikirun/redis": "workspace:*",
 		"@aikirun/server": "workspace:*",
-		"arktype": "^2.1.29",
+		"arktype": "^2.2.9",
 		"dotenv": "^16.4.5"
 	},
 	"devDependencies": {

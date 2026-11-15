@@ -19,7 +19,7 @@
 		"@aikirun/redis": "workspace:*",
 		"@aikirun/server": "workspace:*",
 		"@aikirun/types": "workspace:*",
-		"arktype": "^2.1.29",
+		"arktype": "^2.2.9",
 		"dotenv": "^16.4.5",
 		"ioredis": "^5.4.1",
 		"pino": "^9.6.0",
