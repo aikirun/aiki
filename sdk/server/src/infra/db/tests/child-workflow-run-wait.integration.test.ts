@@ -77,7 +77,11 @@ describe("child workflow run wait repository listByParentRunIdWithChildState", (
 					timedOutAt: null,
 					childWorkflowRunStatus: "completed",
 					signalSequence: 1,
-					childWorkflowRunState: { status: "completed", output: { receiptId: "rcp-1", definitionCodecApplied: false } },
+					childWorkflowRunState: {
+						status: "completed",
+						output: { receiptId: "rcp-1" },
+						definitionCodecApplied: false,
+					},
 				}),
 				expect.objectContaining({
 					parentWorkflowRunId: parent.runId,
@@ -87,7 +91,11 @@ describe("child workflow run wait repository listByParentRunIdWithChildState", (
 					timedOutAt: null,
 					childWorkflowRunStatus: "completed",
 					signalSequence: 2,
-					childWorkflowRunState: { status: "completed", output: { receiptId: "rcp-2", definitionCodecApplied: false } },
+					childWorkflowRunState: {
+						status: "completed",
+						output: { receiptId: "rcp-2" },
+						definitionCodecApplied: false,
+					},
 				}),
 			]);
 		}));

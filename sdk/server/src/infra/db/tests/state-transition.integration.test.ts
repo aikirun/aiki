@@ -144,7 +144,7 @@ describe("state transition repository getById", () => {
 			const row = await repos.stateTransition.getById(transitionId);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
+			expect(row?.state).toEqual({ status: "completed", output: undefined });
 		}));
 });
 
@@ -213,7 +213,12 @@ describe("state transition repository getByIds", () => {
 
 			const rows = await repos.stateTransition.getByIds([transitionId]);
 
-			expect(rows).toEqual([expect.objectContaining({ id: transitionId, state: { status: "completed" } })]);
+			expect(rows).toEqual([
+				expect.objectContaining({
+					id: transitionId,
+					state: { status: "completed", output: undefined, definitionCodecApplied: false },
+				}),
+			]);
 			expect(rows.find((row) => row.id === transitionId)?.state).toHaveProperty("output");
 		}));
 });
