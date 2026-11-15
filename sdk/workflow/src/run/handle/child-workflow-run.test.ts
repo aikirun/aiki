@@ -8,6 +8,7 @@ import { asOpaquePayload } from "@aikirun/testing/payload";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowRunId, WorkflowRunRecord } from "@aikirun/types/workflow/run";
 import {
+	DefinitionCodecMissingError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
 	WorkflowRunSuspendedError,
@@ -26,7 +27,10 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 1_000 },
+							terminal: {
+								state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+								completedAt: 1_000,
+							},
 						},
 					},
 				});
@@ -55,7 +59,10 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+							terminal: {
+								state: { status: "completed", output: storedOutput, definitionCodecApplied: false },
+								completedAt: 1_000,
+							},
 						},
 					},
 				});
@@ -83,7 +90,10 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+							terminal: {
+								state: { status: "completed", output: storedOutput, definitionCodecApplied: true },
+								completedAt: 1_000,
+							},
 						},
 					},
 				});
@@ -108,6 +118,30 @@ describe("childWorkflowRunHandle", () => {
 					success: true,
 					state: { status: "completed", output: "done" },
 				});
+			}));
+
+		test("throws DefinitionCodecMissingError when the completed output expects a definition codec the version lacks", () =>
+			withFakeClient(async (client) => {
+				const childRecord = runningWorkflowRunRecordFactory.build();
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: {
+						[childRecord.id]: {
+							timeouts: [],
+							terminal: {
+								state: {
+									status: "completed",
+									output: asOpaquePayload({ def: "done" }),
+									definitionCodecApplied: true,
+								},
+								completedAt: 1_000,
+							},
+						},
+					},
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
+
+				await expect(childHandle.wait()).rejects.toBeInstanceOf(DefinitionCodecMissingError);
 			}));
 
 		test("resolves with whatever terminal state the child reached", () =>
@@ -140,7 +174,10 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 1_000 },
+							terminal: {
+								state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+								completedAt: 1_000,
+							},
 						},
 					},
 				});
@@ -179,7 +216,10 @@ describe("childWorkflowRunHandle", () => {
 					childWorkflowRunWaits: {
 						[childRecord.id]: {
 							timeouts: [{ timedOutAt: 1_000 }],
-							terminal: { state: { status: "completed", output: asOpaquePayload("done") }, completedAt: 2_000 },
+							terminal: {
+								state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+								completedAt: 2_000,
+							},
 						},
 					},
 				});
@@ -340,7 +380,7 @@ describe("childWorkflowRunHandle", () => {
 
 			const refreshedChildRecord: WorkflowRunRecord = {
 				...baseWorkflowRunRecordFactory.build({ id: childRecord.id }),
-				state: { status: "completed", output: asOpaquePayload("done") },
+				state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
 			};
 			client.api.workflowRun.getByIdV1.once({ id: childRecord.id }, { run: refreshedChildRecord });
 

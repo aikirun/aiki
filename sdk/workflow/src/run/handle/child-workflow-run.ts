@@ -135,7 +135,14 @@ function createWaiter<Output, Context, TEvents extends EventsDefinition>(
 			if (terminal) {
 				return {
 					success: true,
-					state: await decodeWaitResultState<Output>(handle[INTERNAL].codec.workflowOutput, terminal.state),
+					state: await decodeWaitResultState<Output>(
+						{
+							runId: run.id as WorkflowRunId,
+							clientCodec: handle[INTERNAL].codec.client,
+							workflowOutput: handle[INTERNAL].codec.workflowOutput,
+						},
+						terminal.state
+					),
 				};
 			}
 

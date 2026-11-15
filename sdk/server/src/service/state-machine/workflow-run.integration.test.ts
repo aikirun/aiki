@@ -70,7 +70,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 					// The pre-claim revision: exactly what a fenced-out worker would still hold.
 					expectedRevision: revisionWhenClaimed - 1,
 				})
@@ -101,13 +101,13 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			const result = await stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: runId,
-				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 				expectedRevision: revisionWhenClaimed,
 			});
 
 			expect(result).toEqual({
 				revision: revisionWhenClaimed + 1,
-				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 				attempts: attemptsWhenClaimed,
 			});
 
@@ -120,7 +120,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 						revision: result.revision,
 						attempts: result.attempts,
 					}),
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 				})
 			);
 		}));
@@ -186,7 +186,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			expect(run).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({ id: runId, revision: revisionWhenClaimed + 1 }),
-					state: expect.objectContaining({ status: "completed" }),
+					state: expect.objectContaining({ status: "completed", definitionCodecApplied: false }),
 				})
 			);
 		}));
@@ -897,10 +897,18 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 				({
 					type: "optimistic",
 					id,
-					state: { status: "completed", output: asOpaquePayload({ receiptId: "child-receipt-9" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receiptId: "child-receipt-9" }),
+						definitionCodecApplied: false,
+					},
 					expectedRevision,
 				}) as const,
-			expectedChildState: { status: "completed", output: asOpaquePayload({ receiptId: "child-receipt-9" }) },
+			expectedChildState: {
+				status: "completed",
+				output: asOpaquePayload({ receiptId: "child-receipt-9" }),
+				definitionCodecApplied: false,
+			},
 		},
 		failed: {
 			request: (id: string, expectedRevision: number) =>
@@ -1119,7 +1127,11 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: child.runId,
-					state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-7" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receiptId: "rcp-7" }),
+						definitionCodecApplied: false,
+					},
 					expectedRevision: child.revisionWhenClaimed,
 				})
 			);
@@ -1521,7 +1533,7 @@ describe("WorkflowRunStateMachine outbox row", () => {
 					createStateMachine(repos).transitionState(context, {
 						type: "optimistic",
 						id: runId,
-						state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+						state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 						expectedRevision: revisionWhenClaimed,
 					}),
 			};
@@ -1954,7 +1966,7 @@ describe("WorkflowRunStateMachine failed transitions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: parentRun.child.runId,
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 					expectedRevision: parentRun.child.revisionWhenClaimed,
 				})
 			).rejects.toThrow("parent transition append failed");

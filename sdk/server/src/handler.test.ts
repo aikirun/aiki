@@ -78,6 +78,7 @@ describe("handler input validation", () => {
 						workflowRunInputHash: { value: "input-hash" },
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionCodecApplied: false,
 						spec: { type: "interval", everyMs: 0 },
 						workflowRunOptions: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 100, factor: 0.5 } },
 					},

@@ -11,6 +11,7 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	type NonDeterminismError,
 	type WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -169,7 +170,12 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	} catch (err) {
 		if (isControlFlowError(err)) {
 			if (err instanceof ClientCodecMissingError) {
-				logger.error("The workflow run  expects a client codec, but none present", { err });
+				logger.error("The workflow run expects a client codec, but none present", { err });
+				return false;
+			}
+
+			if (err instanceof DefinitionCodecMissingError) {
+				logger.error("The workflow run expects a definition codec, but none present", { err });
 				return false;
 			}
 

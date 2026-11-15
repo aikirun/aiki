@@ -14,6 +14,7 @@ export const referencedWorkflowRunRowFactory = Factory.define<
 	status: "scheduled",
 	clientHasherApplied: false,
 	clientCodecApplied: false,
+	definitionCodecApplied: false,
 	inputHash: "order-7-hash",
 	referenceId: "order-7-ref",
 	latestStateTransitionId: ulid(),

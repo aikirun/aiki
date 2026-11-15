@@ -7,6 +7,7 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 import { describe, expect, test } from "vitest";
@@ -18,6 +19,7 @@ import {
 	instantiateWorkflowDefinitionCodec,
 	noopCodec,
 	resolveDeclaredClientCodec,
+	resolveDeclaredDefinitionCodec,
 	resolveWorkflowInputCodec,
 	toBoundCodec,
 } from "./bound-codec";
@@ -204,6 +206,33 @@ describe("bindDeclaredCodec", () => {
 		}));
 });
 
+describe("resolveDeclaredDefinitionCodec", () => {
+	const runId = "run-1" as WorkflowRunId;
+	const definitionCodec = {
+		encode: async (payload: unknown) => ({ def: payload }),
+		decode: async (payload: unknown) => {
+			const { def } = payload as { def: unknown };
+			return def;
+		},
+	};
+
+	test("returns the definition codec when the declaration says it was applied", () => {
+		expect(resolveDeclaredDefinitionCodec(definitionCodec, { runId, definitionCodecApplied: true })).toBe(
+			definitionCodec
+		);
+	});
+
+	test("returns undefined when the declaration says it was not applied", () => {
+		expect(resolveDeclaredDefinitionCodec(definitionCodec, { runId, definitionCodecApplied: false })).toBeUndefined();
+	});
+
+	test("throws DefinitionCodecMissingError when the declaration expects a definition codec that is absent", () => {
+		expect(() => resolveDeclaredDefinitionCodec(undefined, { runId, definitionCodecApplied: true })).toThrow(
+			DefinitionCodecMissingError
+		);
+	});
+});
+
 describe("composeCodecs", () => {
 	const inner = {
 		encode: async (payload: unknown) => ({ inner: payload }),
@@ -224,6 +253,7 @@ describe("composeCodecs", () => {
 		const composed = composeCodecs(inner, outer);
 		const payload = { value: 1 };
 
+		expect(composed.definitionCodecSupplied).toBe(true);
 		const encoded = await composed.encode(payload);
 		expect(encoded).toEqual(asOpaquePayload({ outer: { inner: payload } }));
 		expect(await composed.decode(encoded)).toEqual(payload);
@@ -233,6 +263,7 @@ describe("composeCodecs", () => {
 		const composed = composeCodecs(inner, undefined);
 		const payload = { value: 1 };
 
+		expect(composed.definitionCodecSupplied).toBe(true);
 		expect(await composed.encode(payload)).toEqual(asOpaquePayload({ inner: payload }));
 		expect(await composed.decode(asOpaquePayload({ inner: payload }))).toEqual(payload);
 	});
@@ -241,6 +272,7 @@ describe("composeCodecs", () => {
 		const composed = composeCodecs(undefined, outer);
 		const payload = { value: 1 };
 
+		expect(composed.definitionCodecSupplied).toBe(false);
 		expect(await composed.encode(payload)).toEqual(asOpaquePayload({ outer: payload }));
 		expect(await composed.decode(asOpaquePayload({ outer: payload }))).toEqual(payload);
 	});
@@ -249,6 +281,7 @@ describe("composeCodecs", () => {
 		const composed = composeCodecs(undefined, undefined);
 		const payload = { value: 1 };
 
+		expect(composed.definitionCodecSupplied).toBe(false);
 		expect(await composed.encode(payload)).toBe(asOpaquePayload(payload));
 		expect(await composed.decode(asOpaquePayload(payload))).toBe(payload);
 	});
@@ -271,7 +304,7 @@ describe("resolveWorkflowInputCodec", () => {
 	};
 
 	test("composes definition inside client when both are present", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
 			definitionCodec,
 			clientCodec,
 			policy: undefined,
@@ -279,12 +312,13 @@ describe("resolveWorkflowInputCodec", () => {
 		const payload = { value: 1 };
 
 		expect(clientCodecApplied).toBe(true);
+		expect(definitionCodecApplied).toBe(true);
 		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ client: { def: payload } }));
 		expect(await codec.decode(asOpaquePayload({ client: { def: payload } }))).toEqual(payload);
 	});
 
 	test("applies only the definition when the client codec is skipped", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
 			definitionCodec,
 			clientCodec,
 			policy: "skip",
@@ -292,12 +326,13 @@ describe("resolveWorkflowInputCodec", () => {
 		const payload = { value: 1 };
 
 		expect(clientCodecApplied).toBe(false);
+		expect(definitionCodecApplied).toBe(true);
 		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ def: payload }));
 		expect(await codec.decode(asOpaquePayload({ def: payload }))).toEqual(payload);
 	});
 
 	test("applies only the client when no definition codec is set", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
 			definitionCodec: undefined,
 			clientCodec,
 			policy: "apply",
@@ -305,11 +340,12 @@ describe("resolveWorkflowInputCodec", () => {
 		const payload = { value: 1 };
 
 		expect(clientCodecApplied).toBe(true);
+		expect(definitionCodecApplied).toBe(false);
 		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ client: payload }));
 	});
 
 	test("is a no-op when neither layer is present", async () => {
-		const { codec, clientCodecApplied } = resolveWorkflowInputCodec({
+		const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
 			definitionCodec: undefined,
 			clientCodec: undefined,
 			policy: undefined,
@@ -317,6 +353,7 @@ describe("resolveWorkflowInputCodec", () => {
 		const payload = { value: 1 };
 
 		expect(clientCodecApplied).toBe(false);
+		expect(definitionCodecApplied).toBe(false);
 		expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
 	});
 });

@@ -130,7 +130,7 @@ describe("state transition repository getById", () => {
 			const row = await repos.stateTransition.getById(transitionId);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
 		}));
 
 	test("returns a completed task's state carrying the output key", () =>
@@ -144,7 +144,7 @@ describe("state transition repository getById", () => {
 			const row = await repos.stateTransition.getById(transitionId);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
 		}));
 });
 

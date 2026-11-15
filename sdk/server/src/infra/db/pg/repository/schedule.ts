@@ -21,6 +21,7 @@ export type ScheduleRowUpdate = Partial<
 		| "workflowRunInputHash"
 		| "clientHasherApplied"
 		| "clientCodecApplied"
+		| "definitionCodecApplied"
 		| "definitionHash"
 		| "nextRunAt"
 	>
