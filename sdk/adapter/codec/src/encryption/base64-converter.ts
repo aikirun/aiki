@@ -9,6 +9,15 @@ type Uint8ArrayConstructorBase64 = {
 	fromBase64: (base64: string, options?: { alphabet?: "base64" | "base64url" }) => Uint8Array;
 };
 
+export function bytesToBase64WithBtoa(bytes: Uint8Array): string {
+	let binary = "";
+	for (let i = 0; i < bytes.length; i += BYTES_TO_BASE64_CHUNK_SIZE) {
+		binary += String.fromCharCode(...bytes.subarray(i, i + BYTES_TO_BASE64_CHUNK_SIZE));
+	}
+
+	return btoa(binary);
+}
+
 export function bytesToBase64(bytes: Uint8Array): string {
 	const { toBase64 } = bytes as Uint8Array & Partial<Uint8ArrayBase64>;
 	if (typeof toBase64 === "function") {
@@ -19,12 +28,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
 		return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");
 	}
 
-	let binary = "";
-	for (let i = 0; i < bytes.length; i += BYTES_TO_BASE64_CHUNK_SIZE) {
-		binary += String.fromCharCode(...bytes.subarray(i, i + BYTES_TO_BASE64_CHUNK_SIZE));
-	}
-
-	return btoa(binary);
+	return bytesToBase64WithBtoa(bytes);
 }
 
 export function base64ToBytes(base64: string): Uint8Array {
@@ -58,5 +62,5 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
 		return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64url");
 	}
 
-	return bytesToBase64(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+	return bytesToBase64WithBtoa(bytes).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 }

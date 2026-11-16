@@ -34,8 +34,8 @@ function isExpired<TValue>(entry: ReadyEntry<TValue>, ttlMs: number | null, nowM
  * The entry count never exceeds `maxEntries`; a new lookup evicts the least-recent entry
  * (pending or ready). Callers of an evicted pending lookup still receive its value.
  */
-export function createAsyncLruCache<TValue, TKey = string>(options: AsyncLruCacheParams): AsyncLruCache<TValue, TKey> {
-	const { maxEntries, ttlMs } = options;
+export function createAsyncLruCache<TValue, TKey = string>(params: AsyncLruCacheParams): AsyncLruCache<TValue, TKey> {
+	const { maxEntries, ttlMs } = params;
 	const entries = new Map<TKey, CacheEntry<TValue>>();
 
 	const ensureSizeLimit = (): void => {

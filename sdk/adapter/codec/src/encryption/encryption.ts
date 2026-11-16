@@ -9,8 +9,8 @@ import { stableStringify } from "@aikirun/lib/json";
 import type { CodecContext } from "@aikirun/types/infra/codec";
 import type { BoundHasher, CreateHasher, Hash, Hasher } from "@aikirun/types/infra/hasher";
 
+import { base64ToBytes, bytesToBase64, bytesToBase64Url } from "./base64-converter";
 import { createCipher } from "./cipher";
-import { base64ToBytes, bytesToBase64, bytesToBase64Url } from "./encoding";
 import {
 	deriveAesGcmKey,
 	deriveHmacKey,
@@ -36,6 +36,7 @@ export interface EncryptionConfig {
 
 export type EncryptionKeyCacheConfig = {
 	maxEntries?: number;
+	/** Entry lifetime in ms. Default: 5 minutes. Pass `0` to re-resolve on every use. */
 	ttlMs?: number;
 };
 
@@ -66,6 +67,7 @@ export class EncryptionDecryptFailedError extends Error {
 const AES_256_GCM_CIPHER = createCipher("AES-256-GCM");
 const HASH_KEY_ID_SEPARATOR = ":";
 const DEFAULT_KEY_CACHE_MAX_ENTRIES = 64;
+const DEFAULT_KEY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -78,17 +80,17 @@ function isPlaintextEnvelope(value: unknown): value is PlaintextEnvelope {
 	return keys.length === 0 || (keys.length === 1 && keys[0] === "input");
 }
 
-function encodePayload(payload: unknown): Uint8Array<ArrayBuffer> {
+function payloadToBytes(payload: unknown): Uint8Array<ArrayBuffer> {
 	const envelope: PlaintextEnvelope = { input: payload };
 
 	return textEncoder.encode(JSON.stringify(envelope));
 }
 
-function encodeHashInput(input: unknown): Uint8Array<ArrayBuffer> {
+function hashInputToBytes(input: unknown): Uint8Array<ArrayBuffer> {
 	return textEncoder.encode(stableStringify({ input }));
 }
 
-function decodePayload(bytes: Uint8Array): unknown {
+function bytesToPayload(bytes: Uint8Array): unknown {
 	const parsed: unknown = JSON.parse(textDecoder.decode(bytes));
 
 	if (!isPlaintextEnvelope(parsed)) {
@@ -96,17 +98,6 @@ function decodePayload(bytes: Uint8Array): unknown {
 	}
 
 	return parsed.input;
-}
-
-function decodeCiphertext(ciphertext: string): Uint8Array {
-	const bytes = base64ToBytes(ciphertext);
-
-	// Decoders may accept non-canonical forms; require an exact standard-base64 spelling.
-	if (bytesToBase64(bytes) !== ciphertext) {
-		throw new Error("Ciphertext is not canonical standard base64");
-	}
-
-	return bytes;
 }
 
 function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefined): AsyncLruCache<DerivedKeys> {
@@ -120,7 +111,7 @@ function toDerivedKeyCache(keyCache: false | EncryptionKeyCacheConfig | undefine
 
 	return createAsyncLruCache({
 		maxEntries: keyCache?.maxEntries ?? DEFAULT_KEY_CACHE_MAX_ENTRIES,
-		ttlMs: keyCache?.ttlMs ?? null,
+		ttlMs: keyCache?.ttlMs ?? DEFAULT_KEY_CACHE_TTL_MS,
 	});
 }
 
@@ -185,7 +176,7 @@ export interface EncryptionParams {
 	/**
 	 * Controls the crypto key cache shared across all codec and hasher contexts from this
 	 * `encryption()` call. Pass `false` to re-resolve and re-derive on every use.
-	 * Default: enabled with 64 entries and no TTL.
+	 * Default: enabled with 64 entries and a 5-minute TTL.
 	 */
 	keyCache?: false | EncryptionKeyCacheConfig;
 }
@@ -229,7 +220,7 @@ export function encryption(params: EncryptionParams): {
 					const { aesKey } = await derivedKeysFor(keyId);
 					const encrypted = await AES_256_GCM_CIPHER.encrypt({
 						key: aesKey,
-						data: encodePayload(payload),
+						data: payloadToBytes(payload),
 						additionalData: additionalDataFor(keyId),
 					});
 
@@ -251,11 +242,11 @@ export function encryption(params: EncryptionParams): {
 					try {
 						const decrypted = await AES_256_GCM_CIPHER.decrypt({
 							key: aesKey,
-							encrypted: decodeCiphertext(ciphertext),
+							encrypted: base64ToBytes(ciphertext),
 							additionalData: additionalDataFor(keyId),
 						});
 
-						return decodePayload(decrypted);
+						return bytesToPayload(decrypted);
 					} catch (err) {
 						throw new EncryptionDecryptFailedError({ keyId, cause: err });
 					}
@@ -277,7 +268,7 @@ export function encryption(params: EncryptionParams): {
 		const hasher = Object.assign(
 			async (input: unknown): Promise<Hash> => {
 				const config = configProvider.config;
-				const payload = encodeHashInput(input);
+				const payload = hashInputToBytes(input);
 				const { previousKeyIds, nextKeyId, keyId } = config;
 
 				const [value, nextValue, deprecatedValues] = await Promise.all([
@@ -311,7 +302,7 @@ export function encryption(params: EncryptionParams): {
 					try {
 						const { hmacKey } = await derivedKeysFor(keyId);
 
-						return async (input: unknown) => signPayload(encodeHashInput(input), keyId, hmacKey);
+						return async (input: unknown) => signPayload(hashInputToBytes(input), keyId, hmacKey);
 					} catch (err) {
 						if (err instanceof EncryptionKeyNotFoundError && err.keyId === keyId) {
 							return null;

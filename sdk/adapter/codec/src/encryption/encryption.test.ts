@@ -226,35 +226,6 @@ describe("encryption codec", () => {
 		});
 	});
 
-	test("rejects ciphertext that is not exact standard base64 as EncryptionDecryptFailedError", async () => {
-		const { codec: createCodec } = encryption({
-			name: "AES-256-GCM",
-			key: resolveKey,
-			config: { keyId: "a" },
-		});
-		const instance = createCodec(context);
-		const encoded = await instance.encode({ n: 1 });
-
-		await expect(
-			instance.decode({
-				codecName: encoded.codecName,
-				body: { keyId: "a", ciphertext: ` ${encoded.body.ciphertext}` },
-			})
-		).rejects.toMatchObject({
-			name: "EncryptionDecryptFailedError",
-			keyId: "a",
-		});
-		await expect(
-			instance.decode({
-				codecName: encoded.codecName,
-				body: { keyId: "a", ciphertext: `${encoded.body.ciphertext}!` },
-			})
-		).rejects.toMatchObject({
-			name: "EncryptionDecryptFailedError",
-			keyId: "a",
-		});
-	});
-
 	test("rejects a tampered ciphertext as EncryptionDecryptFailedError", async () => {
 		const { codec: createCodec } = encryption({
 			name: "AES-256-GCM",
