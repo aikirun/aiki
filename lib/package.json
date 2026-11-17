@@ -9,6 +9,10 @@
 			"types": "./dist/async/index.d.ts",
 			"import": "./dist/async/index.js"
 		},
+		"./cache": {
+			"types": "./dist/cache/index.d.ts",
+			"import": "./dist/cache/index.js"
+		},
 		"./collection/array": {
 			"types": "./dist/collection/array/index.d.ts",
 			"import": "./dist/collection/array/index.js"
