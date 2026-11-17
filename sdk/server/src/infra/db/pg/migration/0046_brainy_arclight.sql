@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_run" ADD CONSTRAINT "chk_workflow_run_sleeping_requires_wakeup_at" CHECK ("workflow_run"."status" != 'sleeping' OR "workflow_run"."wakeup_at" IS NOT NULL);

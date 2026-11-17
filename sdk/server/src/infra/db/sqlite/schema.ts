@@ -210,6 +210,10 @@ export const workflowRun = sqliteTable(
 			.where(sql`${table.status} = 'awaiting_task_retry'`),
 
 		check("chk_workflow_run_status", isOneOf(table.status, WORKFLOW_RUN_STATUSES)),
+		check(
+			"chk_workflow_run_sleeping_requires_wakeup_at",
+			sql`${table.status} != 'sleeping' OR ${table.wakeupAt} IS NOT NULL`
+		),
 	]
 );
 
