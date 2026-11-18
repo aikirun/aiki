@@ -134,7 +134,7 @@ describe("processImminentScheduledRuns", () => {
 				createWorkflowRunStateMachine({ repos }).transitionState(namespaceRequestContext, {
 					type: "optimistic",
 					id: parentRun.child.runId,
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }), definitionCodecApplied: false },
 					expectedRevision: parentRun.child.revisionWhenClaimed,
 				})
 			);

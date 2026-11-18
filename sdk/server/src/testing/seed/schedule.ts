@@ -51,6 +51,7 @@ export async function seedActiveSchedule(deps: SeedScheduleDeps, overrides?: See
 		workflowRunInputHash: { value: await hashInput(seededSchedule.workflowRunInput) },
 		clientHasherApplied: false,
 		clientCodecApplied: false,
+		definitionCodecApplied: false,
 		options: overrides?.referenceId === undefined ? undefined : { reference: { id: overrides.referenceId } },
 		workflowRunOptions: overrides?.workflowRunOptions,
 	});

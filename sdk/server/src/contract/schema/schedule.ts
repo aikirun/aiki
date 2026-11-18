@@ -48,6 +48,7 @@ export const scheduleSchema = type({
 	"workflowRunInput?": opaquePayloadSchema,
 	clientHasherApplied: "boolean",
 	clientCodecApplied: "boolean",
+	definitionCodecApplied: "boolean",
 	spec: scheduleSpecSchema,
 	status: scheduleStatusSchema,
 	"referenceId?": "string > 0 | undefined",

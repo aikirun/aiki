@@ -18,6 +18,7 @@ import type {
 	WorkflowRunState,
 } from "@aikirun/types/workflow/run";
 import {
+	DefinitionCodecMissingError,
 	WorkflowRunNotExecutableError,
 	WorkflowRunRevisionConflictError,
 	WorkflowRunStateUnknownError,
@@ -27,9 +28,11 @@ import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
 	type BoundCodec,
+	type ComposedCodec,
 	composeCodecs,
 	noopCodec,
 	resolveDeclaredClientCodec,
+	resolveDeclaredDefinitionCodec,
 	toBoundCodec,
 	type WorkflowDefinitionCodec,
 } from "./bound-codec";
@@ -158,8 +161,8 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 		client: Client<Context>;
 		codec: {
 			client: BoundCodec;
-			workflowInput: BoundCodec;
-			workflowOutput: BoundCodec;
+			workflowInput: ComposedCodec;
+			workflowOutput: ComposedCodec;
 		};
 		transitionStateOptimistic: (state: WorkflowRunTransitionStateRequestOptimistic["state"]) => Promise<void>;
 		transitionTaskState: (
@@ -202,16 +205,30 @@ export type WorkflowRunWaitResult<Output, Timed extends boolean, Abortable exten
 			  };
 
 export async function decodeWaitResultState<Output>(
-	codec: BoundCodec,
+	params: {
+		runId: WorkflowRunId;
+		clientCodec: BoundCodec;
+		workflowOutput: ComposedCodec;
+	},
 	state: TerminalWorkflowRunState
 ): Promise<WorkflowRunWaitResultSuccess<Output>> {
 	if (state.status !== "completed") {
 		return state;
 	}
 
+	// When the stored completion applied a definition codec, decode through the composed
+	// workflow output (definition inner, client outer). Otherwise decode through the client only.
+	if (state.definitionCodecApplied && !params.workflowOutput.definitionCodecSupplied) {
+		throw new DefinitionCodecMissingError(params.runId);
+	}
+
+	const output = state.definitionCodecApplied
+		? await params.workflowOutput.decode(state.output)
+		: await params.clientCodec.decode(state.output);
+
 	return {
 		status: "completed",
-		output: (await codec.decode(state.output)) as Output,
+		output: output as Output,
 	};
 }
 
@@ -234,17 +251,21 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
 
-		const declaration = {
-			runId: this._run.id as WorkflowRunId,
+		const runId = this._run.id as WorkflowRunId;
+		const clientCodec = resolveDeclaredClientCodec(client, {
+			runId,
 			clientCodecApplied: this._run.clientCodecApplied,
-		};
-		const clientCodec = resolveDeclaredClientCodec(client, declaration);
+		});
+		const definitionInput = resolveDeclaredDefinitionCodec(workflowCodec?.input, {
+			runId,
+			definitionCodecApplied: this._run.definitionCodecApplied,
+		});
 
 		this[INTERNAL] = {
 			client,
 			codec: {
 				client: clientCodec ? toBoundCodec(clientCodec) : noopCodec,
-				workflowInput: composeCodecs(workflowCodec?.input, clientCodec),
+				workflowInput: composeCodecs(definitionInput, clientCodec),
 				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
 			},
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
@@ -306,7 +327,11 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 				return {
 					success: true,
 					state: await decodeWaitResultState<Output>(
-						this[INTERNAL].codec.workflowOutput,
+						{
+							runId: this._run.id as WorkflowRunId,
+							clientCodec: this[INTERNAL].codec.client,
+							workflowOutput: this[INTERNAL].codec.workflowOutput,
+						},
 						this._run.state as TerminalWorkflowRunState
 					),
 				};
