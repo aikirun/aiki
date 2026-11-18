@@ -30,11 +30,11 @@ import {
 	type BoundCodec,
 	type ComposedCodec,
 	composeCodecs,
+	type DefinitionCodec,
 	noopCodec,
 	resolveDeclaredClientCodec,
 	resolveDeclaredDefinitionCodec,
 	toBoundCodec,
-	type WorkflowDefinitionCodec,
 } from "./bound-codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
 import { isControlFlowError } from "../execution/control-flow-error";
@@ -43,7 +43,7 @@ import { taskHandlerScopeStorage } from "../execution/task-handler-scope";
 export interface WorkflowRunHandleOptions<TEvents extends EventsDefinition> {
 	eventsDefinition?: TEvents;
 	logger?: Logger;
-	workflowCodec?: WorkflowDefinitionCodec;
+	definitionCodec?: DefinitionCodec;
 }
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
@@ -77,7 +77,7 @@ export function workflowRunHandle<Output, Context, TEvents extends EventsDefinit
 						"aiki.workflowVersionId": run.versionId,
 						"aiki.workflowRunId": run.id,
 					}),
-				options?.workflowCodec
+				options?.definitionCodec
 			);
 		})();
 	}
@@ -93,7 +93,7 @@ export function workflowRunHandle<Output, Context, TEvents extends EventsDefinit
 				"aiki.workflowVersionId": run.versionId,
 				"aiki.workflowRunId": run.id,
 			}),
-		options?.workflowCodec
+		options?.definitionCodec
 	);
 }
 
@@ -246,7 +246,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		private _run: WorkflowRunRecord,
 		eventsDefinition: TEvents,
 		private readonly logger: Logger,
-		workflowCodec?: WorkflowDefinitionCodec
+		definitionCodec?: DefinitionCodec
 	) {
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
@@ -256,7 +256,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			runId,
 			clientCodecApplied: this._run.clientCodecApplied,
 		});
-		const definitionInput = resolveDeclaredDefinitionCodec(workflowCodec?.input, {
+		const definitionInput = resolveDeclaredDefinitionCodec(definitionCodec?.input, {
 			runId,
 			definitionCodecApplied: this._run.definitionCodecApplied,
 		});
@@ -266,7 +266,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			codec: {
 				client: clientCodec ? toBoundCodec(clientCodec) : noopCodec,
 				workflowInput: composeCodecs(definitionInput, clientCodec),
-				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
+				workflowOutput: composeCodecs(definitionCodec?.output, clientCodec),
 			},
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),

@@ -32,8 +32,14 @@ export function toWorkflowRunState(raw: unknown): WorkflowRunState {
 
 export function toTaskState(raw: unknown): TaskState {
 	const state = raw as Record<string, unknown>;
-	if (state.status === "completed" && !("output" in state)) {
-		state.output = undefined;
+	if (state.status === "completed") {
+		if (!("output" in state)) {
+			state.output = undefined;
+		}
+		// Pre-flag completed states omit the declaration; treat as not applied.
+		if (!("definitionCodecApplied" in state)) {
+			state.definitionCodecApplied = false;
+		}
 	}
 	return state as unknown as TaskState;
 }

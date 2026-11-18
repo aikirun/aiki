@@ -41,16 +41,16 @@ import type { WorkflowRun } from "./run";
 import type { ControlFlowError } from "./run/execution/control-flow-error";
 import { createReplayManifest } from "./run/execution/replay-manifest";
 import { taskExecutionTracker } from "./run/execution/task-execution-tracker";
-import type { WorkflowDefinitionCodec } from "./run/handle/bound-codec";
+import type { DefinitionCodec } from "./run/handle/bound-codec";
 import { workflowRunHandle } from "./run/handle/workflow-run";
 import { type Task, task } from "./task";
 
 function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
-	options: { maxInlineWaitMs?: number; workflowCodec?: WorkflowDefinitionCodec } = {}
+	options: { maxInlineWaitMs?: number; definitionCodec?: DefinitionCodec } = {}
 ): WorkflowRun<null, Record<string, never>> {
-	const handle = workflowRunHandle(client, record, { workflowCodec: options.workflowCodec });
+	const handle = workflowRunHandle(client, record, { definitionCodec: options.definitionCodec });
 	return {
 		id: record.id as WorkflowRunId,
 		name: record.name as WorkflowName,
@@ -194,13 +194,553 @@ describe("task", () => {
 				expect(await sendEmail.start(run, input)).toBe(output);
 			}));
 
+		test("encodes through the task definition codec then the client codec", () =>
+			withFakeClient(async (client) => {
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+				const storedInput = asOpaquePayload({ client: { def: input } });
+				const storedOutput = asOpaquePayload({ client: { def: output } });
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toEqual({ def: expect.any(String) });
+						return { client: payload };
+					},
+					decode: async (payload) => payload,
+				};
+
+				const runRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe(input);
+								return { def: payload as string };
+							},
+							decode: async (payload) => payload,
+						}),
+						output: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe(output);
+								return { def: payload as string };
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output: storedOutput, definitionCodecApplied: true },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: storedInput,
+							inputHash,
+							taskName: sendEmail.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "completed",
+								output: storedOutput,
+								definitionCodecApplied: true,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
+
+		test("still applies the task definition codec when the run skipped the client codec", () =>
+			withFakeClient(async (client) => {
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+				const storedInput = asOpaquePayload({ def: input });
+				const storedOutput = asOpaquePayload({ def: output });
+				client[INTERNAL].codec = {
+					encode: async () => {
+						throw new Error("client codec must not run");
+					},
+					decode: async () => {
+						throw new Error("client codec must not run");
+					},
+				};
+
+				const runRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: false });
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						input: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe(input);
+								return { def: payload as string };
+							},
+							decode: async (payload) => payload,
+						}),
+						output: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe(output);
+								return { def: payload as string };
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output: storedOutput, definitionCodecApplied: true },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: storedInput,
+							inputHash,
+							taskName: sendEmail.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "completed",
+								output: storedOutput,
+								definitionCodecApplied: true,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
+
+		test("decodes through the client codec then the task definition codec when replaying a completed task", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const output = "previously-sent";
+				const storedOutput = asOpaquePayload({ client: { def: output } });
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: storedOutput, definitionCodecApplied: true },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
+					tasks: { [address]: [recordedTask] },
+				});
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual({ client: { def: output } });
+						return (payload as { client: unknown }).client;
+					},
+				};
+				const run = createTestWorkflowRun(client, runRecord);
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string, never, { def: string }>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+					codec: {
+						output: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async (payload) => {
+								expect(payload).toEqual({ def: output });
+								return (payload as { def: string }).def;
+							},
+						}),
+					},
+				});
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
+		test("throws DefinitionCodecMissingError when replaying a completed task that expects a missing output codec", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: asOpaquePayload("previously-sent"), definitionCodecApplied: true },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task<{ to: string }, string>({
+					name: "send-email",
+					handler: async () => "freshly-sent",
+				});
+
+				await expect(sendEmail.start(run, input)).rejects.toBeInstanceOf(DefinitionCodecMissingError);
+			}));
+
+		test("throws CodecInitFailedError when the task definition codec factory throws", () =>
+			withFakeClient(async (client) => {
+				const initError = new Error("factory failed");
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						input: () => {
+							throw initError;
+						},
+					},
+				});
+
+				const starting = sendEmail.start(run, "info@aiki.run");
+				await expect(starting).rejects.toBeInstanceOf(CodecInitFailedError);
+				await expect(starting).rejects.toMatchObject({ cause: initError });
+			}));
+
+		test("reports a failure to encode the input with the task definition codec as CodecEncodeFailedError, caused by the codec's error", () =>
+			withFakeClient(async (client) => {
+				const encodeError = new Error("cannot encode input");
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						input: () => ({
+							encode: async () => {
+								throw encodeError;
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+
+				const starting = sendEmail.start(run, "info@aiki.run");
+				await expect(starting).rejects.toBeInstanceOf(CodecEncodeFailedError);
+				await expect(starting).rejects.toMatchObject({ cause: encodeError });
+			}));
+
+		test("reports a failure to encode the output with the task definition codec as CodecEncodeFailedError, caused by the codec's error", () =>
+			withFakeClient(async (client) => {
+				const encodeError = new Error("cannot encode output");
+				const input = "info@aiki.run";
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						output: () => ({
+							encode: async () => {
+								throw encodeError;
+							},
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				client.api.task.transitionStateV1.once(
+					{
+						type: "create",
+						input: asOpaquePayload(input),
+						inputHash,
+						taskName: sendEmail.name,
+						options: {},
+						workflowRunId: runRecord.id,
+						expectedWorkflowRunRevision: runRecord.revision,
+						sequence: 1,
+					},
+					{ taskInfo: runningTaskInfo }
+				);
+
+				const starting = sendEmail.start(run, input);
+				await expect(starting).rejects.toBeInstanceOf(CodecEncodeFailedError);
+				await expect(starting).rejects.toMatchObject({ cause: encodeError });
+			}));
+
+		test("reports a failure to decode the output with the task definition codec as CodecDecodeFailedError, caused by the codec's error", () =>
+			withFakeClient(async (client) => {
+				const decodeError = new Error("cannot decode output");
+				const input = { to: "info@aiki.run" };
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: asOpaquePayload({ def: "previously-sent" }), definitionCodecApplied: true },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task<{ to: string }, string, never, { def: string }>({
+					name: "send-email",
+					handler: async () => "freshly-sent",
+					codec: {
+						output: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async () => {
+								throw decodeError;
+							},
+						}),
+					},
+				});
+
+				const starting = sendEmail.start(run, input);
+				await expect(starting).rejects.toBeInstanceOf(CodecDecodeFailedError);
+				await expect(starting).rejects.toMatchObject({ cause: decodeError });
+			}));
+
+		test("encodes input through the definition codec and records definitionCodecApplied false on output when only the input codec is configured", () =>
+			withFakeClient(async (client) => {
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+				const storedInput = asOpaquePayload({ def: input });
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						input: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output: asOpaquePayload(output), definitionCodecApplied: false },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: storedInput,
+							inputHash,
+							taskName: sendEmail.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "completed",
+								output: asOpaquePayload(output),
+								definitionCodecApplied: false,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
+
+		test("records definitionCodecApplied true on output when only the output codec is configured", () =>
+			withFakeClient(async (client) => {
+				const input = "info@aiki.run";
+				const output = "Sent to info@aiki.run";
+				const storedOutput = asOpaquePayload({ def: output });
+				const runRecord = runningWorkflowRunRecordFactory.build();
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const sendEmail = task({
+					name: "send-email",
+					handler: async (to: string): Promise<string> => `Sent to ${to}`,
+					codec: {
+						output: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async (payload) => payload,
+						}),
+					},
+				});
+
+				const inputHash = await hashInput(input);
+				const runningTaskInfo = runningTaskInfoFactory.build({ name: sendEmail.name });
+				const completedTaskInfo = completedTaskInfoFactory.build({
+					id: runningTaskInfo.id,
+					name: sendEmail.name,
+					state: { output: storedOutput, definitionCodecApplied: true },
+				});
+
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "create",
+							input: asOpaquePayload(input),
+							inputHash,
+							taskName: sendEmail.name,
+							options: {},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: runningTaskInfo }
+					)
+					.once(
+						{
+							id: runningTaskInfo.id,
+							attempts: 1,
+							state: {
+								status: "completed",
+								output: storedOutput,
+								definitionCodecApplied: true,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{ taskInfo: completedTaskInfo }
+					);
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+			}));
+
+		test("does not decode through the task definition codec when replaying a completed task that recorded definitionCodecApplied false", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const output = "previously-sent";
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: asOpaquePayload(output), definitionCodecApplied: false },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string, never, { def: string }>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+					codec: {
+						output: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async () => {
+								throw new Error("definition output codec must not run when definitionCodecApplied is false");
+							},
+						}),
+					},
+				});
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
+		test("does not instantiate the input codec when replaying a completed task", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const output = "previously-sent";
+				const storedOutput = asOpaquePayload({ def: output });
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: storedOutput, definitionCodecApplied: true },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					tasks: { [address]: [recordedTask] },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string, never, { def: string }>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+					codec: {
+						input: () => {
+							throw new Error("input codec must not be instantiated on completed-task replay");
+						},
+						output: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async (payload) => (payload as { def: string }).def,
+						}),
+					},
+				});
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
 		test("does not apply the workflow definition codec to task input or output", () =>
 			withFakeClient(async (client) => {
 				const input = "info@aiki.run";
 				const output = "Sent to info@aiki.run";
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async () => {
 								throw new Error("definition input codec must not run for tasks");
@@ -276,7 +816,7 @@ describe("task", () => {
 					tasks: { [address]: [recordedTask] },
 				});
 				const run = createTestWorkflowRun(client, runRecord, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async () => {
 								throw new Error("definition input codec must not run for tasks");
@@ -325,7 +865,7 @@ describe("task", () => {
 					tasks: { [address]: [awaitingRetryTaskInfo] },
 				});
 				const run = createTestWorkflowRun(client, runRecord, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async () => {
 								throw new Error("definition input codec must not run for tasks");
@@ -371,7 +911,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload(output) },
+							state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -382,6 +922,89 @@ describe("task", () => {
 								name: chargeCard.name,
 								attempts: 2,
 								state: { output: asOpaquePayload(output) },
+							}),
+						}
+					);
+
+				expect(await chargeCard.start(run, input)).toBe(output);
+			}));
+
+		test("encodes the retried task's output through the task definition codec then the client codec", () =>
+			withFakeClient(async (client) => {
+				const input = { cardId: "card-1" };
+				const output = "charged";
+				const storedOutput = asOpaquePayload({ client: { def: output } });
+				const retry = { type: "fixed", maxAttempts: 3, delayMs: 60_000 } as const;
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "charge-card", referenceId: inputHash });
+				const awaitingRetryTaskInfo = awaitingRetryTaskInfoFactory.build({
+					name: "charge-card",
+					options: { retry },
+					state: { nextAttemptAt: 1 },
+				});
+				client[INTERNAL].codec = {
+					encode: async (payload) => {
+						expect(payload).toEqual({ def: output });
+						return { client: payload };
+					},
+					decode: async (payload) => payload,
+				};
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
+					tasks: { [address]: [awaitingRetryTaskInfo] },
+				});
+				const run = createTestWorkflowRun(client, runRecord);
+
+				const chargeCard = task<{ cardId: string }, string, never, { def: string }>({
+					name: "charge-card",
+					handler: async () => output,
+					codec: {
+						output: () => ({
+							encode: async (payload) => {
+								expect(payload).toBe(output);
+								return { def: payload as string };
+							},
+							decode: async (payload) => (payload as { def: string }).def,
+						}),
+					},
+				});
+
+				const retriedTaskInfo = runningTaskInfoFactory.build({
+					id: awaitingRetryTaskInfo.id,
+					name: chargeCard.name,
+					attempts: 2,
+				});
+				client.api.task.transitionStateV1
+					.once(
+						{
+							type: "retry",
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 1,
+						},
+						{ taskInfo: retriedTaskInfo }
+					)
+					.once(
+						{
+							id: awaitingRetryTaskInfo.id,
+							attempts: 2,
+							state: {
+								status: "completed",
+								output: storedOutput,
+								definitionCodecApplied: true,
+							},
+							workflowRunId: runRecord.id,
+							expectedWorkflowRunRevision: runRecord.revision,
+							sequence: 2,
+						},
+						{
+							taskInfo: completedTaskInfoFactory.build({
+								id: awaitingRetryTaskInfo.id,
+								name: chargeCard.name,
+								attempts: 2,
+								state: { output: storedOutput, definitionCodecApplied: true },
 							}),
 						}
 					);
@@ -601,7 +1224,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -702,7 +1325,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -757,7 +1380,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							state: { status: "completed", output: asOpaquePayload("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -818,7 +1441,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -1102,7 +1725,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							state: { status: "completed", output: asOpaquePayload("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -2121,12 +2744,12 @@ describe("task output on the first run", () => {
 					{
 						id: runningTaskInfo.id,
 						attempts: 1,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: undefined, definitionCodecApplied: false },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 						sequence: 2,
 					},
-					{ taskInfo: { ...runningTaskInfo, state: { status: "completed" } } }
+					{ taskInfo: { ...runningTaskInfo, state: { status: "completed", definitionCodecApplied: false } } }
 				);
 
 			expect(await ping.start(run)).toBeUndefined();
