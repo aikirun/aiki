@@ -33,6 +33,16 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
+import {
+	type ComposedCodec,
+	type CreateDefinitionCodec,
+	composeCodecs,
+	type DefinitionCodec,
+	instantiateCodec,
+	instantiateDefinitionCodec,
+	resolveAppliedClientCodec,
+	resolveDeclaredDefinitionCodec,
+} from "./run/codec";
 import type { WorkflowExecutionConfig } from "./run/execution/config";
 import type { TaskExecutionTracker } from "./run/execution/task-execution-tracker";
 import { type TaskHandlerScope, taskHandlerScopeStorage } from "./run/execution/task-handler-scope";
@@ -93,13 +103,17 @@ type UnknownWorkflowRunHandle = WorkflowRunHandle<unknown, unknown>;
  * const result = await chargeCard.start(run, { cardId: "123", amount: 9999 });
  * ```
  */
-export function task<Input = void, Output = void>(
-	params: TaskParams<Input, Output> & Serializable<Input, "input"> & Serializable<Output, "output">
+export function task<Input = void, Output = void, EncodedInput = never, EncodedOutput = never>(
+	params: TaskParams<Input, Output, EncodedInput, EncodedOutput> &
+		Serializable<Input, "input"> &
+		Serializable<Output, "output"> &
+		Serializable<EncodedInput, "codec.input"> &
+		Serializable<EncodedOutput, "codec.output">
 ): Task<Input, Output> {
 	return new TaskImpl(params);
 }
 
-export interface TaskParams<Input, Output> {
+export interface TaskParams<Input, Output, EncodedInput = never, EncodedOutput = never> {
 	name: string;
 	handler: (input: Input) => Promise<Output>;
 	retry?: RetryStrategy;
@@ -107,6 +121,21 @@ export interface TaskParams<Input, Output> {
 		input?: StandardSchemaV1<Input>;
 		output?: StandardSchemaV1<Output>;
 	}>;
+	/**
+	 * Optional codecs for this task's input and output. Composed with the client's codec at the
+	 * call site and again at consumption: definition encodes first, client wraps; decode reverses
+	 * that order. Does not replace the client codec. Independent of any workflow definition codec.
+	 *
+	 * Each start and each replay builds its own codec from these factories, so keep any state that
+	 * should outlive a start or a replay outside the factory.
+	 *
+	 * Completed outputs a definition codec writes record whether it did (`definitionCodecApplied`).
+	 * Stored task inputs are never decoded, so they carry no such flag. Adding or removing an output
+	 * codec on a task that has stored results is safe: readers honour the stored declaration, and
+	 * refuse with `DefinitionCodecMissingError` when a payload was written with a definition codec
+	 * that is no longer present.
+	 */
+	codec?: CreateDefinitionCodec<EncodedInput, EncodedOutput>;
 }
 
 export interface Task<Input, Output> {
@@ -124,7 +153,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private readonly startOptionsBuilder: ObjectBuilder<TaskStartOptions>;
 
 	constructor(
-		private readonly params: TaskParams<Input, Output>,
+		private readonly params: TaskParams<Input, Output, unknown, unknown>,
 		startOptionsBuilder?: ObjectBuilder<TaskStartOptions>
 	) {
 		this.name = params.name as TaskName;
@@ -181,13 +210,14 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 
 		const attempts = 1;
 		const retryStrategy = startOptions.retry ?? { type: "never" };
-		const codec = handle[INTERNAL].codec.client;
+		const taskCodec = instantiateDefinitionCodec(this.params.codec, logger);
+		const { inputCodec, outputCodec } = this.bindTaskCodecs(handle, taskCodec);
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "create",
 			taskName: this.name,
 			options: startOptions,
-			input: await codec.encode(input),
+			input: await inputCodec.encode(input),
 			inputHash,
 		});
 
@@ -212,7 +242,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: await codec.encode(output) },
+			state: {
+				status: "completed",
+				output: await outputCodec.encode(output),
+				definitionCodecApplied: outputCodec.definitionCodecSupplied,
+			},
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 
@@ -230,7 +264,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const existingTaskState = existingTaskInfo.state;
 
 		if (existingTaskState.status === "completed") {
-			return (await handle[INTERNAL].codec.client.decode(existingTaskState.output)) as Output;
+			return this.decodeCompletedTaskOutput(handle, existingTaskState, logger);
 		}
 
 		if (existingTaskState.status === "failed") {
@@ -314,14 +348,58 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			taskLogger
 		);
 
+		const { outputCodec } = this.bindTaskCodecs(handle, {
+			output: instantiateCodec(this.params.codec?.output, logger),
+		});
+
 		await handle[INTERNAL].transitionTaskState({
 			id: taskInfo.id,
 			attempts: lastAttempt,
-			state: { status: "completed", output: await handle[INTERNAL].codec.client.encode(output) },
+			state: {
+				status: "completed",
+				output: await outputCodec.encode(output),
+				definitionCodecApplied: outputCodec.definitionCodecSupplied,
+			},
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
 
 		return output;
+	}
+
+	private bindTaskCodecs(
+		handle: UnknownWorkflowRunHandle,
+		taskCodec: DefinitionCodec | undefined
+	): { inputCodec: ComposedCodec; outputCodec: ComposedCodec } {
+		const runId = handle.run.id as WorkflowRunId;
+		const clientCodec = resolveAppliedClientCodec(handle[INTERNAL].client, {
+			runId,
+			clientCodecApplied: handle.run.clientCodecApplied,
+		});
+		return {
+			inputCodec: composeCodecs(taskCodec?.input, clientCodec),
+			outputCodec: composeCodecs(taskCodec?.output, clientCodec),
+		};
+	}
+
+	private async decodeCompletedTaskOutput(
+		handle: UnknownWorkflowRunHandle,
+		state: Extract<TaskInfo["state"], { status: "completed" }>,
+		logger: Logger
+	): Promise<Output> {
+		const runId = handle.run.id as WorkflowRunId;
+		const clientCodec = resolveAppliedClientCodec(handle[INTERNAL].client, {
+			runId,
+			clientCodecApplied: handle.run.clientCodecApplied,
+		});
+
+		const definitionOutput = resolveDeclaredDefinitionCodec(instantiateCodec(this.params.codec?.output, logger), {
+			runId,
+			definitionCodecApplied: state.definitionCodecApplied,
+		});
+
+		const output = await composeCodecs(definitionOutput, clientCodec).decode(state.output);
+
+		return output as Output;
 	}
 
 	private async tryExecuteTask(

@@ -1,5 +1,6 @@
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { WorkflowRunState } from "@aikirun/types/workflow/run";
+import type { TaskState } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
@@ -168,7 +169,32 @@ describe("state transition repository getById", () => {
 			const row = await repos.stateTransition.getById(transitionId);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
+		}));
+
+	test("returns a completed task's state carrying definitionCodecApplied when the stored JSON omitted it", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const transitionId = ulid();
+			// Pre-flag completed JSON has neither output nor definitionCodecApplied.
+			await repos.stateTransition.append({
+				id: transitionId,
+				workflowRunId: runId,
+				type: "task",
+				taskId: taskInfo.id,
+				attempt: 1,
+				revision: revisionWhenClaimed,
+				taskSequence: latestTaskSequence + 1,
+				state: { status: "completed" } as TaskState,
+			});
+
+			const row = await repos.stateTransition.getById(transitionId);
+
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
 		}));
 });
 
@@ -330,7 +356,7 @@ describe("state transition repository listByRunId", () => {
 				attempt: 1,
 				revision: revisionWhenClaimed,
 				taskSequence: latestTaskSequence + 1,
-				state: { status: "completed" },
+				state: { status: "completed", definitionCodecApplied: false },
 			});
 
 			const { rows } = await repos.stateTransition.listByRunId(runId, 50, 0, { order: "asc" });

@@ -21,6 +21,7 @@ export const taskStateAwaitingRetrySchema = type({
 export const taskStateCompletedSchema = type({
 	status: "'completed'",
 	output: opaquePayloadSchema,
+	definitionCodecApplied: "boolean",
 });
 
 export const taskStateFailedSchema = type({

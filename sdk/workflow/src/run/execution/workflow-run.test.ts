@@ -347,7 +347,7 @@ describe("executeWorkflowRun", () => {
 						{
 							id: chargeCardTaskInfo.id,
 							attempts: 1,
-							state: { status: "completed", output: asOpaquePayload("charged") },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
 							workflowRunId: workflowRun.id,
 							expectedWorkflowRunRevision: workflowRun.revision,
 							sequence: 2,

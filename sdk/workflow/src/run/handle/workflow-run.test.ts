@@ -173,8 +173,18 @@ describe("workflowRunHandle", () => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 
-				const reserveSeat = { type: "create", taskName: "reserve-seat", options: {}, inputHash: "seat-hash" } as const;
-				const chargeCard = { type: "create", taskName: "charge-card", options: {}, inputHash: "card-hash" } as const;
+				const reserveSeat = {
+					type: "create",
+					taskName: "reserve-seat",
+					options: {},
+					inputHash: "seat-hash",
+				} as const;
+				const chargeCard = {
+					type: "create",
+					taskName: "charge-card",
+					options: {},
+					inputHash: "card-hash",
+				} as const;
 				const sendReceipt = {
 					type: "create",
 					taskName: "send-receipt",
@@ -526,7 +536,7 @@ describe("workflowRunHandle", () => {
 				};
 				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const handle = workflowRunHandle(client, record, {
-					workflowCodec: {
+					definitionCodec: {
 						output: {
 							encode: async (payload) => payload,
 							decode: async (payload) => {

@@ -205,7 +205,7 @@ describe("TaskStateMachine transitionState", () => {
 					sequence: 1,
 					id: victimTaskSeed.taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output: asOpaquePayload("hijacked") },
+					state: { status: "completed", output: asOpaquePayload("hijacked"), definitionCodecApplied: false },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 

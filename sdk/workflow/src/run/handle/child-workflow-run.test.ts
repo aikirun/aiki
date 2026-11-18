@@ -99,7 +99,7 @@ describe("childWorkflowRunHandle", () => {
 				});
 				const parentHandle = workflowRunHandle(client, parentRecord);
 				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async (payload) => payload,
 							decode: async () => "from-input",

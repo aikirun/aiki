@@ -11,12 +11,12 @@ import {
 	type WorkflowRunWaitResultSuccess,
 	workflowRunHandle,
 } from "./workflow-run";
-import type { WorkflowDefinitionCodec } from "../codec";
+import type { DefinitionCodec } from "../codec";
 import type { EventsDefinition } from "../event/definition";
 
 export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition> {
 	eventsDefinition?: TEvents;
-	workflowCodec?: WorkflowDefinitionCodec;
+	definitionCodec?: DefinitionCodec;
 }
 
 export function childWorkflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
