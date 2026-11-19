@@ -696,6 +696,51 @@ describe("task", () => {
 				expect(handlerCalls).toBe(0);
 			}));
 
+		test("decodes through the client codec only when replaying a completed task that recorded definitionCodecApplied false even though a definition codec is present", () =>
+			withFakeClient(async (client) => {
+				const input = { to: "info@aiki.run" };
+				const output = "previously-sent";
+				const storedOutput = asOpaquePayload({ client: output });
+				const inputHash = await hashInput(input);
+				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
+				const recordedTask = completedTaskInfoFactory.build({
+					name: "send-email",
+					state: { output: storedOutput, definitionCodecApplied: false },
+				});
+				const runRecord = runningWorkflowRunRecordFactory.build({
+					clientCodecApplied: true,
+					tasks: { [address]: [recordedTask] },
+				});
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return (payload as { client: string }).client;
+					},
+				};
+				const run = createTestWorkflowRun(client, runRecord);
+
+				let handlerCalls = 0;
+				const sendEmail = task<{ to: string }, string, never, { def: string }>({
+					name: "send-email",
+					handler: async () => {
+						handlerCalls++;
+						return "freshly-sent";
+					},
+					codec: {
+						output: () => ({
+							encode: async (payload) => ({ def: payload as string }),
+							decode: async () => {
+								throw new Error("definition output codec must not run when definitionCodecApplied is false");
+							},
+						}),
+					},
+				});
+
+				expect(await sendEmail.start(run, input)).toBe(output);
+				expect(handlerCalls).toBe(0);
+			}));
+
 		test("does not instantiate the input codec when replaying a completed task", () =>
 			withFakeClient(async (client) => {
 				const input = { to: "info@aiki.run" };
