@@ -75,7 +75,11 @@ async function setTaskStateInTx(
 
 	const state: TaskState =
 		request.state.status === "completed"
-			? { status: "completed", output: request.state.output }
+			? {
+					status: "completed",
+					output: request.state.output,
+					definitionCodecApplied: request.state.definitionCodecApplied,
+				}
 			: { status: request.state.status satisfies "failed", error: request.state.error };
 
 	// Only the worker assigns task sequences, so a result set from outside it takes the next one after

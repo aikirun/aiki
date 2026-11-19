@@ -99,7 +99,7 @@ describe("childWorkflowRunHandle", () => {
 				});
 				const parentHandle = workflowRunHandle(client, parentRecord);
 				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async (payload) => payload,
 							decode: async () => "from-input",
@@ -142,6 +142,46 @@ describe("childWorkflowRunHandle", () => {
 				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
 
 				await expect(childHandle.wait()).rejects.toBeInstanceOf(DefinitionCodecMissingError);
+			}));
+
+		test("decodes the child's completed output through the client codec only when definitionCodecApplied is false even though a definition codec is present", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ client: "done" });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return (payload as { client: string }).client;
+					},
+				};
+				const childRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: {
+						[childRecord.id]: {
+							timeouts: [],
+							terminal: {
+								state: { status: "completed", output: storedOutput, definitionCodecApplied: false },
+								completedAt: 1_000,
+							},
+						},
+					},
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger, {
+					definitionCodec: {
+						output: {
+							encode: async (payload) => payload,
+							decode: async () => {
+								throw new Error("definition output codec must not run when definitionCodecApplied is false");
+							},
+						},
+					},
+				});
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
 			}));
 
 		test("resolves with whatever terminal state the child reached", () =>

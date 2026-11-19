@@ -7,7 +7,7 @@ import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, Schedu
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import type { EventsDefinition } from "./run/event";
-import { instantiateCodec, resolveWorkflowInputCodec } from "./run/handle/bound-codec";
+import { instantiateCodec, resolveInputCodec } from "./run/handle/bound-codec";
 import type { WorkflowVersion } from "./workflow-version";
 
 export interface CronScheduleParams {
@@ -77,7 +77,7 @@ async function activateWithOptions<Input, Output, Context, TEvents extends Event
 	const workflowRunInput = args[0];
 	const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
 	const workflowRunOptions = workflow[INTERNAL].runOptions();
-	const { codec, clientCodecApplied, definitionCodecApplied } = resolveWorkflowInputCodec({
+	const { codec, clientCodecApplied, definitionCodecApplied } = resolveInputCodec({
 		definitionCodec: instantiateCodec(workflow[INTERNAL].codec?.input, client.logger),
 		clientCodec,
 		policy: workflowRunOptions.clientCodecPolicy,
