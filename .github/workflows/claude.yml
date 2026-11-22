@@ -44,8 +44,10 @@ jobs:
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
-          # Optional: Add claude_args to customize behavior and configuration
+          # The inline comment tool lets a review leave one comment per finding on the lines it is about.
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment"
+            --append-system-prompt "When asked to review a pull request, follow .agents/skills/REVIEW.md. Post each finding as its own inline comment on the lines it is about, using mcp__github_inline_comment__create_inline_comment with confirmed: true. Keep your main comment to a summary of two or three lines, without repeating the inline comments."
 
