@@ -316,6 +316,13 @@
 			"when": 1791348670821,
 			"tag": "0045_supreme_the_professor",
 			"breakpoints": true
+		},
+		{
+			"idx": 46,
+			"version": "7",
+			"when": 1794938039315,
+			"tag": "0046_brainy_arclight",
+			"breakpoints": true
 		}
 	]
 }

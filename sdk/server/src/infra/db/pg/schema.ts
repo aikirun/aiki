@@ -213,6 +213,11 @@ export const workflowRun = pgTable(
 		index("idx_workflow_run_due_awaiting_task_retry")
 			.on(table.nextAttemptAt, table.id)
 			.where(sql`${table.status} = 'awaiting_task_retry'`),
+
+		check(
+			"chk_workflow_run_sleeping_requires_wakeup_at",
+			sql`${table.status} != 'sleeping' OR ${table.wakeupAt} IS NOT NULL`
+		),
 	]
 );
 
