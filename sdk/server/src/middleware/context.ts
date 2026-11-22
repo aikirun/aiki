@@ -1,7 +1,12 @@
-import type { AuthedRequestContextBase, ContextBase, PublicRequestContext } from "@aikirun/lib/context";
+import type {
+	AuthedRequestContextBase,
+	ContextBase,
+	PublicRequestContext,
+	RequestContextBase,
+} from "@aikirun/lib/context";
 import type { Logger } from "@aikirun/lib/logger";
 import type { RequiredProp } from "@aikirun/lib/object";
-import type { ApiAuthorizer } from "@aikirun/types/iam";
+import type { ApiAuthorization } from "@aikirun/types/iam";
 import type { NamespaceId } from "@aikirun/types/namespace";
 import type { OrganizationId } from "@aikirun/types/organization";
 import { ulid } from "ulidx";
@@ -42,36 +47,13 @@ export function createPublicRequestContext(params: { request: Request; logger: L
 	};
 }
 
-export async function createNamespaceRequestContext(params: {
-	request: Request;
-	logger: Logger;
-	authorizer: ApiAuthorizer;
-}): Promise<NamespaceRequestContext> {
-	const { request, logger, authorizer } = params;
-	const traceId = request.headers.get("x-trace-id") ?? ulid();
-	const spanId = ulid();
-	const authorization = authorizer(request);
-	const { organizationId, namespaceId, userId } =
-		authorization instanceof Promise ? await authorization : authorization;
-
-	return {
-		type: "request",
-		traceId,
-		spanId,
-		logger: logger.child({
-			"aiki.method": request.method,
-			"aiki.url": request.url,
-			"aiki.traceId": traceId,
-			"aiki.spanId": spanId,
-		}),
-		requestType: "authed",
-		headers: request.headers,
-		method: request.method,
-		url: request.url,
-		organizationId,
-		namespaceId,
-		userId,
-	};
+export function createNamespaceRequestContext(params: {
+	context: RequestContextBase;
+	authorization: ApiAuthorization;
+}): NamespaceRequestContext {
+	const { context, authorization } = params;
+	const { organizationId, namespaceId, userId } = authorization;
+	return { ...context, requestType: "authed", organizationId, namespaceId, userId };
 }
 
 export function createDaemonContext(params: { name: string; logger: Logger; signal: AbortSignal }): DaemonContext {

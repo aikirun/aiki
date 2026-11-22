@@ -1,5 +1,5 @@
 import { createIdentityRouter } from "./identity";
-import { namespaceAuthedImplementer, publicImplementer } from "./implementer";
+import { namespaceAuthedRouterImplementer, publicImplementer } from "./implementer";
 import { createScheduleRouter } from "./schedule";
 import { createTaskRouter } from "./task";
 import { createWorkflowRouter } from "./workflow";
@@ -21,7 +21,7 @@ export interface NamespaceAuthedRouterDeps extends WorkflowRunRouterDeps {
 }
 
 export function createNamespaceAuthedRouter(deps: NamespaceAuthedRouterDeps) {
-	return namespaceAuthedImplementer.router({
+	return namespaceAuthedRouterImplementer.router({
 		identity: createIdentityRouter(),
 		schedule: createScheduleRouter(deps.scheduleService),
 		task: createTaskRouter({

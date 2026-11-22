@@ -22,8 +22,6 @@ class UnauthorizedErrorFromIamBundle extends Error {
 	}
 }
 
-// Authorization runs before the router and answers its errors in plain text, not in oRPC's JSON.
-// The oRPC client can't read plain text, so these tests send raw requests.
 describe("handler API authorization", () => {
 	function handlerWithFailingAuthorizer(err: unknown) {
 		return createHandler({
@@ -42,16 +40,24 @@ describe("handler API authorization", () => {
 		expect(err instanceof UnauthorizedError).toBe(false);
 
 		const handler = await handlerWithFailingAuthorizer(err);
-		const response = await handler(new Request("http://localhost/api/workflowRun/getById"));
+		const api = createNamespaceAuthedClient(handler);
 
-		expect([response.status, await response.text()]).toEqual([401, "Invalid API key"]);
+		await expect(api.identity.getV1({})).rejects.toMatchObject({
+			code: "UNAUTHORIZED",
+			status: 401,
+			message: "Invalid API key",
+		});
 	});
 
 	test("an error carrying no reporting details answers 500", async () => {
 		const handler = await handlerWithFailingAuthorizer(new Error("boom"));
-		const response = await handler(new Request("http://localhost/api/workflowRun/getById"));
+		const api = createNamespaceAuthedClient(handler);
 
-		expect([response.status, await response.text()]).toEqual([500, "Internal Server Error"]);
+		await expect(api.identity.getV1({})).rejects.toMatchObject({
+			code: "INTERNAL_SERVER_ERROR",
+			status: 500,
+			message: "Internal server error",
+		});
 	});
 });
 

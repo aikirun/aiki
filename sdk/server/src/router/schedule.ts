@@ -1,8 +1,8 @@
-import { namespaceAuthedImplementer } from "./implementer";
+import { namespaceAuthedProcedureImplementer } from "./implementer";
 import type { ScheduleService } from "../service/schedule";
 
 export function createScheduleRouter(scheduleService: ScheduleService) {
-	const os = namespaceAuthedImplementer.schedule;
+	const os = namespaceAuthedProcedureImplementer.schedule;
 
 	return os.router({
 		activateV1: os.activateV1.handler(async ({ input: request, context }) => {

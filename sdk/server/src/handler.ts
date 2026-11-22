@@ -4,7 +4,6 @@ import {
 	type CreatePassiveConfigProvider,
 	validatedConfigProvider,
 } from "@aikirun/lib/config";
-import { asAikiError } from "@aikirun/lib/error";
 import { SENTINEL_ULID } from "@aikirun/lib/id";
 import type { Logger } from "@aikirun/lib/logger";
 import { merge } from "@aikirun/lib/object";
@@ -21,7 +20,7 @@ import { defaultServerHandlerConfig, type ServerHandlerConfig, type ServerHandle
 import { validateServerHandlerConfig } from "./config/handler/schema";
 import { createRepos } from "./infra/db/repo";
 import { createImminentTimerQueue } from "./infra/timer/imminent-timer-queue";
-import { createNamespaceRequestContext, type NamespaceRequestContext } from "./middleware/context";
+import { createPublicRequestContext } from "./middleware/context";
 import { createNamespaceAuthedRouter } from "./router/index";
 import { createEventService } from "./service/event";
 import { createScheduleService } from "./service/schedule";
@@ -97,18 +96,10 @@ export async function createHandler(params: CreateHandlerParams) {
 		const pathname = new URL(request.url).pathname;
 
 		if (pathname.startsWith("/api/")) {
-			let context: NamespaceRequestContext;
-			try {
-				context = await createNamespaceRequestContext({ request, logger, authorizer: apiAuthorizer });
-			} catch (err) {
-				const aikiError = asAikiError(err);
-				if (aikiError) {
-					return new Response(aikiError.message, { status: aikiError.status });
-				}
-				logger.error("Unhandled error", { err });
-				return new Response("Internal Server Error", { status: 500 });
-			}
-
+			const context = {
+				...createPublicRequestContext({ request, logger }),
+				authorize: () => apiAuthorizer(request),
+			};
 			const result = await namespaceAuthedHandler.handle(request, { context, prefix: "/api" });
 			return result.response ?? new Response("Not Found", { status: 404 });
 		}

@@ -1,6 +1,6 @@
 import type { WorkflowRunId } from "@aikirun/types/workflow/run";
 
-import { namespaceAuthedImplementer } from "./implementer";
+import { namespaceAuthedProcedureImplementer } from "./implementer";
 import type { EventService } from "../service/event";
 import type { WorkflowRunStateMachine } from "../service/state-machine/workflow-run";
 import type { WorkflowRunService } from "../service/workflow-run";
@@ -14,7 +14,7 @@ export interface WorkflowRunRouterDeps {
 }
 
 export function createWorkflowRunRouter(deps: WorkflowRunRouterDeps) {
-	const os = namespaceAuthedImplementer.workflowRun;
+	const os = namespaceAuthedProcedureImplementer.workflowRun;
 	const { eventService, workflowRunService, workflowRunStateMachine, workflowRunOutboxService } = deps;
 
 	return os.router({

@@ -1,8 +1,8 @@
-import { namespaceAuthedImplementer } from "./implementer";
+import { namespaceAuthedProcedureImplementer } from "./implementer";
 import type { WorkflowService } from "../service/workflow";
 
 export function createWorkflowRouter(workflowService: WorkflowService) {
-	const os = namespaceAuthedImplementer.workflow;
+	const os = namespaceAuthedProcedureImplementer.workflow;
 
 	return os.router({
 		listV1: os.listV1.handler(async ({ input: request, context }) => {

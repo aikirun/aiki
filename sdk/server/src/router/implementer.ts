@@ -1,13 +1,16 @@
-import type { PublicRequestContext } from "@aikirun/lib/context";
+import type { PublicRequestContext, RequestContextBase } from "@aikirun/lib/context";
+import type { ApiAuthorization } from "@aikirun/types/iam";
 import { implement } from "@orpc/server";
 
 import { handleError } from "./error-handler";
 import { namespaceAuthedContract } from "../contract/namespace-authed";
 import { publicContract } from "../contract/public";
-import type { NamespaceRequestContext } from "../middleware/context";
+import { createNamespaceRequestContext, type NamespaceRequestContext } from "../middleware/context";
 
 const basePublicImplementer = implement(publicContract).$context<PublicRequestContext>();
-const baseNamespaceAuthedImplementer = implement(namespaceAuthedContract).$context<NamespaceRequestContext>();
+const baseNamespaceAuthedRouterImplementer = implement(namespaceAuthedContract).$context<
+	RequestContextBase & { authorize: () => ApiAuthorization | Promise<ApiAuthorization> }
+>();
 
 const publicErrorHandler = basePublicImplementer.middleware(async ({ context, next }) => {
 	try {
@@ -18,7 +21,7 @@ const publicErrorHandler = basePublicImplementer.middleware(async ({ context, ne
 	}
 });
 
-const namespaceAuthedErrorHandler = baseNamespaceAuthedImplementer.middleware(async ({ context, next }) => {
+const namespaceAuthedRouterErrorHandler = baseNamespaceAuthedRouterImplementer.middleware(async ({ context, next }) => {
 	try {
 		return await next({ context });
 	} catch (err) {
@@ -27,5 +30,22 @@ const namespaceAuthedErrorHandler = baseNamespaceAuthedImplementer.middleware(as
 	}
 });
 
+const namespaceAuthedRouterAuthorization = baseNamespaceAuthedRouterImplementer.middleware(
+	async ({ context, next }) => {
+		const { authorize, ...requestContext } = context;
+		const authorization = authorize();
+		return next({
+			context: createNamespaceRequestContext({
+				context: requestContext,
+				authorization: authorization instanceof Promise ? await authorization : authorization,
+			}),
+		});
+	}
+);
+
 export const publicImplementer = basePublicImplementer.use(publicErrorHandler);
-export const namespaceAuthedImplementer = baseNamespaceAuthedImplementer.use(namespaceAuthedErrorHandler);
+export const namespaceAuthedRouterImplementer = baseNamespaceAuthedRouterImplementer
+	.use(namespaceAuthedRouterErrorHandler)
+	.use(namespaceAuthedRouterAuthorization);
+export const namespaceAuthedProcedureImplementer =
+	implement(namespaceAuthedContract).$context<NamespaceRequestContext>();

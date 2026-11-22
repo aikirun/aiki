@@ -1,7 +1,7 @@
-import { namespaceAuthedImplementer } from "./implementer";
+import { namespaceAuthedProcedureImplementer } from "./implementer";
 
 export function createIdentityRouter() {
-	const os = namespaceAuthedImplementer.identity;
+	const os = namespaceAuthedProcedureImplementer.identity;
 
 	return os.router({
 		getV1: os.getV1.handler(async ({ context }) => ({

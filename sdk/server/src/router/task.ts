@@ -1,4 +1,4 @@
-import { namespaceAuthedImplementer } from "./implementer";
+import { namespaceAuthedProcedureImplementer } from "./implementer";
 import type { TaskStateMachine } from "../service/state-machine/task";
 import type { TaskService } from "../service/task";
 
@@ -8,7 +8,7 @@ export interface TaskRouterDeps {
 }
 
 export function createTaskRouter(deps: TaskRouterDeps) {
-	const os = namespaceAuthedImplementer.task;
+	const os = namespaceAuthedProcedureImplementer.task;
 	const { taskService, taskStateMachine } = deps;
 
 	return os.router({
