@@ -7,6 +7,7 @@ import type { OrganizationId } from "@aikirun/types/organization";
 import { describe, expect, test } from "vitest";
 
 import { createHandler } from "./handler";
+import { createNamespaceAuthedClient } from "./testing/client";
 
 // iam ships as its own bundle with its own copy of the lib error classes, so the error its
 // authorizer throws is never built by the constructor this package imports. This stands in
@@ -21,6 +22,8 @@ class UnauthorizedErrorFromIamBundle extends Error {
 	}
 }
 
+// Authorization runs before the router and answers its errors in plain text, not in oRPC's JSON.
+// The oRPC client can't read plain text, so these tests send raw requests.
 describe("handler API authorization", () => {
 	function handlerWithFailingAuthorizer(err: unknown) {
 		return createHandler({
@@ -67,37 +70,25 @@ describe("handler config", () => {
 describe("handler input validation", () => {
 	test("an invalid request answers 400 naming each invalid field", async () => {
 		const handler = await createHandler({ db: {} as Database, logger: noopLogger });
-		const response = await handler(
-			new Request("http://localhost/api/schedule/activateV1", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({
-					json: {
-						workflowName: "send-invoices",
-						workflowVersionId: "v1",
-						workflowRunInputHash: { value: "input-hash" },
-						clientHasherApplied: false,
-						clientCodecApplied: false,
-						spec: { type: "interval", everyMs: 0 },
-						workflowRunOptions: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 100, factor: 0.5 } },
-					},
-				}),
-			})
-		);
+		const api = createNamespaceAuthedClient(handler);
 
-		expect([response.status, await response.json()]).toEqual([
-			400,
-			{
-				json: {
-					defined: false,
-					code: "BAD_REQUEST",
-					status: 400,
-					message: expect.stringMatching(
-						/^Input validation failed: spec\.everyMs [^;]+; workflowRunOptions\.retry\.factor [^;]+$/
-					),
-				},
-			},
-		]);
+		await expect(
+			api.schedule.activateV1({
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInputHash: { value: "input-hash" },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec: { type: "interval", everyMs: 0 },
+				workflowRunOptions: { retry: { type: "exponential", maxAttempts: 3, baseDelayMs: 100, factor: 0.5 } },
+			})
+		).rejects.toMatchObject({
+			code: "BAD_REQUEST",
+			status: 400,
+			message: expect.stringMatching(
+				/^Input validation failed: spec\.everyMs [^;]+; workflowRunOptions\.retry\.factor [^;]+$/
+			),
+		});
 	});
 });
 
@@ -113,29 +104,18 @@ describe("identity API", () => {
 				}),
 			},
 		});
-		const response = await handler(
-			new Request("http://localhost/api/identity/getV1", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ json: {} }),
-			})
-		);
-		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({
-			json: { organizationId: "org-authenticated", namespaceId: "ns-authenticated" },
+		const api = createNamespaceAuthedClient(handler);
+
+		expect(await api.identity.getV1({})).toEqual({
+			organizationId: "org-authenticated",
+			namespaceId: "ns-authenticated",
 		});
 	});
 
 	test("returns the default identity without IAM", async () => {
 		const handler = await createHandler({ db: {} as Database, logger: noopLogger });
-		const response = await handler(
-			new Request("http://localhost/api/identity/getV1", {
-				method: "POST",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ json: {} }),
-			})
-		);
-		expect(response.status).toBe(200);
-		expect(await response.json()).toEqual({ json: { organizationId: SENTINEL_ULID, namespaceId: SENTINEL_ULID } });
+		const api = createNamespaceAuthedClient(handler);
+
+		expect(await api.identity.getV1({})).toEqual({ organizationId: SENTINEL_ULID, namespaceId: SENTINEL_ULID });
 	});
 });
