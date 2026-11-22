@@ -1,4 +1,5 @@
-import { asAikiError, UnauthorizedError } from "@aikirun/lib/error";
+import type { PublicRequestContext } from "@aikirun/lib/context";
+import { UnauthorizedError } from "@aikirun/lib/error";
 import type {
 	CreateDashboardAuthenticator,
 	CreateDashboardIam,
@@ -15,21 +16,13 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { ulid } from "ulidx";
 
 import type { AuthService } from "./auth";
-import type { OrganizationSessionRequestContext } from "./context";
-import type { OrganizationRole } from "./infra/db/constants/organization";
+import type { OrganizationDashboardAuthorization } from "./context";
 import { createRepos } from "./infra/db/repo";
 import type { OrganizationRepository } from "./infra/db/types/organization";
 import { reportPendingMigrations } from "./pending-migrations";
 import { createOrganizationAuthedRouter } from "./router/index";
 import { type ApiKeyAuthorizationInfo, createApiKeyService } from "./service/api-key";
 import { createNamespaceService } from "./service/namespace";
-
-export interface OrganizationDashboardAuthorization {
-	organizationId: OrganizationId;
-	organizationRole: OrganizationRole;
-	userId: string;
-	sessionId: string;
-}
 
 export interface DashboardSessionIamParams {
 	db: CreateDatabase;
@@ -141,21 +134,9 @@ function createOrganizationHandler(
 				const rpcHandler = new RPCHandler(router, {});
 
 				return async (request: Request): Promise<Response> => {
-					let authorization: OrganizationDashboardAuthorization;
-					try {
-						authorization = await authorizeOrganizationSession(authService, repos.organization, request);
-					} catch (err) {
-						const aikiError = asAikiError(err);
-						if (aikiError) {
-							return new Response(aikiError.message, { status: aikiError.status });
-						}
-						logger.error("Unhandled error", { err });
-						return new Response("Internal Server Error", { status: 500 });
-					}
-
 					const traceId = request.headers.get("x-trace-id") ?? ulid();
 					const spanId = ulid();
-					const organizationSessionContext: OrganizationSessionRequestContext = {
+					const publicContext: PublicRequestContext = {
 						type: "request",
 						traceId,
 						spanId,
@@ -165,18 +146,17 @@ function createOrganizationHandler(
 							"aiki.traceId": traceId,
 							"aiki.spanId": spanId,
 						}),
-						requestType: "authed",
+						requestType: "public",
 						headers: request.headers,
 						method: request.method,
 						url: request.url,
-						organizationId: authorization.organizationId,
-						userId: authorization.userId,
-						sessionId: authorization.sessionId,
-						organizationRole: authorization.organizationRole,
 					};
 
 					const result = await rpcHandler.handle(request, {
-						context: organizationSessionContext,
+						context: {
+							...publicContext,
+							authorize: () => authorizeOrganizationSession(authService, repos.organization, request),
+						},
 						prefix: "/dashboard",
 					});
 					return result.response ?? new Response("Not Found", { status: 404 });

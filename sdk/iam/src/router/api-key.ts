@@ -3,13 +3,13 @@ import { ForbiddenError, NotFoundError } from "@aikirun/lib/error";
 import type { TimestampMs } from "@aikirun/lib/timestamp";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
-import { organizationAuthedImplementer } from "./implementer";
+import { organizationAuthedProcedureImplementer } from "./implementer";
 import type { OrganizationSessionRequestContext } from "../context";
 import type { ApiKeyService } from "../service/api-key";
 import type { NamespaceService } from "../service/namespace";
 
 export function createApiKeyRouter(apiKeyService: ApiKeyService, namespaceService: NamespaceService) {
-	const os = organizationAuthedImplementer.apiKey;
+	const os = organizationAuthedProcedureImplementer.apiKey;
 
 	async function assertCanManageApiKey(
 		context: OrganizationSessionRequestContext,

@@ -1,8 +1,8 @@
-import type { ContextBase } from "@aikirun/lib/context";
+import type { RequestContextBase } from "@aikirun/lib/context";
 import { asAikiError } from "@aikirun/lib/error";
 import { ORPCError } from "@orpc/server";
 
-export function handleError<T extends ContextBase>({ logger }: T, err: unknown): never {
+export function handleError<T extends RequestContextBase>({ logger }: T, err: unknown): never {
 	const aikiError = asAikiError(err);
 	if (aikiError) {
 		throw new ORPCError(aikiError.code, { message: aikiError.message, status: aikiError.status });

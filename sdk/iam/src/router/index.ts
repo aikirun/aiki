@@ -1,5 +1,5 @@
 import { createApiKeyRouter } from "./api-key";
-import { organizationAuthedImplementer } from "./implementer";
+import { organizationAuthedRouterImplementer } from "./implementer";
 import { createNamespaceRouter } from "./namespace";
 import type { ApiKeyService } from "../service/api-key";
 import type { NamespaceService } from "../service/namespace";
@@ -10,7 +10,7 @@ export interface OrganizationAuthedRouterDeps {
 }
 
 export function createOrganizationAuthedRouter(deps: OrganizationAuthedRouterDeps) {
-	return organizationAuthedImplementer.router({
+	return organizationAuthedRouterImplementer.router({
 		apiKey: createApiKeyRouter(deps.apiKeyService, deps.namespaceService),
 		namespace: createNamespaceRouter(deps.namespaceService),
 	});

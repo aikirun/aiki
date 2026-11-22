@@ -62,9 +62,7 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 			if (status === 200) {
 				return { status, output: (JSON.parse(text) as { json?: unknown }).json };
 			}
-			// A refusal from a route is JSON with a message; one from before the routes is plain text.
-			const error = text.startsWith("{") ? (JSON.parse(text) as { json: { message: string } }).json.message : text;
-			return { status, error };
+			return { status, error: (JSON.parse(text) as { json: { message: string } }).json.message };
 		},
 		async authorizeApiRequest() {
 			return authorizeApiRequest(new Request(`${baseURL}/api/workflowRun/listV1`, { headers: headers() }));

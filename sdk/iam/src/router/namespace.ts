@@ -2,7 +2,7 @@ import { isNonEmptyArray } from "@aikirun/lib/collection/array";
 import { ForbiddenError, NotFoundError } from "@aikirun/lib/error";
 import type { NamespaceId } from "@aikirun/types/namespace";
 
-import { organizationAuthedImplementer } from "./implementer";
+import { organizationAuthedProcedureImplementer } from "./implementer";
 import {
 	isOrganizationManager,
 	type OrganizationManagerSessionRequestContext,
@@ -11,7 +11,7 @@ import {
 import type { NamespaceService } from "../service/namespace";
 
 export function createNamespaceRouter(namespaceService: NamespaceService) {
-	const os = organizationAuthedImplementer.namespace;
+	const os = organizationAuthedProcedureImplementer.namespace;
 
 	async function assertNamespaceBelongsToOrganization(
 		context: OrganizationSessionRequestContext,
