@@ -12,17 +12,17 @@ export async function seedOrganizationWithNamespace(deps: SeedUserDeps) {
 	});
 	const organizationId = organization.body?.id as string;
 	await owner.callAuth("/organization/set-active", { organizationId });
-	const created = await owner.callDashboard("/namespace/createV1", { name: "main" });
-	const namespaceId = (created.output as { namespace: { id: string } }).namespace.id;
+	const created = await owner.dashboard.namespace.createV1({ name: "main" });
+	const namespaceId = created.namespace.id;
 	return { owner, organizationId, namespaceId };
 }
 
 /** An organization with a namespace its owner created and then removed, beside the one it keeps. */
 export async function seedRemovedNamespace(deps: SeedUserDeps) {
 	const { owner, organizationId } = await seedOrganizationWithNamespace(deps);
-	const created = await owner.callDashboard("/namespace/createV1", { name: "staging" });
-	const removedNamespaceId = (created.output as { namespace: { id: string } }).namespace.id;
-	await owner.callDashboard("/namespace/deleteV1", { id: removedNamespaceId });
+	const created = await owner.dashboard.namespace.createV1({ name: "staging" });
+	const removedNamespaceId = created.namespace.id;
+	await owner.dashboard.namespace.deleteV1({ id: removedNamespaceId });
 	return { owner, organizationId, removedNamespaceId };
 }
 

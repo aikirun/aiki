@@ -1,6 +1,10 @@
 import type { ApiAuthorization } from "@aikirun/types/iam";
+import { createORPCClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
+import type { ContractRouterClient } from "@orpc/contract";
 import { ulid } from "ulidx";
 
+import type { OrganizationAuthedContract } from "../../contract/organization-authed";
 import type { IamHarnessDeps } from "../harness";
 
 export type SeedUserDeps = IamHarnessDeps;
@@ -12,7 +16,8 @@ export interface SignedInUser {
 	callAuth(path: string, body: unknown): Promise<{ status: number; body: Record<string, unknown> | null }>;
 	/** Reads an auth route. The body is the parsed JSON, or the text when the response is not JSON. */
 	readAuth(path: string): Promise<{ status: number; body: unknown }>;
-	callDashboard(path: string, input: unknown): Promise<{ status: number; output?: unknown; error?: string }>;
+	/** Calls the dashboard procedures with this user's session, through the oRPC client the dashboard uses. */
+	dashboard: ContractRouterClient<OrganizationAuthedContract>;
 	authorizeApiRequest(): Promise<ApiAuthorization>;
 }
 
@@ -22,20 +27,26 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 	const email = `${ulid().toLowerCase()}@example.com`;
 	const cookies = new Map<string, string>();
 
+	const cookieHeader = () =>
+		cookies.size > 0 ? Array.from(cookies, ([name, value]) => `${name}=${value}`).join("; ") : undefined;
 	const headers = () => {
 		const requestHeaders = new Headers({ "content-type": "application/json", origin: dashboardOrigin });
-		if (cookies.size > 0) {
-			requestHeaders.set("cookie", Array.from(cookies, ([name, value]) => `${name}=${value}`).join("; "));
+		const cookie = cookieHeader();
+		if (cookie) {
+			requestHeaders.set("cookie", cookie);
 		}
 		return requestHeaders;
 	};
-	const send = async (handler: (request: Request) => Promise<Response>, request: Request) => {
-		const response = await handler(request);
+	const keepCookies = (response: Response) => {
 		for (const setCookie of response.headers.getSetCookie()) {
 			const [nameAndValue = ""] = setCookie.split(";");
 			const separatorIndex = nameAndValue.indexOf("=");
 			cookies.set(nameAndValue.slice(0, separatorIndex), nameAndValue.slice(separatorIndex + 1));
 		}
+	};
+	const send = async (handler: (request: Request) => Promise<Response>, request: Request) => {
+		const response = await handler(request);
+		keepCookies(response);
 		return { status: response.status, text: await response.text() };
 	};
 	const post = (handler: (request: Request) => Promise<Response>, path: string, body: unknown) =>
@@ -57,13 +68,17 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 			const isJson = text.startsWith("{") || text.startsWith("[") || text === "null";
 			return { status, body: isJson ? (JSON.parse(text) as unknown) : text };
 		},
-		async callDashboard(path, input) {
-			const { status, text } = await post(dashboardIam.organization, `/dashboard${path}`, { json: input });
-			if (status === 200) {
-				return { status, output: (JSON.parse(text) as { json?: unknown }).json };
-			}
-			return { status, error: (JSON.parse(text) as { json: { message: string } }).json.message };
-		},
+		dashboard: createORPCClient<ContractRouterClient<OrganizationAuthedContract>>(
+			new RPCLink({
+				url: `${baseURL}/dashboard`,
+				headers: () => ({ origin: dashboardOrigin, cookie: cookieHeader() }),
+				fetch: async (request) => {
+					const response = await dashboardIam.organization(request);
+					keepCookies(response);
+					return response;
+				},
+			})
+		),
 		async authorizeApiRequest() {
 			return authorizeApiRequest(new Request(`${baseURL}/api/workflowRun/listV1`, { headers: headers() }));
 		},

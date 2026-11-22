@@ -48,6 +48,7 @@
 	"devDependencies": {
 		"@aikirun/lib": "workspace:*",
 		"@aikirun/server": "workspace:*",
+		"@orpc/client": "^1.9.3",
 		"drizzle-kit": "^0.31.8",
 		"postgres": "^3.4.8"
 	},

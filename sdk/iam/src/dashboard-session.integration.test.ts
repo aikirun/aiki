@@ -12,9 +12,11 @@ describe("organization dashboard handler", () => {
 			await user.callAuth("/sign-out", {});
 			expect(await user.readAuth("/get-session")).toEqual({ status: 200, body: null });
 
-			const response = await user.callDashboard("/namespace/listV1", undefined);
-
-			expect(response).toEqual({ status: 401, error: "Not authenticated" });
+			await expect(user.dashboard.namespace.listV1()).rejects.toMatchObject({
+				code: "UNAUTHORIZED",
+				status: 401,
+				message: "Not authenticated",
+			});
 		}));
 
 	test("refuses a user with no active organization", () =>
@@ -25,8 +27,10 @@ describe("organization dashboard handler", () => {
 				body: expect.objectContaining({ session: expect.objectContaining({ activeOrganizationId: null }) }),
 			});
 
-			const response = await user.callDashboard("/namespace/listV1", undefined);
-
-			expect(response).toEqual({ status: 401, error: "No active organization selected" });
+			await expect(user.dashboard.namespace.listV1()).rejects.toMatchObject({
+				code: "UNAUTHORIZED",
+				status: 401,
+				message: "No active organization selected",
+			});
 		}));
 });
