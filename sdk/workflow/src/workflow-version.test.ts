@@ -1687,7 +1687,7 @@ describe("creating a workflow run", () => {
 				});
 			}));
 
-		test("encodes the child input with the parent's bound codec and inherits the parent's declaration", () =>
+		test("encodes the child input with the parent's client codec and inherits the parent's declaration", () =>
 			withFakeClient(async (client) => {
 				const encodedInput = asOpaquePayload({ encoded: true });
 				client[INTERNAL].codec = {

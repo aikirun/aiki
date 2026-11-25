@@ -86,40 +86,40 @@ describe("instantiateWorkflowDefinitionCodec", () => {
 
 describe("toOpaquePayloadCodec", () => {
 	test("delegates encode and decode to the codec", async () => {
-		const bound = toOpaquePayloadCodec({
+		const codec = toOpaquePayloadCodec({
 			encode: async (payload) => ({ marked: payload }),
 			decode: async (payload) => ({ unmarked: payload }),
 		});
 		const payload = { value: 1 };
 
-		expect(await bound.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-		expect(await bound.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
+		expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
+		expect(await codec.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
 	});
 
 	test("rejects with CodecEncodeFailedError, caused by the codec's error, when the codec cannot encode", async () => {
 		const codecError = new Error("Key 2025-06 not found");
-		const bound = toOpaquePayloadCodec({
+		const codec = toOpaquePayloadCodec({
 			encode: async () => {
 				throw codecError;
 			},
 			decode: async (payload) => payload,
 		});
 
-		const encoding = bound.encode({ value: 1 });
+		const encoding = codec.encode({ value: 1 });
 		await expect(encoding).rejects.toThrow(CodecEncodeFailedError);
 		await expect(encoding).rejects.toMatchObject({ cause: codecError });
 	});
 
 	test("rejects with CodecDecodeFailedError, caused by the codec's error, when the codec cannot decode", async () => {
 		const codecError = new Error("No codec named aes-v1");
-		const bound = toOpaquePayloadCodec({
+		const codec = toOpaquePayloadCodec({
 			encode: async (payload) => payload,
 			decode: async () => {
 				throw codecError;
 			},
 		});
 
-		const decoding = bound.decode(asOpaquePayload("aes-v1:charged"));
+		const decoding = codec.decode(asOpaquePayload("aes-v1:charged"));
 		await expect(decoding).rejects.toThrow(CodecDecodeFailedError);
 		await expect(decoding).rejects.toMatchObject({ cause: codecError });
 	});
