@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { bytesToBase64WithBtoa } from "./base64-converter";
+import { base64ToBytesWithAtob, bytesToBase64UrlWithBtoa, bytesToBase64WithBtoa } from "./base64-converter";
 
 describe("bytesToBase64WithBtoa", () => {
 	test("encodes an empty payload", () => {
@@ -20,5 +20,30 @@ describe("bytesToBase64WithBtoa", () => {
 		expect(bytesToBase64WithBtoa(bytes)).toBe(
 			Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64")
 		);
+	});
+});
+
+describe("base64ToBytesWithAtob", () => {
+	test("decodes an empty string", () => {
+		expect(base64ToBytesWithAtob("")).toEqual(new Uint8Array(0));
+	});
+
+	test("decodes standard base64 with padding", () => {
+		expect(base64ToBytesWithAtob("aGVsbG8=")).toEqual(new TextEncoder().encode("hello"));
+	});
+
+	test("decodes bytes that use the full alphabet", () => {
+		expect(base64ToBytesWithAtob("/+8A")).toEqual(new Uint8Array([0xff, 0xef, 0x00]));
+	});
+});
+
+describe("bytesToBase64UrlWithBtoa", () => {
+	test("writes - and _ where standard base64 has + and /", () => {
+		expect(bytesToBase64UrlWithBtoa(new Uint8Array([0xff, 0xef, 0x00]))).toBe("_-8A");
+	});
+
+	test("drops one or two padding characters", () => {
+		expect(bytesToBase64UrlWithBtoa(new TextEncoder().encode("hello"))).toBe("aGVsbG8");
+		expect(bytesToBase64UrlWithBtoa(new Uint8Array([0xff]))).toBe("_w");
 	});
 });
