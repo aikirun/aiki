@@ -77,7 +77,7 @@ const aiki = client({ url: "http://localhost:9876", codec, hasher });
 
 - `key` looks up a key by its ID. A key is 32 random bytes, kept in your secret store. Return `null` for an ID you don't have. The lookup can be async, for example, a call to your KMS.
 - `config.keyId` is the ID of the key that encrypts new values. Each encrypted value records that ID, so it can still be decrypted after you move to a newer key.
-- `name` is stored with every encrypted value and identifies this codec. Keep it once chosen. If you later replace this codec, keep it as a `deprecated` member of `switchCodecs()` so the values it wrote still decode.
+- `name` is stored with every encrypted value and at the start of every hash. Keep it once chosen: a new name changes every hash, so Aiki would treat inputs hashed under the old name as different inputs. If you later replace this codec, keep it as a `deprecated` member of `switchCodecs()` so the values it wrote still decode.
 
 Pass both `codec` and `hasher` to every client: the ones that start workflows or send events, and the ones your workers use.
 

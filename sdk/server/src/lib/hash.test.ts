@@ -14,15 +14,22 @@ describe("candidateHashes", () => {
 		});
 	});
 
-	test("lists the deprecated values and the next value after the current one", () => {
-		expect(candidateHashes({ value: "h2", deprecatedValues: ["h0", "h1"], nextValue: "h3" })).toEqual({
+	test("lists the deprecated values and the next values after the current one", () => {
+		expect(candidateHashes({ value: "h2", deprecatedValues: ["h0", "h1"], nextValues: ["h3", "h4"] })).toEqual({
 			current: "h2",
-			all: ["h2", "h0", "h1", "h3"],
+			all: ["h2", "h0", "h1", "h3", "h4"],
+		});
+	});
+
+	test("lists a deprecated nextValue after the next values", () => {
+		expect(candidateHashes({ value: "h2", nextValues: ["h3"], nextValue: "h4" })).toEqual({
+			current: "h2",
+			all: ["h2", "h3", "h4"],
 		});
 	});
 
 	test("drops a value that appears more than once", () => {
-		expect(candidateHashes({ value: "h2", deprecatedValues: ["h2"], nextValue: "h2" })).toEqual({
+		expect(candidateHashes({ value: "h2", deprecatedValues: ["h2"], nextValues: ["h2"], nextValue: "h2" })).toEqual({
 			current: "h2",
 			all: ["h2"],
 		});

@@ -18,7 +18,7 @@ import { ScheduleConflictError } from "../errors";
 import type { Repositories, TxRepositories } from "../infra/db/types";
 import type { ScheduleRow } from "../infra/db/types/schedule";
 import type { ImminentTimerQueue } from "../infra/timer/imminent-timer-queue";
-import { type CandidateHashes, candidateHashes } from "../lib/hash";
+import { type CandidateHashes, candidateHashes, nextHashes } from "../lib/hash";
 
 export function getReferenceId(scheduleId: string, occurrence: number) {
 	return `schedule:${scheduleId}:${occurrence}`;
@@ -267,13 +267,13 @@ async function hashScheduleDefinitions(request: ScheduleActivateRequestV1): Prom
 			workflowRunOptions,
 		});
 
-	const [currentHash, deprecatedHashes, nextHash] = await Promise.all([
+	const [currentHash, deprecatedHashes, nextDefinitionHashes] = await Promise.all([
 		hashDefinition(workflowRunInputHash.value),
 		Promise.all((workflowRunInputHash.deprecatedValues ?? []).map(hashDefinition)),
-		workflowRunInputHash.nextValue === undefined ? undefined : hashDefinition(workflowRunInputHash.nextValue),
+		Promise.all(nextHashes(workflowRunInputHash).map(hashDefinition)),
 	]);
 
-	return { value: currentHash, deprecatedValues: deprecatedHashes, nextValue: nextHash };
+	return { value: currentHash, deprecatedValues: deprecatedHashes, nextValues: nextDefinitionHashes };
 }
 
 interface SchedulePayload {
@@ -380,7 +380,7 @@ async function activateScheduleInTx(
 			namespaceId,
 			existing: existingSchedule,
 			payload,
-			nextDefinitionHash: definitionHashes.nextValue,
+			nextDefinitionHashes: definitionHashes.nextValues ?? [],
 			referenceIdToAttach: existingSchedule.referenceId === null ? referenceId : undefined,
 			nextRunAt,
 		},
@@ -396,7 +396,7 @@ async function activateExistingSchedule(
 		namespaceId: NamespaceId;
 		existing: ScheduleRow;
 		payload: SchedulePayload;
-		nextDefinitionHash: string | undefined;
+		nextDefinitionHashes: string[];
 		referenceIdToAttach?: string;
 		nextRunAt: TimestampMs;
 	},
@@ -409,12 +409,12 @@ async function activateExistingSchedule(
 	// A paused schedule stays paused: only `resume` ends a pause.
 	const needsReactivation = existing.status === "inactive";
 
-	// The announced next hash identifies a newer stored payload that this client must preserve.
+	// An announced next hash identifies a newer stored payload that this client must preserve.
 	// Otherwise, attaching a reference records the activating client's payload. Repeated
 	// activation without attachment keeps equivalent input: a randomized codec can produce
 	// different bytes for the same input, so hashes and declarations decide whether to write.
 	const shouldWritePayload =
-		existing.definitionHash !== params.nextDefinitionHash &&
+		!params.nextDefinitionHashes.includes(existing.definitionHash) &&
 		(params.referenceIdToAttach !== undefined ||
 			existing.workflowRunInputHash !== payload.workflowRunInputHash ||
 			existing.definitionHash !== payload.definitionHash ||
