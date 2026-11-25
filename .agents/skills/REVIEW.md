@@ -2,6 +2,19 @@
 
 How review comments on this repository are written, by people and by agents. A review is read by the author next to their code, one comment at a time. Each comment should tell them what to change without making them work out what it means.
 
+## Start with the design
+
+Most pull requests are now written with AI, and each one tends to add entropy: a concept that blurs an existing one, or a layer that leaks what it was meant to hide. Line comments can't fix that, so a review starts above the lines.
+
+- First ask whether the change is needed at all. Find the problem it solves and the issue or design decision it builds on, and check that the problem is real.
+- Then check that the design fits the model the code already has. Read each concept the change adds or reshapes, such as a type, a field, a function or a name, against the ones around it. Look for:
+  - one name for two things, such as two flags for two separate codec slots that share one name;
+  - an abstraction that exposes what it should hide, such as a composed codec that reports which codecs it was built from;
+  - a type or field that only carries a value the caller already has;
+  - a name for the wrong kind of thing, such as `workflowOutput` for a codec.
+- Raise the design problems first. A design change moves or removes the code a line comment would point at, so line comments wait until the design is settled.
+- Put a design comment on the line that defines the concept, such as the field or the type. When it spans the whole change, put it in the summary.
+
 ## What to comment on
 
 - Comment only on what should change in the code. Leave out nits about wording, test titles and code comments unless they cause a real problem.
