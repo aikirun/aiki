@@ -33,9 +33,9 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
+import type { WorkflowExecutionConfig } from "./run/execution/config";
 import type { TaskExecutionTracker } from "./run/execution/task-execution-tracker";
 import { type TaskHandlerScope, taskHandlerScopeStorage } from "./run/execution/task-handler-scope";
-import type { WorkflowExecutionConfig } from "./run/execution/workflow-run";
 import { isRequestInvalid, type WorkflowRunHandle } from "./run/handle/workflow-run";
 import { validateWithSchema } from "./run/schema-validation";
 

@@ -12,7 +12,7 @@ import {
 	workflowRunHandle,
 } from "./workflow-run";
 import type { WorkflowDefinitionCodec } from "../codec";
-import type { EventsDefinition } from "../event";
+import type { EventsDefinition } from "../event/definition";
 
 export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition> {
 	eventsDefinition?: TEvents;

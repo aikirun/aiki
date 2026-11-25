@@ -33,7 +33,8 @@ import {
 	toBoundCodec,
 	type WorkflowDefinitionCodec,
 } from "../codec";
-import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
+import type { EventsDefinition } from "../event/definition";
+import { createEventSenders, type EventSenders } from "../event/sender";
 import { isControlFlowError } from "../execution/control-flow-error";
 import { taskHandlerScopeStorage } from "../execution/task-handler-scope";
 

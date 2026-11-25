@@ -39,17 +39,13 @@ export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
 export type { WorkflowRun } from "./run";
 export type { CreateWorkflowDefinitionCodec } from "./run/codec";
-export type {
-	EventDefinition,
-	EventMulticaster,
-	EventMulticasters,
-	EventSender,
-	EventSenders,
-	EventWaiter,
-	EventWaiters,
-} from "./run/event";
-export { event } from "./run/event";
-export type { ExecuteWorkflowParams, WorkflowExecutionConfig } from "./run/execution/workflow-run";
+export type { EventDefinition } from "./run/event/definition";
+export { event } from "./run/event/definition";
+export type { EventMulticaster, EventMulticasters } from "./run/event/multicaster";
+export type { EventSender, EventSenders } from "./run/event/sender";
+export type { EventWaiter, EventWaiters } from "./run/event/waiter";
+export type { WorkflowExecutionConfig } from "./run/execution/config";
+export type { ExecuteWorkflowParams } from "./run/execution/workflow-run";
 export { executeWorkflowRun } from "./run/execution/workflow-run";
 export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle/workflow-run";
 export type { ScheduleDefinition, ScheduleHandle, ScheduleParams } from "./schedule";

@@ -2,7 +2,7 @@ import type { Serializable } from "@aikirun/lib/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 
-import type { EventsData, EventsDefinition } from "./run/event";
+import type { EventsData, EventsDefinition } from "./run/event/definition";
 import {
 	type AnyWorkflowVersion,
 	type WorkflowVersion,

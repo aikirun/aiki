@@ -7,7 +7,7 @@ import type { ScheduleActivateOptions, ScheduleId, ScheduleOverlapPolicy, Schedu
 import { INTERNAL } from "@aikirun/types/symbols";
 
 import { instantiateCodec, resolveWorkflowInputCodec } from "./run/codec";
-import type { EventsDefinition } from "./run/event";
+import type { EventsDefinition } from "./run/event/definition";
 import type { WorkflowVersion } from "./workflow-version";
 
 export interface CronScheduleParams {

@@ -2,7 +2,7 @@ import { INTERNAL } from "@aikirun/types/symbols";
 import type { WorkflowName, WorkflowVersionId } from "@aikirun/types/workflow";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import { event } from "./run/event";
+import { event } from "./run/event/definition";
 import { workflow } from "./workflow";
 import type { WorkflowVersion } from "./workflow-version";
 

@@ -42,7 +42,8 @@ import {
 	instantiateWorkflowDefinitionCodec,
 	resolveWorkflowInputCodec,
 } from "./run/codec";
-import { createEventMulticasters, type EventMulticasters, type EventsDefinition } from "./run/event";
+import type { EventsDefinition } from "./run/event/definition";
+import { createEventMulticasters, type EventMulticasters } from "./run/event/multicaster";
 import { isControlFlowError } from "./run/execution/control-flow-error";
 import { type ChildWorkflowRunHandle, childWorkflowRunHandle } from "./run/handle/child-workflow-run";
 import {
