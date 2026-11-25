@@ -2,7 +2,7 @@ export abstract class AikiError extends Error {
 	abstract readonly code: string;
 	abstract readonly status: number;
 
-	// biome-ignore lint/complexity/noUselessConstructor: makes the message required for every subclass
+	// Makes the message required for every subclass.
 	constructor(message: string) {
 		super(message);
 	}
