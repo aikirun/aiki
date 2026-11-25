@@ -26,11 +26,11 @@ import {
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
-	type BoundCodec,
 	composeCodecs,
 	noopCodec,
+	type OpaquePayloadCodec,
 	resolveAppliedClientCodec,
-	toBoundCodec,
+	toOpaquePayloadCodec,
 	type WorkflowDefinitionCodec,
 } from "../codec";
 import type { EventsDefinition } from "../event/definition";
@@ -158,9 +158,9 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 	[INTERNAL]: {
 		client: Client<Context>;
 		codec: {
-			client: BoundCodec;
-			workflowInput: BoundCodec;
-			workflowOutput: BoundCodec;
+			client: OpaquePayloadCodec;
+			workflowInput: OpaquePayloadCodec;
+			workflowOutput: OpaquePayloadCodec;
 		};
 		transitionStateOptimistic: (state: WorkflowRunTransitionStateRequestOptimistic["state"]) => Promise<void>;
 		transitionTaskState: (
@@ -203,7 +203,7 @@ export type WorkflowRunWaitResult<Output, Timed extends boolean, Abortable exten
 			  };
 
 export async function decodeWaitResultState<Output>(
-	codec: BoundCodec,
+	codec: OpaquePayloadCodec,
 	state: TerminalWorkflowRunState
 ): Promise<WorkflowRunWaitResultSuccess<Output>> {
 	if (state.status !== "completed") {
@@ -243,7 +243,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this[INTERNAL] = {
 			client,
 			codec: {
-				client: clientCodec ? toBoundCodec(clientCodec) : noopCodec,
+				client: clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec,
 				workflowInput: composeCodecs(workflowCodec?.input, clientCodec),
 				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
 			},

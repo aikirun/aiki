@@ -13,7 +13,7 @@ import {
 	type WorkflowRunId,
 } from "@aikirun/types/workflow/run";
 
-export interface BoundCodec {
+export interface OpaquePayloadCodec {
 	encode(payload: unknown): Promise<OpaquePayload>;
 	decode(payload: OpaquePayload | undefined): Promise<unknown>;
 }
@@ -67,7 +67,7 @@ export function instantiateWorkflowDefinitionCodec(
 	return codec;
 }
 
-export const noopCodec: BoundCodec = {
+export const noopCodec: OpaquePayloadCodec = {
 	encode: async (payload) => payload as OpaquePayload,
 	decode: async (encoded) => encoded,
 };
@@ -76,7 +76,7 @@ export const noopCodec: BoundCodec = {
  * A codec can throw anything, so its errors are wrapped in `CodecEncodeFailedError` and
  * `CodecDecodeFailedError` for the SDK to recognise, with the codec's error as the cause.
  */
-export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
+export const toOpaquePayloadCodec = (codec: Codec<unknown>): OpaquePayloadCodec => ({
 	encode: async (payload) => {
 		try {
 			return (await codec.encode(payload)) as OpaquePayload;
@@ -97,20 +97,23 @@ export const toBoundCodec = (codec: Codec<unknown>): BoundCodec => ({
  * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`. Absent layers are
  * skipped; the result is bound once.
  */
-export function composeCodecs(inner: Codec<unknown> | undefined, outer: Codec<unknown> | undefined): BoundCodec {
+export function composeCodecs(
+	inner: Codec<unknown> | undefined,
+	outer: Codec<unknown> | undefined
+): OpaquePayloadCodec {
 	if (inner && outer) {
-		return toBoundCodec({
+		return toOpaquePayloadCodec({
 			encode: async (payload) => outer.encode(await inner.encode(payload)),
 			decode: async (encoded) => inner.decode(await outer.decode(encoded)),
 		});
 	}
 
 	if (inner) {
-		return toBoundCodec(inner);
+		return toOpaquePayloadCodec(inner);
 	}
 
 	if (outer) {
-		return toBoundCodec(outer);
+		return toOpaquePayloadCodec(outer);
 	}
 
 	return noopCodec;
@@ -124,7 +127,7 @@ export function resolveWorkflowInputCodec(params: {
 	definitionCodec: Codec<unknown> | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
-}): { codec: BoundCodec; clientCodecApplied: boolean } {
+}): { codec: OpaquePayloadCodec; clientCodecApplied: boolean } {
 	const clientCodecApplied = params.policy !== "skip" && params.clientCodec !== undefined;
 
 	return {

@@ -18,7 +18,7 @@ import {
 	noopCodec,
 	resolveAppliedClientCodec,
 	resolveWorkflowInputCodec,
-	toBoundCodec,
+	toOpaquePayloadCodec,
 } from "./codec";
 
 describe("instantiateCodec", () => {
@@ -84,9 +84,9 @@ describe("instantiateWorkflowDefinitionCodec", () => {
 	});
 });
 
-describe("toBoundCodec", () => {
+describe("toOpaquePayloadCodec", () => {
 	test("delegates encode and decode to the codec", async () => {
-		const bound = toBoundCodec({
+		const bound = toOpaquePayloadCodec({
 			encode: async (payload) => ({ marked: payload }),
 			decode: async (payload) => ({ unmarked: payload }),
 		});
@@ -98,7 +98,7 @@ describe("toBoundCodec", () => {
 
 	test("rejects with CodecEncodeFailedError, caused by the codec's error, when the codec cannot encode", async () => {
 		const codecError = new Error("Key 2025-06 not found");
-		const bound = toBoundCodec({
+		const bound = toOpaquePayloadCodec({
 			encode: async () => {
 				throw codecError;
 			},
@@ -112,7 +112,7 @@ describe("toBoundCodec", () => {
 
 	test("rejects with CodecDecodeFailedError, caused by the codec's error, when the codec cannot decode", async () => {
 		const codecError = new Error("No codec named aes-v1");
-		const bound = toBoundCodec({
+		const bound = toOpaquePayloadCodec({
 			encode: async (payload) => payload,
 			decode: async () => {
 				throw codecError;

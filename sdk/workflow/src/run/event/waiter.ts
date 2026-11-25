@@ -5,7 +5,7 @@ import type { EventName, EventWaitOptions, EventWaitResult, WorkflowRunId } from
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
 import type { EventData, EventsDefinition } from "./definition";
-import { noopCodec, resolveAppliedClientCodec, toBoundCodec } from "../codec";
+import { noopCodec, resolveAppliedClientCodec, toOpaquePayloadCodec } from "../codec";
 import type { WorkflowRunHandle } from "../handle/workflow-run";
 
 export type EventWaiters<TEvents extends EventsDefinition> = {
@@ -64,7 +64,7 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 					runId: handle.run.id as WorkflowRunId,
 					clientCodecApplied: existingEventWait.clientCodecApplied,
 				});
-				const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+				const codec = clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec;
 				logger.debug("Event received");
 				return {
 					timeout: false,

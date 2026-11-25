@@ -8,7 +8,7 @@ import type { EventMulticastResult, EventName, EventSendOptions } from "@aikirun
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { EventData, EventsDefinition } from "./definition";
-import { noopCodec, toBoundCodec } from "../codec";
+import { noopCodec, toOpaquePayloadCodec } from "../codec";
 
 export type EventMulticasters<TEvents extends EventsDefinition> = {
 	[Name in keyof TEvents]: EventMulticaster<EventData<TEvents[Name]>>;
@@ -89,7 +89,7 @@ function createEventMulticaster<Data>(
 
 		const options = optionsBuilder.build();
 		const { codec: clientCodec } = client[INTERNAL];
-		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const codec = clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec;
 		const jsonData: unknown = data !== undefined ? JSON.parse(JSON.stringify(data)) : data;
 
 		const result = await client.api.workflowRun.multicastEventV1({
@@ -140,7 +140,7 @@ function createEventMulticaster<Data>(
 
 		const options = optionsBuilder.build();
 		const { codec: clientCodec } = client[INTERNAL];
-		const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
+		const codec = clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec;
 		const jsonData: unknown = data !== undefined ? JSON.parse(JSON.stringify(data)) : data;
 
 		const result = await client.api.workflowRun.multicastEventByReferenceV1({
