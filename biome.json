@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
 	"assist": {
 		"actions": {
 			"source": {
@@ -23,7 +23,7 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"preset": "recommended",
 			"correctness": {
 				"noUnusedImports": "error"
 			},
@@ -57,7 +57,8 @@
 	"files": {
 		"includes": [
 			"**",
-			"!*.md",
+			"!**/*.md",
+			"!**/*.yml",
 			"!!**/npm",
 			"!!**/dist",
 			"!!**/node_modules",
@@ -76,7 +77,9 @@
 				"app/dashboard/**/*.ts",
 				"app/website/**/*.tsx",
 				"app/website/**/*.ts",
-				"app/website/public/index.html"
+				"app/website/public/index.html",
+				"app/dashboard/**/*.svg",
+				"app/website/**/*.svg"
 			],
 			"linter": {
 				"rules": {
