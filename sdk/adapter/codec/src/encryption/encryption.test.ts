@@ -447,9 +447,9 @@ describe("encryption hasher", () => {
 		const hash = await hasher(input);
 		expect(hash.value.startsWith("AES-256-GCM:b:")).toBe(true);
 		expect(hash.deprecatedValues).toEqual([expect.stringMatching(/^AES-256-GCM:a:/)]);
-		expect(hash.nextValue).toEqual(expect.stringMatching(/^AES-256-GCM:next:/));
+		expect(hash.nextValues).toEqual([expect.stringMatching(/^AES-256-GCM:next:/)]);
 		expect(hash.value).not.toBe(hash.deprecatedValues?.[0]);
-		expect(hash.value).not.toBe(hash.nextValue);
+		expect(hash.nextValues).not.toContain(hash.value);
 	});
 
 	test("for binds to the stamped key id even when absent from config", async () => {
@@ -503,7 +503,7 @@ describe("encryption hasher", () => {
 		const hash = await hasher(input);
 		expect(hash.value.startsWith("pay%3A100%25:b:")).toBe(true);
 		expect(hash.deprecatedValues).toEqual([expect.stringMatching(/^pay%3A100%25:a:/)]);
-		expect(hash.nextValue).toEqual(expect.stringMatching(/^pay%3A100%25:next:/));
+		expect(hash.nextValues).toEqual([expect.stringMatching(/^pay%3A100%25:next:/)]);
 		expect(await (await hasher.for(hash.value))?.(input)).toBe(hash.value);
 	});
 

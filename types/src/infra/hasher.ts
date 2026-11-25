@@ -10,10 +10,13 @@ export interface Hash {
 	/** The hash under rotations this hasher has switched away from, whose stored hashes still match. */
 	deprecatedValues?: string[];
 	/**
-	 * The hash under a rotation this hasher has been told about but has not switched to yet.
+	 * The hash under rotations this hasher has been told about but has not switched to yet.
 	 * Matched like `value`, never stored, so an instance that has not switched yet still finds what
-	 * an instance that already has stored.
+	 * an instance that already has stored. A list, because transitions can overlap: a hasher being
+	 * adopted can itself be mid-rotation.
 	 */
+	nextValues?: string[];
+	/** @deprecated Use `nextValues`. Still matched as a next value, until the next release removes it. */
 	nextValue?: string;
 }
 

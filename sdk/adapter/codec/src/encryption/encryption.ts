@@ -299,7 +299,7 @@ export function encryption(params: EncryptionParams): {
 				}
 
 				if (nextValue !== undefined) {
-					hash.nextValue = nextValue;
+					hash.nextValues = [nextValue];
 				}
 
 				return hash;

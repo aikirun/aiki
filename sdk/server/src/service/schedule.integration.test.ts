@@ -791,6 +791,67 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
 				workflowRunInput: behindInput,
+				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
+				clientHasherApplied: false,
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(matched.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(stored);
+		}));
+
+	test("matches a schedule stored under any of several announced hashes and leaves its payload alone", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: aheadInput,
+				workflowRunInputHash: { value: announcedHash },
+				clientHasherApplied: false,
+				clientCodecApplied: true,
+				spec,
+			});
+			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+
+			const { schedule: matched } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: behindInput,
+				workflowRunInputHash: {
+					value: await hashInput(workflowRunInput),
+					nextValues: ["another-announced-hash", announcedHash],
+				},
+				clientHasherApplied: false,
+				clientCodecApplied: true,
+				spec,
+			});
+
+			expect(matched.id).toBe(schedule.id);
+			expect(await repos.schedule.get(context.namespaceId, { id: schedule.id })).toEqual(stored);
+		}));
+
+	test("still matches an announced hash sent as the deprecated nextValue and leaves its payload alone", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: aheadInput,
+				workflowRunInputHash: { value: announcedHash },
+				clientHasherApplied: false,
+				clientCodecApplied: true,
+				spec,
+			});
+			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
+
+			const { schedule: matched } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: behindInput,
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
@@ -822,7 +883,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
 				workflowRunInput: behindInput,
-				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
@@ -851,7 +912,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowName: "send-invoices",
 				workflowVersionId: "v1",
 				workflowRunInput: behindInput,
-				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
+				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
 				spec,
@@ -1887,7 +1948,7 @@ describe("ScheduleService status transitions", () => {
 						secondary.activateSchedule(context.namespaceId, {
 							...request,
 							workflowRunInput: asOpaquePayload({ encrypted: "older-invoices" }),
-							workflowRunInputHash: { ...request.workflowRunInputHash, nextValue: "rotated-hash" },
+							workflowRunInputHash: { ...request.workflowRunInputHash, nextValues: ["rotated-hash"] },
 							clientCodecApplied: true,
 						})
 				);
