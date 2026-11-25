@@ -870,6 +870,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
+				definitionCodecApplied: true,
 				spec,
 			});
 
@@ -888,6 +889,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
+				definitionCodecApplied: true,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -902,6 +904,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				},
 				clientHasherApplied: false,
 				clientCodecApplied: true,
+				definitionCodecApplied: true,
 				spec,
 			});
 
@@ -920,6 +923,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
+				definitionCodecApplied: true,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
