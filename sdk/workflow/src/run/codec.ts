@@ -95,7 +95,7 @@ export const toOpaquePayloadCodec = (codec: Codec<unknown>): OpaquePayloadCodec 
 
 /**
  * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`. Absent layers are
- * skipped; the result is bound once.
+ * skipped; the result is wrapped once.
  */
 export function composeCodecs(
 	inner: Codec<unknown> | undefined,
