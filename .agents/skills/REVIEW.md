@@ -11,7 +11,8 @@ Most pull requests are now written with AI, and each one tends to add entropy: a
   - one name for two things, such as two flags for two separate codec slots that share one name;
   - an abstraction that exposes what it should hide, such as a composed codec that reports which codecs it was built from;
   - a type or field that only carries a value the caller already has;
-  - a name for the wrong kind of thing, such as `workflowOutput` for a codec.
+  - a name for the wrong kind of thing, such as `workflowOutput` for a codec;
+  - logic that only a code comment explains, such as a parameter that already holds another codec composed in. Let the code show it, through a name or by doing the step where the value is read.
 - Raise the design problems first. A design change moves or removes the code a line comment would point at, so line comments wait until the design is settled.
 - Put a design comment on the line that defines the concept, such as the field or the type. When it spans the whole change, put it in the summary.
 
