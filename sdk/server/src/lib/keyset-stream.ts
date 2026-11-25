@@ -37,6 +37,7 @@ export function createKeysetStreamCursorAdvancer<Item>(options: {
 		}
 
 		const { maxSeenId: cursorMaxSeenId } = cursor;
+		// biome-ignore lint/complexity/useMathMinMax: ids are strings, and Math.max of two strings is NaN
 		const maxSeenId = id > cursorMaxSeenId ? id : cursorMaxSeenId;
 
 		if (order >= cursor.order) {
