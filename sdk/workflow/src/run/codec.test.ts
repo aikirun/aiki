@@ -19,7 +19,7 @@ import {
 	resolveAppliedClientCodec,
 	resolveWorkflowInputCodec,
 	toBoundCodec,
-} from "./bound-codec";
+} from "./codec";
 
 describe("instantiateCodec", () => {
 	test("throws CodecInitFailedError, caused by the factory's error, when the factory throws", () => {

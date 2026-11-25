@@ -38,6 +38,7 @@ export { TaskFailedError } from "@aikirun/types/workflow/task";
 export type { WorkflowRegistry } from "./registry";
 export { workflowRegistry } from "./registry";
 export type { WorkflowRun } from "./run";
+export type { CreateWorkflowDefinitionCodec } from "./run/codec";
 export type {
 	EventDefinition,
 	EventMulticaster,
@@ -50,7 +51,6 @@ export type {
 export { event } from "./run/event";
 export type { ExecuteWorkflowParams, WorkflowExecutionConfig } from "./run/execution/workflow-run";
 export { executeWorkflowRun } from "./run/execution/workflow-run";
-export type { CreateWorkflowDefinitionCodec } from "./run/handle/bound-codec";
 export type { WorkflowRunHandle, WorkflowRunWaitOptions } from "./run/handle/workflow-run";
 export type { ScheduleDefinition, ScheduleHandle, ScheduleParams } from "./schedule";
 export { schedule } from "./schedule";

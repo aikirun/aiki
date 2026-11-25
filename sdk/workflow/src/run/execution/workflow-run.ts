@@ -25,8 +25,8 @@ import { isControlFlowError } from "./control-flow-error";
 import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
+import { instantiateWorkflowDefinitionCodec } from "../codec";
 import { createEventWaiters } from "../event";
-import { instantiateWorkflowDefinitionCodec } from "../handle/bound-codec";
 import { workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
 

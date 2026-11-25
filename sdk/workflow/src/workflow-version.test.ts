@@ -33,10 +33,10 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 
 import type { WorkflowRun } from "./run";
+import type { WorkflowDefinitionCodec } from "./run/codec";
 import type { ControlFlowError } from "./run/execution/control-flow-error";
 import { createReplayManifest } from "./run/execution/replay-manifest";
 import { taskExecutionTracker } from "./run/execution/task-execution-tracker";
-import type { WorkflowDefinitionCodec } from "./run/handle/bound-codec";
 import { workflowRunHandle } from "./run/handle/workflow-run";
 import { task } from "./task";
 import { workflow } from "./workflow";

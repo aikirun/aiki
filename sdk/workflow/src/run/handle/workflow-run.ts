@@ -32,7 +32,7 @@ import {
 	resolveAppliedClientCodec,
 	toBoundCodec,
 	type WorkflowDefinitionCodec,
-} from "./bound-codec";
+} from "../codec";
 import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
 import { isControlFlowError } from "../execution/control-flow-error";
 import { taskHandlerScopeStorage } from "../execution/task-handler-scope";

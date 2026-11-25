@@ -5,13 +5,13 @@ import type { Client } from "@aikirun/types/client";
 import { INTERNAL } from "@aikirun/types/symbols";
 import { type WorkflowRunId, type WorkflowRunRecord, WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 
-import type { WorkflowDefinitionCodec } from "./bound-codec";
 import {
 	decodeWaitResultState,
 	type WorkflowRunHandle,
 	type WorkflowRunWaitResultSuccess,
 	workflowRunHandle,
 } from "./workflow-run";
+import type { WorkflowDefinitionCodec } from "../codec";
 import type { EventsDefinition } from "../event";
 
 export interface ChildWorkflowRunHandleOptions<TEvents extends EventsDefinition> {

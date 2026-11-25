@@ -17,7 +17,7 @@ import type {
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import { noopCodec, resolveAppliedClientCodec, toBoundCodec } from "./handle/bound-codec";
+import { noopCodec, resolveAppliedClientCodec, toBoundCodec } from "./codec";
 import type { WorkflowRunHandle } from "./handle/workflow-run";
 
 /**
