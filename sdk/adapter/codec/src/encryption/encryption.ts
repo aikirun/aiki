@@ -45,8 +45,8 @@ export type EncryptionKeyCacheConfig = {
 
 type DerivedKeys = { aesKey: CryptoKey; hmacKey: CryptoKey };
 
-export class EncryptionDecryptFailedError extends Error {
-	public override readonly name = "EncryptionDecryptFailedError";
+export class DecryptionFailedError extends Error {
+	public override readonly name = "DecryptionFailedError";
 	public readonly keyId?: string;
 
 	constructor(options: { keyId?: string; cause?: unknown } = {}) {
@@ -260,7 +260,7 @@ export function encryption(params: EncryptionParams): {
 
 						return bytesToPayload(decrypted);
 					} catch (err) {
-						throw new EncryptionDecryptFailedError({ keyId, cause: err });
+						throw new DecryptionFailedError({ keyId, cause: err });
 					}
 				},
 			})(context);

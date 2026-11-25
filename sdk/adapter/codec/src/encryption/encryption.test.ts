@@ -3,7 +3,7 @@ import { stableStringify } from "@aikirun/lib/json";
 import { noopLogger } from "@aikirun/lib/logger";
 import { describe, expect, expectTypeOf, test } from "vitest";
 
-import { type EncryptedValue, type EncryptionConfig, EncryptionDecryptFailedError, encryption } from "./encryption";
+import { DecryptionFailedError, type EncryptedValue, type EncryptionConfig, encryption } from "./encryption";
 import { EncryptionKeyNotFoundError, InvalidEncryptionKeyError } from "./key-material";
 import { type EncodedValue, InvalidEncodedValueError, type NamedCreateCodec } from "../codec";
 
@@ -185,7 +185,7 @@ describe("encryption codec", () => {
 		});
 	});
 
-	test("rejects ciphertext shorter than IV plus tag as EncryptionDecryptFailedError", async () => {
+	test("rejects ciphertext shorter than IV plus tag as DecryptionFailedError", async () => {
 		const { codec: createCodec } = encryption({
 			name: "AES-256-GCM",
 			key: resolveKey,
@@ -196,7 +196,7 @@ describe("encryption codec", () => {
 				codecName: "AES-256-GCM",
 				body: { keyId: "a", ciphertext: "AAAA" },
 			})
-		).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
+		).rejects.toBeInstanceOf(DecryptionFailedError);
 		await expect(
 			createCodec(context).decode({
 				codecName: "AES-256-GCM",
@@ -215,7 +215,7 @@ describe("encryption codec", () => {
 		});
 	});
 
-	test("rejects a tampered ciphertext as EncryptionDecryptFailedError", async () => {
+	test("rejects a tampered ciphertext as DecryptionFailedError", async () => {
 		const { codec: createCodec } = encryption({
 			name: "AES-256-GCM",
 			key: resolveKey,
@@ -230,7 +230,7 @@ describe("encryption codec", () => {
 			codecName: encoded.codecName,
 			body: { keyId: encoded.body.keyId, ciphertext: packed.toString("base64") },
 		};
-		await expect(instance.decode(tampered)).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
+		await expect(instance.decode(tampered)).rejects.toBeInstanceOf(DecryptionFailedError);
 		await expect(instance.decode(tampered)).rejects.toMatchObject({
 			keyId: "a",
 			cause: expect.objectContaining({ name: "OperationError" }),
@@ -254,7 +254,7 @@ describe("encryption codec", () => {
 			codecName: encoded.codecName,
 			body: { keyId: "b", ciphertext: encoded.body.ciphertext },
 		};
-		await expect(instance.decode(swapped)).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
+		await expect(instance.decode(swapped)).rejects.toBeInstanceOf(DecryptionFailedError);
 		await expect(instance.decode(swapped)).rejects.toMatchObject({
 			keyId: "b",
 			cause: expect.objectContaining({ name: "OperationError" }),
