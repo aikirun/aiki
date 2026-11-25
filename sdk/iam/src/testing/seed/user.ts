@@ -57,9 +57,13 @@ export async function seedSignedInUser(deps: SeedUserDeps): Promise<SignedInUser
 		return { status, body: text ? (JSON.parse(text) as Record<string, unknown>) : null };
 	};
 	const signedUp = await callAuth("/sign-up/email", { name: "Test User", email, password: "correct-horse-battery" });
+	const userId = (signedUp.body?.user as { id?: unknown } | undefined)?.id;
+	if (typeof userId !== "string") {
+		throw new Error(`The user was not signed up: ${signedUp.status}`);
+	}
 
 	return {
-		userId: (signedUp.body?.user as { id: string }).id,
+		userId,
 		email,
 		callAuth,
 		async readAuth(path) {

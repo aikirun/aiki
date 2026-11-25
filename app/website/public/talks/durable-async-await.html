@@ -80,6 +80,7 @@ tr td.ours-cell{background:var(--accent-soft);color:var(--ink);font-weight:600}
 .db th{font:600 19px var(--mono);background:#475569}
 .db th.r1{background:var(--r1)}
 .db th.r3{background:var(--r3)}
+/* biome-ignore lint/style/noDescendingSpecificity: sets only padding, and the striped-row rules above set only background */
 .db td{padding:9px 16px}
 .db td:first-child{font-weight:400;color:var(--body)}
 .db td code{font-size:.95em}
@@ -138,6 +139,7 @@ tr td.ours-cell{background:var(--accent-soft);color:var(--ink);font-weight:600}
 .notes-panel .meta{display:flex;justify-content:space-between;color:#94a3b8;font-size:14px;margin-bottom:8px}
 .notes-panel p{margin:0 0 8px;color:#e2e8f0;max-width:110ch}
 .notes-panel ol,.notes-panel ul{color:#e2e8f0;margin:0 0 8px}
+/* biome-ignore lint/style/noDescendingSpecificity: the notes panel never holds a .db table */
 .notes-panel code{background:#1e293b;color:#e2e8f0;font-size:.92em}
 .notes-panel .time{color:#c4b5fd;font-weight:600}
 </style>
