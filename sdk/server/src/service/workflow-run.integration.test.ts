@@ -876,6 +876,36 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				inputHash: { value: await hashInput(input), nextValues: [announcedHash] },
+				options,
+			});
+
+			expect(matchedRunId).toBe(runId);
+		}));
+
+	test("returns the existing run when the announced value comes as the deprecated nextValue", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+			const input = { orderId: "order-1" };
+			const announcedHash = "announced-hash";
+			const options = { reference: { id: "order-ref-1" } };
+
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				inputHash: { value: announcedHash },
+				options,
+			});
+
+			const matchedRunId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				clientHasherApplied: false,
+				clientCodecApplied: false,
 				inputHash: { value: await hashInput(input), nextValue: announcedHash },
 				options,
 			});

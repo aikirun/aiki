@@ -38,7 +38,7 @@ import { executeWorkflowRun } from "./workflow-run";
 import { task } from "../../task";
 import { workflow } from "../../workflow";
 import type { AnyWorkflowVersion } from "../../workflow-version";
-import type { EventsDefinition } from "../event";
+import type { EventsDefinition } from "../event/definition";
 import type { WorkflowRun } from "../index";
 
 const configProvider = asConfigProvider(() => ({

@@ -26,14 +26,15 @@ import {
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
-	type BoundCodec,
 	composeCodecs,
 	noopCodec,
-	resolveDeclaredClientCodec,
-	toBoundCodec,
+	type OpaquePayloadCodec,
+	resolveAppliedClientCodec,
+	toOpaquePayloadCodec,
 	type WorkflowDefinitionCodec,
-} from "./bound-codec";
-import { createEventSenders, type EventSenders, type EventsDefinition } from "../event";
+} from "../codec";
+import type { EventsDefinition } from "../event/definition";
+import { createEventSenders, type EventSenders } from "../event/sender";
 import { isControlFlowError } from "../execution/control-flow-error";
 import { taskHandlerScopeStorage } from "../execution/task-handler-scope";
 
@@ -157,9 +158,9 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 	[INTERNAL]: {
 		client: Client<Context>;
 		codec: {
-			client: BoundCodec;
-			workflowInput: BoundCodec;
-			workflowOutput: BoundCodec;
+			client: OpaquePayloadCodec;
+			workflowInput: OpaquePayloadCodec;
+			workflowOutput: OpaquePayloadCodec;
 		};
 		transitionStateOptimistic: (state: WorkflowRunTransitionStateRequestOptimistic["state"]) => Promise<void>;
 		transitionTaskState: (
@@ -202,7 +203,7 @@ export type WorkflowRunWaitResult<Output, Timed extends boolean, Abortable exten
 			  };
 
 export async function decodeWaitResultState<Output>(
-	codec: BoundCodec,
+	codec: OpaquePayloadCodec,
 	state: TerminalWorkflowRunState
 ): Promise<WorkflowRunWaitResultSuccess<Output>> {
 	if (state.status !== "completed") {
@@ -234,16 +235,15 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
 
-		const declaration = {
+		const clientCodec = resolveAppliedClientCodec(client, {
 			runId: this._run.id as WorkflowRunId,
 			clientCodecApplied: this._run.clientCodecApplied,
-		};
-		const clientCodec = resolveDeclaredClientCodec(client, declaration);
+		});
 
 		this[INTERNAL] = {
 			client,
 			codec: {
-				client: clientCodec ? toBoundCodec(clientCodec) : noopCodec,
+				client: clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec,
 				workflowInput: composeCodecs(workflowCodec?.input, clientCodec),
 				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
 			},

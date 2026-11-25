@@ -6,9 +6,9 @@ export {
 	type NamedCreateCodec,
 } from "./codec";
 export {
+	DecryptionFailedError,
 	type EncryptedValue,
 	type EncryptionConfig,
-	EncryptionDecryptFailedError,
 	type EncryptionKeyCacheConfig,
 	type EncryptionParams,
 	encryption,

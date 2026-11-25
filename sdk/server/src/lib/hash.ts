@@ -7,10 +7,13 @@ export interface CandidateHashes {
 	all: NonEmptyArray<string>;
 }
 
+/** The hash's next values, with the deprecated single `nextValue` counted as one more. */
+export function nextHashes(hash: Hash): string[] {
+	const nextValues = hash.nextValues ?? [];
+	return hash.nextValue === undefined ? nextValues : nextValues.concat(hash.nextValue);
+}
+
 export function candidateHashes(hash: Hash): CandidateHashes {
-	const candidates = [hash.value].concat(hash.deprecatedValues ?? []);
-	if (hash.nextValue !== undefined) {
-		candidates.push(hash.nextValue);
-	}
+	const candidates = [hash.value].concat(hash.deprecatedValues ?? [], nextHashes(hash));
 	return { current: hash.value, all: asNonEmptyArray(Array.from(new Set(candidates))) };
 }

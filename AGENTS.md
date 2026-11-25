@@ -50,6 +50,7 @@ Each package in the monorepo is a separate Bun workspace. The root `package.json
 | Writing tests           | [testing](.agents/skills/TESTING.md)       |
 | Local end-to-end run    | [local](.agents/skills/LOCAL.md)           |
 | Database and migrations | [db](.agents/skills/DB.md)                 |
+| Reviewing a PR          | [review](.agents/skills/REVIEW.md)         |
 
 ## Naming Conventions
 
