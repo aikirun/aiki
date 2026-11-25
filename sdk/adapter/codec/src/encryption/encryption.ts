@@ -66,6 +66,7 @@ export class EncryptionDecryptFailedError extends Error {
 
 const AES_256_GCM_CIPHER = createCipher("AES-256-GCM");
 const HASH_KEY_ID_SEPARATOR = ":";
+const HASHER_NAME_SEPARATOR = ":";
 const DEFAULT_KEY_CACHE_MAX_ENTRIES = 64;
 const DEFAULT_KEY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const textEncoder = new TextEncoder();
@@ -151,6 +152,12 @@ async function signPayload(payload: Uint8Array<ArrayBuffer>, keyId: string, hmac
 	return formatHash(keyId, digest);
 }
 
+// Escaping `%` first keeps the `%` of `%3A` from being escaped again. The escaped name holds no
+// separator, so the first separator in a hash always ends the name, whatever the name is.
+function escapeHasherName(name: string): string {
+	return name.replaceAll("%", "%25").replaceAll(HASHER_NAME_SEPARATOR, "%3A");
+}
+
 function parseHashKeyId(hash: string): string | null {
 	// Real-world KMS identifiers frequently contain colons (e.g. AWS ARNs), so split on the last separator.
 	const separatorIndex = hash.lastIndexOf(HASH_KEY_ID_SEPARATOR);
@@ -161,6 +168,11 @@ function parseHashKeyId(hash: string): string | null {
 }
 
 export interface EncryptionParams {
+	/**
+	 * Identifies this codec and its hasher. It is stored with every encrypted value and at the start
+	 * of every hash. Keep it once chosen: a new name changes every hash, so Aiki would treat inputs
+	 * hashed under the old name as different inputs.
+	 */
 	name: string;
 
 	/**
@@ -182,17 +194,17 @@ export interface EncryptionParams {
 }
 
 /**
- * Builds an AES-256-GCM codec and a matching keyed hasher. Each stored value and hash names the
- * `keyId` that produced it; `key` fn must resolve that id to the same 32-byte master material every
+ * Builds an AES-256-GCM codec and a matching keyed hasher. Each stored value names the `keyId` that
+ * produced it, and each hash starts with `name` followed by that `keyId`; `key` fn must resolve that id to the same 32-byte master material every
  * time — never overwrite or rotate bytes under an existing id. AES-GCM and HMAC-SHA-256 keys are
  * derived from that material with HKDF-SHA-256 under distinct info labels, so the same bytes are
  * never used as raw key material for both primitives.
  *
  * To rotate, announce the new id in `nextKeyId`, flip it into `keyId` (the old id moves to
- * `previousKeyIds`), then drop the old id from the config once no stored hash uses it. Old values
- * keep decoding because each names its key id, and a run keeps the key its hash was made under for
- * as long as it lives — unless history is later rewritten and re-encoded. The resolver must keep
- * serving every key id a stored value or hash still names.
+ * `previousKeyIds`), and keep the old id there: once it is dropped, inputs hashed under it count as
+ * different inputs. Old values keep decoding because each names its key id, and a run keeps the key
+ * its hash was made under for as long as it lives, unless history is later rewritten and re-encoded.
+ * The resolver must keep serving every key id a stored value or hash still names.
  * Mutating key material in place leaves ciphertext undecryptable and hashes unverifiable.
  */
 export function encryption(params: EncryptionParams): {
@@ -200,6 +212,7 @@ export function encryption(params: EncryptionParams): {
 	hasher: CreateHasher;
 } {
 	const { name, key: resolveKey, keyCache: keyCacheConfig } = params;
+	const hashPrefix = `${escapeHasherName(name)}${HASHER_NAME_SEPARATOR}`;
 	const derivedKeyCache = toDerivedKeyCache(keyCacheConfig);
 	const derivedKeysFor = (keyId: string) =>
 		derivedKeyCache.getOrCreate(keyId, async () => {
@@ -262,7 +275,7 @@ export function encryption(params: EncryptionParams): {
 		const hashUnderKey = async (payload: Uint8Array<ArrayBuffer>, keyId: string): Promise<string> => {
 			const { hmacKey } = await derivedKeysFor(keyId);
 
-			return signPayload(payload, keyId, hmacKey);
+			return `${hashPrefix}${await signPayload(payload, keyId, hmacKey)}`;
 		};
 
 		const hasher = Object.assign(
@@ -293,16 +306,19 @@ export function encryption(params: EncryptionParams): {
 			},
 			{
 				for: async (hash: string): Promise<BoundHasher | null> => {
-					const keyId = parseHashKeyId(hash);
+					if (!hash.startsWith(hashPrefix)) {
+						return null;
+					}
 
+					const keyId = parseHashKeyId(hash.slice(hashPrefix.length));
 					if (keyId === null) {
 						return null;
 					}
 
 					try {
 						const { hmacKey } = await derivedKeysFor(keyId);
-
-						return async (input: unknown) => signPayload(hashInputToBytes(input), keyId, hmacKey);
+						return async (input: unknown) =>
+							`${hashPrefix}${await signPayload(hashInputToBytes(input), keyId, hmacKey)}`;
 					} catch (err) {
 						if (err instanceof EncryptionKeyNotFoundError && err.keyId === keyId) {
 							return null;

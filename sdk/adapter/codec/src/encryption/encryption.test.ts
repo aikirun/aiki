@@ -445,9 +445,9 @@ describe("encryption hasher", () => {
 		const input = { orderId: "42" };
 
 		const hash = await hasher(input);
-		expect(hash.value.startsWith("b:")).toBe(true);
-		expect(hash.deprecatedValues).toEqual([expect.stringMatching(/^a:/)]);
-		expect(hash.nextValue).toEqual(expect.stringMatching(/^next:/));
+		expect(hash.value.startsWith("AES-256-GCM:b:")).toBe(true);
+		expect(hash.deprecatedValues).toEqual([expect.stringMatching(/^AES-256-GCM:a:/)]);
+		expect(hash.nextValue).toEqual(expect.stringMatching(/^AES-256-GCM:next:/));
 		expect(hash.value).not.toBe(hash.deprecatedValues?.[0]);
 		expect(hash.value).not.toBe(hash.nextValue);
 	});
@@ -482,13 +482,39 @@ describe("encryption hasher", () => {
 		const hasher = createHasher(context);
 		const written = await hasher({ orderId: "7" });
 
-		expect(written.value.startsWith(`${kmsKeyId}:`)).toBe(true);
+		expect(written.value.startsWith(`AES-256-GCM:${kmsKeyId}:`)).toBe(true);
 		const bound = await hasher.for(written.value);
 		expect(bound).not.toBeNull();
 		if (bound === null) {
 			return;
 		}
 		expect(await bound({ orderId: "7" })).toBe(written.value);
+	});
+
+	test("starts every hash with its escaped name, and binds hashes that carry it", async () => {
+		const { hasher: createHasher } = encryption({
+			name: "pay:100%",
+			key: resolveKey,
+			config: { keyId: "b", previousKeyIds: ["a"], nextKeyId: "next" },
+		});
+		const hasher = createHasher(context);
+		const input = { orderId: "42" };
+
+		const hash = await hasher(input);
+		expect(hash.value.startsWith("pay%3A100%25:b:")).toBe(true);
+		expect(hash.deprecatedValues).toEqual([expect.stringMatching(/^pay%3A100%25:a:/)]);
+		expect(hash.nextValue).toEqual(expect.stringMatching(/^pay%3A100%25:next:/));
+		expect(await (await hasher.for(hash.value))?.(input)).toBe(hash.value);
+	});
+
+	test("for returns null for a hash made under another name, even with the same keys", async () => {
+		// Names of equal length, so a hasher that skipped the name check would still find key id "a" and bind.
+		const written = await encryption({ name: "billing", key: resolveKey, config: { keyId: "a" } }).hasher(context)({
+			orderId: "7",
+		});
+		const hasher = encryption({ name: "payment", key: resolveKey, config: { keyId: "a" } }).hasher(context);
+
+		expect(await hasher.for(written.value)).toBeNull();
 	});
 
 	test("for returns null when the resolver returns null", async () => {
@@ -498,7 +524,7 @@ describe("encryption hasher", () => {
 			config: { keyId: "a" },
 		});
 		const hasher = createHasher(context);
-		expect(await hasher.for("missing:abc")).toBeNull();
+		expect(await hasher.for("AES-256-GCM:missing:abc")).toBeNull();
 	});
 
 	test("for returns null for an unparsable hash", async () => {
@@ -507,9 +533,9 @@ describe("encryption hasher", () => {
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
-		expect(await createHasher(context).for("nocolon")).toBeNull();
-		expect(await createHasher(context).for(":onlydigest")).toBeNull();
-		expect(await createHasher(context).for("onlykey:")).toBeNull();
+		expect(await createHasher(context).for("AES-256-GCM:nocolon")).toBeNull();
+		expect(await createHasher(context).for("AES-256-GCM::onlydigest")).toBeNull();
+		expect(await createHasher(context).for("AES-256-GCM:onlykey:")).toBeNull();
 	});
 
 	test("for propagates a thrown resolver error instead of returning null", async () => {
@@ -524,7 +550,7 @@ describe("encryption hasher", () => {
 			},
 			config: { keyId: "a" },
 		});
-		await expect(createHasher(context).for("b:abc")).rejects.toBe(vaultError);
+		await expect(createHasher(context).for("AES-256-GCM:b:abc")).rejects.toBe(vaultError);
 	});
 
 	test("throws EncryptionKeyNotFoundError when hashing and a listed key is missing", async () => {
@@ -612,7 +638,7 @@ describe("encryption hasher", () => {
 		const digest = new Uint8Array(
 			await crypto.subtle.sign("HMAC", rawHmacKey, new TextEncoder().encode(stableStringify({ input })))
 		);
-		const rawHash = `a:${Buffer.from(digest).toString("base64url")}`;
+		const rawHash = `AES-256-GCM:a:${Buffer.from(digest).toString("base64url")}`;
 
 		expect(hash.value).not.toBe(rawHash);
 	});
