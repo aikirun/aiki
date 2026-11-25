@@ -29,7 +29,7 @@ import {
 	type BoundCodec,
 	composeCodecs,
 	noopCodec,
-	resolveDeclaredClientCodec,
+	resolveAppliedClientCodec,
 	toBoundCodec,
 	type WorkflowDefinitionCodec,
 } from "./bound-codec";
@@ -234,11 +234,10 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
 
-		const declaration = {
+		const clientCodec = resolveAppliedClientCodec(client, {
 			runId: this._run.id as WorkflowRunId,
 			clientCodecApplied: this._run.clientCodecApplied,
-		};
-		const clientCodec = resolveDeclaredClientCodec(client, declaration);
+		});
 
 		this[INTERNAL] = {
 			client,

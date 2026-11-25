@@ -117,7 +117,7 @@ export function composeCodecs(inner: Codec<unknown> | undefined, outer: Codec<un
 }
 
 /**
- * Composes the definition input codec (inner) with the client codec chosen by policy (outer).
+ * Composes the definition input codec (inner) with the client codec (outer) chosen by policy.
  * `clientCodecApplied` reflects only the client layer.
  */
 export function resolveWorkflowInputCodec(params: {
@@ -134,33 +134,21 @@ export function resolveWorkflowInputCodec(params: {
 }
 
 /**
- * Returns the client's codec when a stored record declares it was applied, undefined otherwise.
- * Throws when the record expects a codec the client lacks.
+ * Returns the client's codec when the stored payload says it was applied, undefined otherwise.
+ * Throws when the payload expects a codec the client lacks.
  */
-export function resolveDeclaredClientCodec<Context>(
+export function resolveAppliedClientCodec<Context>(
 	client: Client<Context>,
-	declaration: { runId: WorkflowRunId; clientCodecApplied: boolean }
+	params: { runId: WorkflowRunId; clientCodecApplied: boolean }
 ): Codec<unknown> | undefined {
-	if (!declaration.clientCodecApplied) {
+	if (!params.clientCodecApplied) {
 		return undefined;
 	}
 
 	const codec = client[INTERNAL].codec;
 	if (!codec) {
-		throw new ClientCodecMissingError(declaration.runId);
+		throw new ClientCodecMissingError(params.runId);
 	}
 
 	return codec;
-}
-
-/**
- * Binds the codec a stored record declares: the client's when the record says the client codec was
- * applied, the noop otherwise. Throws when the record expects a codec the client lacks.
- */
-export function bindDeclaredCodec<Context>(
-	client: Client<Context>,
-	declaration: { runId: WorkflowRunId; clientCodecApplied: boolean }
-): BoundCodec {
-	const codec = resolveDeclaredClientCodec(client, declaration);
-	return codec ? toBoundCodec(codec) : noopCodec;
 }

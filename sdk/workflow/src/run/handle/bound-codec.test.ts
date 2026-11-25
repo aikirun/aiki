@@ -12,12 +12,11 @@ import {
 import { describe, expect, test } from "vitest";
 
 import {
-	bindDeclaredCodec,
 	composeCodecs,
 	instantiateCodec,
 	instantiateWorkflowDefinitionCodec,
 	noopCodec,
-	resolveDeclaredClientCodec,
+	resolveAppliedClientCodec,
 	resolveWorkflowInputCodec,
 	toBoundCodec,
 } from "./bound-codec";
@@ -135,10 +134,10 @@ describe("noopCodec", () => {
 	});
 });
 
-describe("resolveDeclaredClientCodec", () => {
+describe("resolveAppliedClientCodec", () => {
 	const runId = "run-1" as WorkflowRunId;
 
-	test("returns the client's codec when the declaration says it was applied", () =>
+	test("returns the client's codec when the stored payload says it was applied", () =>
 		withFakeClient((client) => {
 			const codec = {
 				encode: async (payload: unknown) => ({ marked: payload }),
@@ -146,61 +145,24 @@ describe("resolveDeclaredClientCodec", () => {
 			};
 			client[INTERNAL].codec = codec;
 
-			expect(resolveDeclaredClientCodec(client, { runId, clientCodecApplied: true })).toBe(codec);
+			expect(resolveAppliedClientCodec(client, { runId, clientCodecApplied: true })).toBe(codec);
 		}));
 
-	test("returns undefined when the declaration says it was not applied", () =>
+	test("returns undefined when the stored payload says it was not applied", () =>
 		withFakeClient((client) => {
 			client[INTERNAL].codec = {
 				encode: async (payload) => ({ marked: payload }),
 				decode: async (payload) => ({ unmarked: payload }),
 			};
 
-			expect(resolveDeclaredClientCodec(client, { runId, clientCodecApplied: false })).toBeUndefined();
+			expect(resolveAppliedClientCodec(client, { runId, clientCodecApplied: false })).toBeUndefined();
 		}));
 
-	test("throws ClientCodecMissingError when the declaration expects a client codec the client lacks", () =>
+	test("throws ClientCodecMissingError when the stored payload expects a client codec the client lacks", () =>
 		withFakeClient((client) => {
-			expect(() => resolveDeclaredClientCodec(client, { runId, clientCodecApplied: true })).toThrow(
+			expect(() => resolveAppliedClientCodec(client, { runId, clientCodecApplied: true })).toThrow(
 				ClientCodecMissingError
 			);
-		}));
-});
-
-describe("bindDeclaredCodec", () => {
-	const runId = "run-1" as WorkflowRunId;
-
-	test("binds the client's codec when the declaration says it was applied", () =>
-		withFakeClient(async (client) => {
-			client[INTERNAL].codec = {
-				encode: async (payload) => ({ marked: payload }),
-				decode: async (payload) => ({ unmarked: payload }),
-			};
-
-			const codec = bindDeclaredCodec(client, { runId, clientCodecApplied: true });
-
-			const payload = { value: 1 };
-			expect(await codec.encode(payload)).toEqual(asOpaquePayload({ marked: payload }));
-			expect(await codec.decode(asOpaquePayload(payload))).toEqual({ unmarked: payload });
-		}));
-
-	test("binds a passthrough codec when the declaration says it was not applied", () =>
-		withFakeClient(async (client) => {
-			client[INTERNAL].codec = {
-				encode: async (payload) => ({ marked: payload }),
-				decode: async (payload) => ({ unmarked: payload }),
-			};
-
-			const codec = bindDeclaredCodec(client, { runId, clientCodecApplied: false });
-
-			const payload = { value: 1 };
-			expect(await codec.encode(payload)).toBe(asOpaquePayload(payload));
-			expect(await codec.decode(asOpaquePayload(payload))).toBe(payload);
-		}));
-
-	test("throws ClientCodecMissingError when the declaration expects a client codec the client lacks", () =>
-		withFakeClient((client) => {
-			expect(() => bindDeclaredCodec(client, { runId, clientCodecApplied: true })).toThrow(ClientCodecMissingError);
 		}));
 });
 

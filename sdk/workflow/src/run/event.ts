@@ -17,7 +17,7 @@ import type {
 import { WorkflowRunSuspendedError } from "@aikirun/types/workflow/run";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import { bindDeclaredCodec, noopCodec, toBoundCodec } from "./handle/bound-codec";
+import { noopCodec, resolveAppliedClientCodec, toBoundCodec } from "./handle/bound-codec";
 import type { WorkflowRunHandle } from "./handle/workflow-run";
 
 /**
@@ -155,10 +155,11 @@ function createEventWaiter<TEvents extends EventsDefinition, Data>(
 
 				// The data decodes by its sender's declaration, not the run's: the sender's client
 				// wrote it, and that client may hold a codec this run's creator did not, or vice versa.
-				const codec = bindDeclaredCodec(handle[INTERNAL].client, {
+				const clientCodec = resolveAppliedClientCodec(handle[INTERNAL].client, {
 					runId: handle.run.id as WorkflowRunId,
 					clientCodecApplied: existingEventWait.clientCodecApplied,
 				});
+				const codec = clientCodec ? toBoundCodec(clientCodec) : noopCodec;
 				logger.debug("Event received");
 				return {
 					timeout: false,
