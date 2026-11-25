@@ -5,7 +5,7 @@ import { describe, expect, expectTypeOf, test } from "vitest";
 
 import { type EncryptedValue, type EncryptionConfig, EncryptionDecryptFailedError, encryption } from "./encryption";
 import { EncryptionKeyNotFoundError, InvalidEncryptionKeyError } from "./key-material";
-import type { EncodedValue, NamedCreateCodec } from "../codec";
+import { type EncodedValue, InvalidEncodedValueError, type NamedCreateCodec } from "../codec";
 
 const context = { logger: noopLogger };
 
@@ -150,36 +150,25 @@ describe("encryption codec", () => {
 		).rejects.toBe(vaultError);
 	});
 
-	test("rejects an invalid encrypted body as EncryptionDecryptFailedError", async () => {
+	test("rejects a body its encode did not produce as InvalidEncodedValueError", async () => {
 		const { codec: createCodec } = encryption({
 			name: "AES-256-GCM",
 			key: resolveKey,
 			config: { keyId: "a" },
 		});
-		await expect(
-			createCodec(context).decode({
-				codecName: "AES-256-GCM",
-				body: { keyId: "a" },
-			})
-		).rejects.toBeInstanceOf(EncryptionDecryptFailedError);
-		await expect(
-			createCodec(context).decode({
-				codecName: "AES-256-GCM",
-				body: { keyId: "a" },
-			})
-		).rejects.toMatchObject({
-			name: "EncryptionDecryptFailedError",
-			message: "Encrypted body does not fit { keyId, ciphertext }",
+
+		const missingCiphertext = createCodec(context).decode({
+			codecName: "AES-256-GCM",
+			body: { keyId: "a" },
 		});
-		await expect(
-			createCodec(context).decode({
-				codecName: "AES-256-GCM",
-				body: { keyId: "", ciphertext: "AAAA" },
-			})
-		).rejects.toMatchObject({
-			name: "EncryptionDecryptFailedError",
-			message: "Encrypted body does not fit { keyId, ciphertext }",
+		await expect(missingCiphertext).rejects.toBeInstanceOf(InvalidEncodedValueError);
+		await expect(missingCiphertext).rejects.toMatchObject({ codecName: "AES-256-GCM" });
+
+		const emptyKeyId = createCodec(context).decode({
+			codecName: "AES-256-GCM",
+			body: { keyId: "", ciphertext: "AAAA" },
 		});
+		await expect(emptyKeyId).rejects.toBeInstanceOf(InvalidEncodedValueError);
 	});
 
 	test("rejects an empty keyId without calling the key resolver", async () => {

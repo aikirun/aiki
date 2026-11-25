@@ -19,7 +19,7 @@ import {
 	type ResolveEncryptionKey,
 	requireKeyMaterial,
 } from "./key-material";
-import { codec, type EncodedValue, type NamedCreateCodec } from "../codec";
+import { codec, type EncodedValue, InvalidEncodedValueError, type NamedCreateCodec } from "../codec";
 
 type PlaintextEnvelope = { input: unknown };
 
@@ -36,7 +36,10 @@ export interface EncryptionConfig {
 
 export type EncryptionKeyCacheConfig = {
 	maxEntries?: number;
-	/** Entry lifetime in ms. Default: 5 minutes. Pass `0` to re-resolve on every use. */
+	/**
+	 * Entry lifetime in ms. Default: 5 minutes. A key the resolver stops serving keeps working for up
+	 * to this long in a process that already has it cached. Pass `0` to re-resolve on every use.
+	 */
 	ttlMs?: number;
 };
 
@@ -46,10 +49,8 @@ export class EncryptionDecryptFailedError extends Error {
 	public override readonly name = "EncryptionDecryptFailedError";
 	public readonly keyId?: string;
 
-	constructor(options: { keyId?: string; cause?: unknown; message?: string } = {}) {
-		const message =
-			options.message ??
-			(options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted");
+	constructor(options: { keyId?: string; cause?: unknown } = {}) {
+		const message = options.cause instanceof Error ? options.cause.message : "Encrypted value could not be decrypted";
 		const errorOptions: ErrorOptions = {};
 
 		if ("cause" in options) {
@@ -244,9 +245,7 @@ export function encryption(params: EncryptionParams): {
 				},
 				decode: async (encoded) => {
 					if (!isEncryptedValue(encoded)) {
-						throw new EncryptionDecryptFailedError({
-							message: "Encrypted body does not fit { keyId, ciphertext }",
-						});
+						throw new InvalidEncodedValueError(name);
 					}
 
 					const { keyId, ciphertext } = encoded;
