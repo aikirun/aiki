@@ -83,7 +83,7 @@ export const schedule = sqliteTable(
 		status: text("status", { enum: SCHEDULE_STATUSES }).notNull(),
 		clientHasherApplied: boolean("client_hasher_applied").notNull(),
 		clientCodecApplied: boolean("client_codec_applied").notNull(),
-		definitionCodecApplied: boolean("definition_codec_applied").notNull(),
+		definitionInputCodecApplied: boolean("definition_input_codec_applied").notNull(),
 		revision: integer("revision").notNull().default(0),
 
 		type: text("type", { enum: SCHEDULE_TYPES }).notNull(),
@@ -143,7 +143,7 @@ export const workflowRun = sqliteTable(
 		status: text("status", { enum: WORKFLOW_RUN_STATUSES }).notNull(),
 		clientHasherApplied: boolean("client_hasher_applied").notNull(),
 		clientCodecApplied: boolean("client_codec_applied").notNull(),
-		definitionCodecApplied: boolean("definition_codec_applied").notNull(),
+		definitionInputCodecApplied: boolean("definition_input_codec_applied").notNull(),
 		revision: integer("revision").notNull().default(0),
 		signalSequence: integer("signal_sequence").notNull().default(0),
 		attempts: integer("attempts").notNull().default(1),

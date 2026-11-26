@@ -44,7 +44,7 @@ export type DueSchedule = Schedule & {
 	workflowRunInputHash: string;
 	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
-	definitionCodecApplied: boolean;
+	definitionInputCodecApplied: boolean;
 };
 
 const advanceScheduleCursor = createKeysetStreamCursorAdvancer<{ schedule: { id: string; nextRunAt: TimestampMs } }>({
@@ -271,7 +271,7 @@ async function processOverlapAllowSchedules(
 				status: "queued",
 				clientHasherApplied: schedule.clientHasherApplied,
 				clientCodecApplied: schedule.clientCodecApplied,
-				definitionCodecApplied: schedule.definitionCodecApplied,
+				definitionInputCodecApplied: schedule.definitionInputCodecApplied,
 				input: schedule.workflowRunInput,
 				inputHash: schedule.workflowRunInputHash,
 				options: schedule.workflowRunOptions,
@@ -407,7 +407,7 @@ async function processOverlapSkipSchedules(
 			status: "queued",
 			clientHasherApplied: schedule.clientHasherApplied,
 			clientCodecApplied: schedule.clientCodecApplied,
-			definitionCodecApplied: schedule.definitionCodecApplied,
+			definitionInputCodecApplied: schedule.definitionInputCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,
@@ -554,7 +554,7 @@ async function processOverlapCancelPreviousSchedules(
 			status: "queued",
 			clientHasherApplied: schedule.clientHasherApplied,
 			clientCodecApplied: schedule.clientCodecApplied,
-			definitionCodecApplied: schedule.definitionCodecApplied,
+			definitionInputCodecApplied: schedule.definitionInputCodecApplied,
 			input: schedule.workflowRunInput,
 			inputHash: schedule.workflowRunInputHash,
 			options: schedule.workflowRunOptions,

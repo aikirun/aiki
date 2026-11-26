@@ -39,7 +39,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "cron", expression: "0 9 * * *", timezone: "Europe/Berlin" },
 			});
 
@@ -64,7 +64,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "cron", expression: "61 9 * * *" },
 			});
 
@@ -84,7 +84,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "cron", expression: "0 9 * * *", timezone: "Europe/Atlantis" },
 			});
 
@@ -106,7 +106,7 @@ describe("ScheduleService activateSchedule", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: { type: "interval", everyMs: MAX_TIMESTAMP_MS - now },
 				})
 			);
@@ -130,7 +130,7 @@ describe("ScheduleService activateSchedule", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: { type: "interval", everyMs: MAX_TIMESTAMP_MS - now + 1 },
 				})
 			);
@@ -153,7 +153,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: previousHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -167,7 +167,7 @@ describe("ScheduleService activateSchedule", () => {
 				},
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -189,7 +189,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: previousHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -202,7 +202,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -224,7 +224,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: "previous-hash" },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 			const { schedule: current } = await scheduleService.activateSchedule(context.namespaceId, {
@@ -234,7 +234,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -256,7 +256,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: previousHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 				options,
 			});
@@ -270,7 +270,7 @@ describe("ScheduleService activateSchedule", () => {
 				},
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 				options,
 			});
@@ -294,7 +294,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: previousHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 				options,
 			});
@@ -308,7 +308,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 				options,
 			});
@@ -327,7 +327,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInput: asOpaquePayload({ region: "eu-west" }),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "interval" as const, everyMs: 60_000 },
 			};
 			await scheduleService.activateSchedule(context.namespaceId, {
@@ -356,7 +356,7 @@ describe("ScheduleService activateSchedule", () => {
 				workflowRunInput: asOpaquePayload({ region: "eu-west" }),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "interval" as const, everyMs: 60_000 },
 			};
 			await scheduleService.activateSchedule(context.namespaceId, {
@@ -389,7 +389,7 @@ describe("ScheduleService activateSchedule", () => {
 						workflowRunInput: asOpaquePayload({ region: "eu-west" }),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
-						definitionCodecApplied: false,
+						definitionInputCodecApplied: false,
 						spec: { type: "interval" as const, everyMs: 60_000 },
 					};
 					const scheduleService = createScheduleService({ repos });
@@ -486,7 +486,7 @@ describe("ScheduleService activateSchedule", () => {
 						workflowRunInputHash: { value: "current-hash" },
 						clientHasherApplied: false,
 						clientCodecApplied: false,
-						definitionCodecApplied: false,
+						definitionInputCodecApplied: false,
 						spec: { type: "interval" as const, everyMs: 60_000 },
 					};
 					// The workflow already exists. With a new one, the second activation would wait for
@@ -564,7 +564,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash: { value: await hashInput({ region: "eu-west" }) },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -594,7 +594,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash: { value: previousHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -605,7 +605,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash: { value: currentHash, deprecatedValues: [previousHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -633,7 +633,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -645,7 +645,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -655,7 +655,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 					id: schedule.id,
 					workflowRunInput: encodedInput,
 					clientCodecApplied: true,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 				})
 			);
 		}));
@@ -674,7 +674,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -685,7 +685,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -694,7 +694,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				expect.objectContaining({
 					id: schedule.id,
 					workflowRunInput: encodedInput,
-					definitionCodecApplied: true,
+					definitionInputCodecApplied: true,
 				})
 			);
 		}));
@@ -714,7 +714,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -725,7 +725,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -748,7 +748,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -759,7 +759,7 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 				options: { reference: { id: "invoices-eu-west" } },
 			});
@@ -791,7 +791,7 @@ describe("ScheduleService activateSchedule recording the client hasher", () => {
 				workflowRunInputHash: { value: "client-hash" },
 				clientHasherApplied: true,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -816,7 +816,7 @@ describe("ScheduleService activateSchedule recording the client hasher", () => {
 				workflowRunInputHash,
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -828,7 +828,7 @@ describe("ScheduleService activateSchedule recording the client hasher", () => {
 				workflowRunInputHash,
 				clientHasherApplied: true,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -858,7 +858,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -870,7 +870,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -889,7 +889,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -904,7 +904,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				},
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -923,7 +923,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 			const stored = await repos.schedule.get(context.namespaceId, { id: schedule.id });
@@ -935,7 +935,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValue: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -955,7 +955,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 				options,
 			});
@@ -968,7 +968,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 				options,
 			});
@@ -988,7 +988,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: announcedHash },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 			});
 
@@ -999,7 +999,7 @@ describe("ScheduleService activateSchedule under an announced key", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput), nextValues: [announcedHash] },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
-				definitionCodecApplied: true,
+				definitionInputCodecApplied: true,
 				spec,
 				options: { reference: { id: "invoices-eu-west" } },
 			});
@@ -1031,7 +1031,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			};
 
@@ -1060,7 +1060,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			};
 
@@ -1087,7 +1087,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 				options: { reference: { id: "invoices-eu-west" } },
 			};
@@ -1115,7 +1115,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			};
 
@@ -1152,7 +1152,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			};
 
@@ -1198,7 +1198,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: { type: "interval", everyMs: 5_000 },
 				})
 			);
@@ -1228,7 +1228,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 
@@ -1255,7 +1255,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec,
 			});
 			await scheduleService.pauseSchedule(context.namespaceId, schedule.id);
@@ -1289,7 +1289,7 @@ describe("ScheduleService activateSchedule and the next run", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "interval" as const, everyMs: 5_000 },
 			};
 
@@ -1339,7 +1339,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: everyFiveMinutes,
 				};
 
@@ -1371,7 +1371,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: everyFiveMinutes,
 				};
 
@@ -1402,7 +1402,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: everyMinute,
 				options: { reference: { id: "invoices-eu-west", conflictPolicy: "return_existing" } },
 			});
@@ -1428,7 +1428,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: everyMinute,
 				options: { reference: { id: "invoices-eu-west", conflictPolicy: "return_existing" } },
 			});
@@ -1452,7 +1452,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: everyMinute,
 				};
 
@@ -1485,7 +1485,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: everyMinute,
 			};
 
@@ -1514,7 +1514,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: everyMinute,
 				options: { reference: { id: "invoices-eu-west" } },
 			};
@@ -1544,7 +1544,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: everyMinute,
 				options: { reference: { id: "invoices-eu-west" } },
 			};
@@ -1575,7 +1575,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 					workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
-					definitionCodecApplied: false,
+					definitionInputCodecApplied: false,
 					spec: everyMinute,
 				};
 				const { schedule: unreferencedSchedule } = await scheduleService.activateSchedule(context.namespaceId, request);
@@ -1613,7 +1613,7 @@ describe("ScheduleService activateSchedule and reference ids", () => {
 						workflowVersionId: "v1",
 						clientHasherApplied: false,
 						clientCodecApplied: false,
-						definitionCodecApplied: false,
+						definitionInputCodecApplied: false,
 						spec: everyMinute,
 						options: { reference: { id: "invoices-eu" } },
 					};
@@ -1705,7 +1705,7 @@ describe("ScheduleService status transitions", () => {
 			workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 			clientHasherApplied: false,
 			clientCodecApplied: false,
-			definitionCodecApplied: false,
+			definitionInputCodecApplied: false,
 			spec,
 		};
 	}
@@ -2015,7 +2015,7 @@ describe("ScheduleService status transitions", () => {
 							workflowRunInputHash: { value: "rotated-hash", deprecatedValues: [request.workflowRunInputHash.value] },
 							clientHasherApplied: true,
 							clientCodecApplied: true,
-							definitionCodecApplied: true,
+							definitionInputCodecApplied: true,
 						})
 				);
 
@@ -2026,7 +2026,7 @@ describe("ScheduleService status transitions", () => {
 						workflowRunInputHash: "rotated-hash",
 						clientHasherApplied: true,
 						clientCodecApplied: true,
-						definitionCodecApplied: true,
+						definitionInputCodecApplied: true,
 					})
 				);
 			})
@@ -2050,7 +2050,7 @@ describe("ScheduleService status transitions", () => {
 							workflowRunInputHash: { value: "rotated-hash", deprecatedValues: [request.workflowRunInputHash.value] },
 							clientHasherApplied: true,
 							clientCodecApplied: true,
-							definitionCodecApplied: true,
+							definitionInputCodecApplied: true,
 						}),
 					(secondary) =>
 						secondary.activateSchedule(context.namespaceId, {
@@ -2067,7 +2067,7 @@ describe("ScheduleService status transitions", () => {
 						workflowRunInputHash: "rotated-hash",
 						clientHasherApplied: true,
 						clientCodecApplied: true,
-						definitionCodecApplied: true,
+						definitionInputCodecApplied: true,
 					})
 				);
 			})

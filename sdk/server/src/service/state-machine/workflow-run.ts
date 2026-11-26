@@ -511,7 +511,7 @@ export function convertDurationToTimestamp(
 		return {
 			status: request.status,
 			output: request.output,
-			definitionCodecApplied: request.definitionCodecApplied,
+			definitionOutputCodecApplied: request.definitionOutputCodecApplied,
 		};
 	}
 

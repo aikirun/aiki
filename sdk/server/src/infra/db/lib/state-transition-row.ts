@@ -23,8 +23,8 @@ export function toWorkflowRunState(raw: unknown): WorkflowRunState {
 			state.output = undefined;
 		}
 		// Pre-flag completed states omit the declaration; treat as not applied.
-		if (!("definitionCodecApplied" in state)) {
-			state.definitionCodecApplied = false;
+		if (!("definitionOutputCodecApplied" in state)) {
+			state.definitionOutputCodecApplied = false;
 		}
 	}
 	return state as unknown as WorkflowRunState;

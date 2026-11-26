@@ -98,7 +98,7 @@ describe("processDueTimers", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 				workflowRunOptions: { priority: 2 },
 			});
@@ -197,7 +197,7 @@ describe("processDueTimers", () => {
 				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
-				definitionCodecApplied: false,
+				definitionInputCodecApplied: false,
 				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
 			});
 

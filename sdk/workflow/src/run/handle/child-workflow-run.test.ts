@@ -28,7 +28,7 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [],
 							terminal: {
-								state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
 								completedAt: 1_000,
 							},
 						},
@@ -60,7 +60,7 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [],
 							terminal: {
-								state: { status: "completed", output: storedOutput, definitionCodecApplied: false },
+								state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: false },
 								completedAt: 1_000,
 							},
 						},
@@ -91,7 +91,7 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [],
 							terminal: {
-								state: { status: "completed", output: storedOutput, definitionCodecApplied: true },
+								state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: true },
 								completedAt: 1_000,
 							},
 						},
@@ -131,7 +131,7 @@ describe("childWorkflowRunHandle", () => {
 								state: {
 									status: "completed",
 									output: asOpaquePayload({ def: "done" }),
-									definitionCodecApplied: true,
+									definitionOutputCodecApplied: true,
 								},
 								completedAt: 1_000,
 							},
@@ -175,7 +175,7 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [],
 							terminal: {
-								state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
 								completedAt: 1_000,
 							},
 						},
@@ -217,7 +217,7 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [{ timedOutAt: 1_000 }],
 							terminal: {
-								state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
 								completedAt: 2_000,
 							},
 						},
@@ -380,7 +380,7 @@ describe("childWorkflowRunHandle", () => {
 
 			const refreshedChildRecord: WorkflowRunRecord = {
 				...baseWorkflowRunRecordFactory.build({ id: childRecord.id }),
-				state: { status: "completed", output: asOpaquePayload("done"), definitionCodecApplied: false },
+				state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
 			};
 			client.api.workflowRun.getByIdV1.once({ id: childRecord.id }, { run: refreshedChildRecord });
 

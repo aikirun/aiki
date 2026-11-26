@@ -269,7 +269,7 @@ describe("schedule", () => {
 						workflowRunInput: encodedInput,
 						workflowRunInputHash: { value: workflowRunInputHash },
 						clientCodecApplied: true,
-						definitionCodecApplied: true,
+						definitionInputCodecApplied: true,
 					}),
 					{ schedule: intervalScheduleFactory.build() }
 				);

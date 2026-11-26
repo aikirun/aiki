@@ -116,7 +116,7 @@ export interface WorkflowRunCreateRequestV1 {
 	inputHash: Hash;
 	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
-	definitionCodecApplied: boolean;
+	definitionInputCodecApplied: boolean;
 	parent?: {
 		workflowRunId: string;
 		expectedRevision: number;

@@ -43,7 +43,7 @@ export async function writeScheduleStateInTx(
 			| "workflowRunInputHash"
 			| "clientHasherApplied"
 			| "clientCodecApplied"
-			| "definitionCodecApplied"
+			| "definitionInputCodecApplied"
 			| "definitionHash"
 			| "referenceId"
 			| "nextRunAt"

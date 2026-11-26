@@ -219,11 +219,11 @@ export async function decodeWaitResultState<Output>(
 
 	// When the stored completion applied a definition codec, decode through the composed
 	// workflow output (definition inner, client outer). Otherwise decode through the client only.
-	if (state.definitionCodecApplied && !params.workflowOutput.definitionCodecSupplied) {
+	if (state.definitionOutputCodecApplied && !params.workflowOutput.definitionCodecSupplied) {
 		throw new DefinitionCodecMissingError(params.runId);
 	}
 
-	const output = state.definitionCodecApplied
+	const output = state.definitionOutputCodecApplied
 		? await params.workflowOutput.decode(state.output)
 		: await params.clientCodec.decode(state.output);
 
@@ -259,7 +259,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		});
 		const definitionInput = resolveDeclaredDefinitionCodec(workflowCodec?.input, {
 			runId,
-			definitionCodecApplied: this._run.definitionCodecApplied,
+			definitionCodecApplied: this._run.definitionInputCodecApplied,
 		});
 
 		this[INTERNAL] = {

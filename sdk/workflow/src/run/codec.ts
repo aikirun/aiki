@@ -145,20 +145,20 @@ export function composeCodecs(
 
 /**
  * Composes the definition input codec with the client codec chosen by policy.
- * `clientCodecApplied` reflects only the client layer; `definitionCodecApplied` only the definition.
+ * `clientCodecApplied` reflects only the client layer; `definitionInputCodecApplied` only the definition.
  */
 export function resolveWorkflowInputCodec(params: {
 	definitionCodec: Codec<unknown> | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
-}): { codec: ComposedCodec; clientCodecApplied: boolean; definitionCodecApplied: boolean } {
+}): { codec: ComposedCodec; clientCodecApplied: boolean; definitionInputCodecApplied: boolean } {
 	const clientCodecApplied = params.policy !== "skip" && params.clientCodec !== undefined;
 	const codec = composeCodecs(params.definitionCodec, clientCodecApplied ? params.clientCodec : undefined);
 
 	return {
 		codec,
 		clientCodecApplied,
-		definitionCodecApplied: codec.definitionCodecSupplied,
+		definitionInputCodecApplied: codec.definitionCodecSupplied,
 	};
 }
 

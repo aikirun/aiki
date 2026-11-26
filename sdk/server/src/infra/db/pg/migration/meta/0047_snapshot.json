@@ -1,5 +1,5 @@
 {
-	"id": "2d5a081c-e2ee-4cc6-be71-d6cb04fd390e",
+	"id": "541ac7d6-cc07-48a3-a74d-a4df6efbda3b",
 	"prevId": "da8d8bd0-8a01-437f-b7a4-076e88625788",
 	"version": "7",
 	"dialect": "postgresql",
@@ -329,8 +329,8 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"definition_codec_applied": {
-					"name": "definition_codec_applied",
+				"definition_input_codec_applied": {
+					"name": "definition_input_codec_applied",
 					"type": "boolean",
 					"primaryKey": false,
 					"notNull": true
@@ -1175,8 +1175,8 @@
 					"primaryKey": false,
 					"notNull": true
 				},
-				"definition_codec_applied": {
-					"name": "definition_codec_applied",
+				"definition_input_codec_applied": {
+					"name": "definition_input_codec_applied",
 					"type": "boolean",
 					"primaryKey": false,
 					"notNull": true

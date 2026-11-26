@@ -260,7 +260,7 @@ export interface WorkflowRunStateCompleted extends WorkflowRunStateBase {
 	 * Whether this version's output definition codec was applied when the output was written.
 	 * Absent on pre-flag completed states; readers treat that as `false`.
 	 */
-	definitionCodecApplied: boolean;
+	definitionOutputCodecApplied: boolean;
 }
 
 interface WorkflowRunStateFailedBase extends WorkflowRunStateBase {
@@ -322,7 +322,7 @@ export interface WorkflowRunRecord {
 	/**
 	 * Whether this version's input definition codec was applied when the input was written.
 	 */
-	definitionCodecApplied: boolean;
+	definitionInputCodecApplied: boolean;
 	referenceId?: string;
 	options?: WorkflowRunOptions;
 	attempts: number;

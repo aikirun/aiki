@@ -30,7 +30,7 @@ export const workflowRunStateByStatus: {
 	},
 	stalled: { status: "stalled" },
 	cancelled: { status: "cancelled" },
-	completed: { status: "completed", output: undefined, definitionCodecApplied: false },
+	completed: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 	failed: { status: "failed", cause: "self", error: { name: "Error", message: "boom" } },
 };
 
@@ -53,7 +53,7 @@ const baseWorkflowRunRecord = (sequence: number): Omit<WorkflowRunRecord, "state
 	inputHash: "hash",
 	clientHasherApplied: false,
 	clientCodecApplied: false,
-	definitionCodecApplied: false,
+	definitionInputCodecApplied: false,
 	attempts: 1,
 	tasks: {},
 	sleeps: {},

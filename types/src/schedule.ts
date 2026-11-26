@@ -75,7 +75,7 @@ export interface Schedule {
 	 * Whether this version's input definition codec was applied when the schedule input was written.
 	 * Copied onto runs the schedule creates.
 	 */
-	definitionCodecApplied: boolean;
+	definitionInputCodecApplied: boolean;
 	referenceId?: string;
 	workflowRunOptions?: WorkflowRunOptions;
 	createdAt: number;

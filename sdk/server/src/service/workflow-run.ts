@@ -368,7 +368,7 @@ async function createWorkflowRunInTx(
 		status: "scheduled",
 		clientHasherApplied: request.clientHasherApplied,
 		clientCodecApplied: request.clientCodecApplied,
-		definitionCodecApplied: request.definitionCodecApplied,
+		definitionInputCodecApplied: request.definitionInputCodecApplied,
 		input,
 		inputHash: inputHash.value,
 		options: options && {
@@ -568,7 +568,7 @@ async function getWorkflowRun(
 		inputHash: run.inputHash,
 		clientHasherApplied: run.clientHasherApplied,
 		clientCodecApplied: run.clientCodecApplied,
-		definitionCodecApplied: run.definitionCodecApplied,
+		definitionInputCodecApplied: run.definitionInputCodecApplied,
 		referenceId: run.referenceId ?? undefined,
 		options: run.options !== null ? run.options : undefined,
 		attempts: run.attempts,

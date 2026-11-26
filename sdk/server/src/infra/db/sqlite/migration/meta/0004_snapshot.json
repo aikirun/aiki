@@ -1,7 +1,7 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "89958a34-cc03-42ca-b58f-df663301dab3",
+	"id": "c3566819-2553-4c0f-a733-86f89b13895a",
 	"prevId": "dfb77c49-7297-4745-ad3c-f698b0a04392",
 	"tables": {
 		"child_workflow_run_wait": {
@@ -296,8 +296,8 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"definition_codec_applied": {
-					"name": "definition_codec_applied",
+				"definition_input_codec_applied": {
+					"name": "definition_input_codec_applied",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
@@ -985,8 +985,8 @@
 					"notNull": true,
 					"autoincrement": false
 				},
-				"definition_codec_applied": {
-					"name": "definition_codec_applied",
+				"definition_input_codec_applied": {
+					"name": "definition_input_codec_applied",
 					"type": "integer",
 					"primaryKey": false,
 					"notNull": true,
