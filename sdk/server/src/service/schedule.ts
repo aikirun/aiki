@@ -302,7 +302,7 @@ async function activateScheduleInTx(
 		workflowRunInputHash: request.workflowRunInputHash.value,
 		clientHasherApplied: request.clientHasherApplied,
 		clientCodecApplied: request.clientCodecApplied,
-		definitionInputCodecApplied: request.definitionInputCodecApplied,
+		definitionInputCodecApplied: request.definitionInputCodecApplied ?? false,
 		definitionHash: currentDefinitionHash,
 	};
 

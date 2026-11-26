@@ -13,6 +13,7 @@ import type {
 	WorkflowRunStateAwaitingRetry,
 	WorkflowRunStateAwaitingTaskRetry,
 	WorkflowRunStateCancelled,
+	WorkflowRunStateCompleted,
 	WorkflowRunStatePaused,
 	WorkflowRunStateScheduled,
 	WorkflowRunStateSleeping,
@@ -116,7 +117,7 @@ export interface WorkflowRunCreateRequestV1 {
 	inputHash: Hash;
 	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
-	definitionInputCodecApplied: boolean;
+	definitionInputCodecApplied?: boolean;
 	parent?: {
 		workflowRunId: string;
 		expectedRevision: number;
@@ -150,14 +151,19 @@ export type WorkflowRunStateAwaitingChildWorkflowRequest = Omit<WorkflowRunState
 	timeoutInMs?: number;
 };
 
+export type WorkflowRunStateCompletedRequest = Omit<WorkflowRunStateCompleted, "definitionOutputCodecApplied"> & {
+	definitionOutputCodecApplied?: boolean;
+};
+
 export type WorkflowRunStateRequest =
-	| Exclude<WorkflowRunState, { status: TimedWorkflowRunStatus | "queued" }>
+	| Exclude<WorkflowRunState, { status: TimedWorkflowRunStatus | "queued" | "completed" }>
 	| WorkflowRunStateScheduledRequest
 	| WorkflowRunStateSleepingRequest
 	| WorkflowRunStateAwaitingEventRequest
 	| WorkflowRunStateAwaitingRetryRequest
 	| WorkflowRunStateAwaitingTaskRetryRequest
-	| WorkflowRunStateAwaitingChildWorkflowRequest;
+	| WorkflowRunStateAwaitingChildWorkflowRequest
+	| WorkflowRunStateCompletedRequest;
 
 type WorkflowRunStateRequestOptimistic = Exclude<
 	WorkflowRunStateRequest,

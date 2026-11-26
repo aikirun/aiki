@@ -141,6 +141,43 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			);
 		}));
 
+	test("defaults definitionOutputCodecApplied to false when omitted on completed transition", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const result = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				expectedRevision: revisionWhenClaimed,
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receipt: "r-2" }),
+				},
+			});
+
+			expect(result).toEqual({
+				revision: revisionWhenClaimed + 1,
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receipt: "r-2" }),
+					definitionOutputCodecApplied: false,
+				},
+				attempts: attemptsWhenClaimed,
+			});
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run?.state).toEqual({
+				status: "completed",
+				output: asOpaquePayload({ receipt: "r-2" }),
+				definitionOutputCodecApplied: false,
+			});
+		}));
+
 	test("a pessimistic transition succeeds without a revision", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({

@@ -126,6 +126,28 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			);
 		}));
 
+	test("defaults definitionInputCodecApplied to false when omitted on create", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
+				expect.objectContaining({
+					id: runId,
+					definitionInputCodecApplied: false,
+				})
+			);
+		}));
+
 	test("finds the run only under the workflow version it belongs to", () =>
 		withHarness(async ({ context, repos }) => {
 			const { service } = createService(repos);

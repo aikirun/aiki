@@ -37,7 +37,7 @@ const activateV1: ContractProcedure<ScheduleActivateRequestV1, ScheduleActivateR
 			workflowRunInputHash: inputHashSchema,
 			clientHasherApplied: "boolean",
 			clientCodecApplied: "boolean",
-			definitionInputCodecApplied: "boolean",
+			definitionInputCodecApplied: "boolean = false",
 			spec: scheduleSpecSchema,
 			"options?": scheduleActivateOptionsSchema.or("undefined"),
 			"workflowRunOptions?": workflowRunOptionsSchema.or("undefined"),

@@ -21,7 +21,7 @@ export interface ScheduleActivateRequestV1 {
 	workflowRunInputHash: Hash;
 	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
-	definitionInputCodecApplied: boolean;
+	definitionInputCodecApplied?: boolean;
 	spec: ScheduleSpec;
 	options?: ScheduleActivateOptions;
 	workflowRunOptions?: WorkflowRunOptions;

@@ -579,6 +579,29 @@ describe("ScheduleService activateSchedule recording the client codec", () => {
 			);
 		}));
 
+	test("defaults definitionInputCodecApplied to false when omitted on activate", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+
+			const { schedule } = await scheduleService.activateSchedule(context.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInputHash: { value: await hashInput({ region: "eu-west" }) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				spec,
+			});
+
+			expect(await scheduleService.getScheduleById(context.namespaceId, schedule.id)).toEqual(
+				expect.objectContaining({
+					schedule: expect.objectContaining({
+						id: schedule.id,
+						definitionInputCodecApplied: false,
+					}),
+				})
+			);
+		}));
+
 	test("rewrites the stored input and declaration together with the hashes when matched via a deprecated value", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });

@@ -368,7 +368,7 @@ async function createWorkflowRunInTx(
 		status: "scheduled",
 		clientHasherApplied: request.clientHasherApplied,
 		clientCodecApplied: request.clientCodecApplied,
-		definitionInputCodecApplied: request.definitionInputCodecApplied,
+		definitionInputCodecApplied: request.definitionInputCodecApplied ?? false,
 		input,
 		inputHash: inputHash.value,
 		options: options && {
