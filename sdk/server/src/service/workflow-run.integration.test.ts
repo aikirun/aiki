@@ -102,7 +102,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			);
 		}));
 
-	test("records that the client codec was applied", () =>
+	test("records that the client and definition input codecs were applied", () =>
 		withHarness(async ({ context, repos }) => {
 			const { service } = createService(repos);
 
@@ -118,7 +118,11 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			});
 
 			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
-				expect.objectContaining({ id: runId, clientCodecApplied: true })
+				expect.objectContaining({
+					id: runId,
+					clientCodecApplied: true,
+					definitionInputCodecApplied: true,
+				})
 			);
 		}));
 

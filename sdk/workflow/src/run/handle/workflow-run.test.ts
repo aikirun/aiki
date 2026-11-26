@@ -41,11 +41,13 @@ describe("workflowRunHandle", () => {
 				expect(() => workflowRunHandle(client, record)).toThrow(ClientCodecMissingError);
 			}));
 
-		test("throws DefinitionCodecMissingError for a run that expects a definition input codec when the version has none", () =>
+		test("returns a handle for a run that expects a definition input codec even when the version has none", () =>
 			withFakeClient((client) => {
 				const record = runningWorkflowRunRecordFactory.build({ definitionInputCodecApplied: true });
 
-				expect(() => workflowRunHandle(client, record)).toThrow(DefinitionCodecMissingError);
+				const handle = workflowRunHandle(client, record);
+
+				expect(handle.run).toEqual(record);
 			}));
 
 		test("the id overload fetches the run via getByIdV1", () =>
@@ -563,7 +565,12 @@ describe("workflowRunHandle", () => {
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 
-				await expect(handle.wait()).rejects.toBeInstanceOf(DefinitionCodecMissingError);
+				const error = await handle.wait().catch((err) => err);
+				expect(error).toBeInstanceOf(DefinitionCodecMissingError);
+				expect(error).toMatchObject({
+					slot: "output",
+					message: expect.stringContaining("output"),
+				});
 			}));
 
 		test("resolves with whatever terminal state the run reached", () =>

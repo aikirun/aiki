@@ -473,8 +473,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		await transitionStateOptimistic({
 			status: "completed",
-			output: await codec.workflowOutput.encode(jsonOutput),
-			definitionOutputCodecApplied: codec.workflowOutput.definitionCodecSupplied,
+			output: await codec.workflowOutputCodec.encode(jsonOutput),
+			definitionOutputCodecApplied: codec.definitionOutputCodecApplied,
 		});
 		logger.debug("Workflow complete");
 	}

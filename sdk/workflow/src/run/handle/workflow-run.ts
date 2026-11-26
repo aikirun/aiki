@@ -27,12 +27,10 @@ import {
 import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
-	type ComposedCodec,
 	composeCodecs,
 	noopCodec,
 	type OpaquePayloadCodec,
 	resolveAppliedClientCodec,
-	resolveDeclaredDefinitionCodec,
 	toOpaquePayloadCodec,
 	type WorkflowDefinitionCodec,
 } from "../codec";
@@ -162,8 +160,10 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 		client: Client<Context>;
 		codec: {
 			client: OpaquePayloadCodec;
-			workflowInput: ComposedCodec;
-			workflowOutput: ComposedCodec;
+			workflowInputCodec: OpaquePayloadCodec;
+			workflowOutputCodec: OpaquePayloadCodec;
+			definitionInputCodecApplied: boolean;
+			definitionOutputCodecApplied: boolean;
 		};
 		transitionStateOptimistic: (state: WorkflowRunTransitionStateRequestOptimistic["state"]) => Promise<void>;
 		transitionTaskState: (
@@ -174,6 +174,8 @@ export interface WorkflowRunHandle<Output, Context, TEvents extends EventsDefini
 		) => Promise<TaskInfo>;
 		assertExecutionAllowed: () => void;
 		executeIfAllowed: <Result>(fn: () => Promise<Result>) => Promise<Result>;
+		resolveInputCodec: () => OpaquePayloadCodec;
+		resolveOutputCodec: (state: TerminalWorkflowRunState) => OpaquePayloadCodec;
 	};
 }
 
@@ -206,30 +208,16 @@ export type WorkflowRunWaitResult<Output, Timed extends boolean, Abortable exten
 			  };
 
 export async function decodeWaitResultState<Output>(
-	params: {
-		runId: WorkflowRunId;
-		clientCodec: OpaquePayloadCodec;
-		workflowOutput: ComposedCodec;
-	},
+	codec: OpaquePayloadCodec,
 	state: TerminalWorkflowRunState
 ): Promise<WorkflowRunWaitResultSuccess<Output>> {
 	if (state.status !== "completed") {
 		return state;
 	}
 
-	// When the stored completion applied a definition codec, decode through the composed
-	// workflow output (definition inner, client outer). Otherwise decode through the client only.
-	if (state.definitionOutputCodecApplied && !params.workflowOutput.definitionCodecSupplied) {
-		throw new DefinitionCodecMissingError(params.runId);
-	}
-
-	const output = state.definitionOutputCodecApplied
-		? await params.workflowOutput.decode(state.output)
-		: await params.clientCodec.decode(state.output);
-
 	return {
 		status: "completed",
-		output: output as Output,
+		output: (await codec.decode(state.output)) as Output,
 	};
 }
 
@@ -257,23 +245,58 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			runId,
 			clientCodecApplied: this._run.clientCodecApplied,
 		});
-		const definitionInput = resolveDeclaredDefinitionCodec(workflowCodec?.input, {
-			runId,
-			definitionCodecApplied: this._run.definitionInputCodecApplied,
-		});
 
 		this[INTERNAL] = {
 			client,
 			codec: {
 				client: clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec,
-				workflowInput: composeCodecs(definitionInput, clientCodec),
-				workflowOutput: composeCodecs(workflowCodec?.output, clientCodec),
+				workflowInputCodec: composeCodecs(workflowCodec?.input, clientCodec),
+				workflowOutputCodec: composeCodecs(workflowCodec?.output, clientCodec),
+				definitionInputCodecApplied: workflowCodec?.input !== undefined,
+				definitionOutputCodecApplied: workflowCodec?.output !== undefined,
 			},
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),
 			assertExecutionAllowed: this.assertExecutionAllowed.bind(this),
 			executeIfAllowed: this.executeIfAllowed.bind(this),
+			resolveInputCodec: this.resolveInputCodec.bind(this),
+			resolveOutputCodec: this.resolveOutputCodec.bind(this),
 		};
+	}
+
+	private resolveInputCodec(): OpaquePayloadCodec {
+		return this.resolveSlotCodec(
+			"input",
+			this._run.definitionInputCodecApplied,
+			this[INTERNAL].codec.definitionInputCodecApplied,
+			this[INTERNAL].codec.workflowInputCodec
+		);
+	}
+
+	private resolveOutputCodec(state: TerminalWorkflowRunState): OpaquePayloadCodec {
+		return this.resolveSlotCodec(
+			"output",
+			state.status === "completed" && state.definitionOutputCodecApplied,
+			this[INTERNAL].codec.definitionOutputCodecApplied,
+			this[INTERNAL].codec.workflowOutputCodec
+		);
+	}
+
+	private resolveSlotCodec(
+		slot: "input" | "output",
+		recordedApplied: boolean,
+		definitionHasCodec: boolean,
+		workflowCodec: OpaquePayloadCodec
+	): OpaquePayloadCodec {
+		if (!recordedApplied) {
+			return this[INTERNAL].codec.client;
+		}
+
+		if (!definitionHasCodec) {
+			throw new DefinitionCodecMissingError(this._run.id as WorkflowRunId, slot);
+		}
+
+		return workflowCodec;
 	}
 
 	public get run(): Readonly<WorkflowRunRecord> {
@@ -325,16 +348,10 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 				// Terminal states have no exits, so a run reported terminated is terminated
 				// forever: the refreshed state is a terminal state.
 				await this.refresh();
+				const state = this._run.state as TerminalWorkflowRunState;
 				return {
 					success: true,
-					state: await decodeWaitResultState<Output>(
-						{
-							runId: this._run.id as WorkflowRunId,
-							clientCodec: this[INTERNAL].codec.client,
-							workflowOutput: this[INTERNAL].codec.workflowOutput,
-						},
-						this._run.state as TerminalWorkflowRunState
-					),
+					state: await decodeWaitResultState<Output>(this.resolveOutputCodec(state), state),
 				};
 			}
 

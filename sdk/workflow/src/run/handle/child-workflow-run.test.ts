@@ -120,6 +120,33 @@ describe("childWorkflowRunHandle", () => {
 				});
 			}));
 
+		test("resolves wait when the child expects a definition input codec the version lacks", () =>
+			withFakeClient(async (client) => {
+				const childRecord = runningWorkflowRunRecordFactory.build({ definitionInputCodecApplied: true });
+				const parentRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRunWaits: {
+						[childRecord.id]: {
+							timeouts: [],
+							terminal: {
+								state: {
+									status: "completed",
+									output: asOpaquePayload("done"),
+									definitionOutputCodecApplied: false,
+								},
+								completedAt: 1_000,
+							},
+						},
+					},
+				});
+				const parentHandle = workflowRunHandle(client, parentRecord);
+				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
+
 		test("throws DefinitionCodecMissingError when the completed output expects a definition codec the version lacks", () =>
 			withFakeClient(async (client) => {
 				const childRecord = runningWorkflowRunRecordFactory.build();
@@ -141,7 +168,12 @@ describe("childWorkflowRunHandle", () => {
 				const parentHandle = workflowRunHandle(client, parentRecord);
 				const childHandle = childWorkflowRunHandle(client, childRecord, parentHandle, client.logger);
 
-				await expect(childHandle.wait()).rejects.toBeInstanceOf(DefinitionCodecMissingError);
+				const error = await childHandle.wait().catch((err) => err);
+				expect(error).toBeInstanceOf(DefinitionCodecMissingError);
+				expect(error).toMatchObject({
+					slot: "output",
+					message: expect.stringContaining("output"),
+				});
 			}));
 
 		test("resolves with whatever terminal state the child reached", () =>

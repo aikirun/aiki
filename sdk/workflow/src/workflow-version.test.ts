@@ -883,7 +883,7 @@ describe("workflow version execution", () => {
 			NonDeterminismError: (id, attempts) =>
 				new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
-			DefinitionCodecMissingError: (id) => new DefinitionCodecMissingError(id),
+			DefinitionCodecMissingError: (id) => new DefinitionCodecMissingError(id, "input"),
 			CodecInitFailedError: () => new CodecInitFailedError(new Error("No keyring available")),
 			CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
 			CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
@@ -2527,6 +2527,51 @@ describe("creating a workflow run", () => {
 				});
 			}));
 
+		test("replays startAsChild and resolves wait when the child expects a definition input codec the version lacks", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+					childWorkflowRunWaits: {
+						[recordedChildRun.id]: {
+							timeouts: [],
+							terminal: {
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
+								completedAt: 1_000,
+							},
+						},
+					},
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.getByIdV1.once(
+					{ id: recordedChildRun.id },
+					{ run: runningWorkflowRunRecordFactory.build({ id: recordedChildRun.id, definitionInputCodecApplied: true }) }
+				);
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
+
 		test("reports the parent's state as unknown when fetching the recorded child on replay gets no response", () =>
 			withFakeClient(async (client) => {
 				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
@@ -2714,6 +2759,32 @@ describe("getting a run handle", () => {
 			const handle = await workflowVersion.getHandleById(client, runRecord.id);
 
 			expect(handle.run.id).toBe(runRecord.id);
+		}));
+
+	test("getHandleById returns a handle that can cancel a run whose definition input codec the version lacks", () =>
+		withFakeClient(async (client) => {
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build({
+				name: "orders",
+				versionId: "1.0.0",
+				definitionInputCodecApplied: true,
+			});
+
+			client.api.workflowRun.getByIdV1.once(
+				{ id: runRecord.id, workflow: { name: "orders", versionId: "1.0.0" } },
+				{ run: runRecord }
+			);
+			client.api.workflowRun.transitionStateV1.once(
+				{ type: "pessimistic", id: runRecord.id, state: { status: "cancelled", explanation: undefined } },
+				{ revision: runRecord.revision + 1, state: { status: "cancelled" }, attempts: runRecord.attempts }
+			);
+
+			const handle = await workflowVersion.getHandleById(client, runRecord.id);
+			await handle.cancel();
+
+			expect(handle.run.state).toEqual({ status: "cancelled" });
 		}));
 
 	test("getHandleById returns a handle whose wait decodes the completed output with the definition codec", () =>

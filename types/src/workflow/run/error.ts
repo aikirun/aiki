@@ -101,10 +101,12 @@ export class ClientCodecMissingError extends Error {
 export class DefinitionCodecMissingError extends Error {
 	public override readonly name = "DefinitionCodecMissingError";
 	public readonly id: WorkflowRunId;
+	public readonly slot: "input" | "output";
 
-	constructor(id: WorkflowRunId) {
-		super(`Workflow ${id} expects a definition codec, but none present`);
+	constructor(id: WorkflowRunId, slot: "input" | "output") {
+		super(`Workflow ${id} expects a definition ${slot} codec, but none present`);
 		this.id = id;
+		this.slot = slot;
 	}
 }
 

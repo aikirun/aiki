@@ -104,6 +104,36 @@ describe("processImminentRecurringRuns", () => {
 			).toEqual(expect.objectContaining({ run: expect.objectContaining({ clientHasherApplied: true }) }));
 		}));
 
+	test("a run created from the schedule copies its definition input codec declaration", () =>
+		withHarness(async ({ context, repos }) => {
+			const scheduleService = createScheduleService({ repos });
+			const workflowRunInput = { region: "eu-west" };
+
+			const { schedule } = await scheduleService.activateSchedule(namespaceRequestContext.namespaceId, {
+				workflowName: "send-invoices",
+				workflowVersionId: "v1",
+				workflowRunInput: asOpaquePayload(workflowRunInput),
+				workflowRunInputHash: { value: await hashInput(workflowRunInput) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+				definitionInputCodecApplied: true,
+				spec: { type: "interval", everyMs: 60_000, overlapPolicy: "skip" },
+			});
+			const occurrence = schedule.nextRunAt;
+
+			await withFakeClock(occurrence, () => processImminentRecurringRuns(context, { repos }, config));
+
+			expect(
+				await repos.workflowRun.getByReferenceWithWorkflowAndState({
+					namespaceId: namespaceRequestContext.namespaceId,
+					name: "send-invoices",
+					versionId: "v1",
+					source: "user",
+					referenceId: getReferenceId(schedule.id, occurrence),
+				})
+			).toEqual(expect.objectContaining({ run: expect.objectContaining({ definitionInputCodecApplied: true }) }));
+		}));
+
 	test("an allow schedule owes every occurrence from its next run, oldest first", () =>
 		withHarness(async ({ context, repos }) => {
 			const scheduleService = createScheduleService({ repos });
