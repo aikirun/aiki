@@ -25,6 +25,7 @@ export type {
 } from "@aikirun/types/workflow/run";
 export {
 	ClientCodecMissingError,
+	DefinitionCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,

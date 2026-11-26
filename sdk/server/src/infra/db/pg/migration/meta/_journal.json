@@ -323,6 +323,13 @@
 			"when": 1794938039315,
 			"tag": "0046_brainy_arclight",
 			"breakpoints": true
+		},
+		{
+			"idx": 47,
+			"version": "7",
+			"when": 1795703648300,
+			"tag": "0047_chemical_starfox",
+			"breakpoints": true
 		}
 	]
 }

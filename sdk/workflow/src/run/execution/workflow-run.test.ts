@@ -24,6 +24,7 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunNotExecutableError,
@@ -59,12 +60,14 @@ function fakeWorkflowVersion(
 
 describe("executeWorkflowRun", () => {
 	describe("error classification", () => {
-		// ClientCodecMissingError, CodecInitFailedError, CodecEncodeFailedError, CodecDecodeFailedError and
-		// WorkflowRunStateUnknownError return false, and have their own tests below.
+		// ClientCodecMissingError, DefinitionCodecMissingError, CodecInitFailedError,
+		// CodecEncodeFailedError, CodecDecodeFailedError and WorkflowRunStateUnknownError return
+		// false, and have their own tests below.
 		const createControlFlowErrorByName: {
 			[Member in Exclude<
 				ControlFlowError,
 				| ClientCodecMissingError
+				| DefinitionCodecMissingError
 				| CodecInitFailedError
 				| CodecEncodeFailedError
 				| CodecDecodeFailedError
@@ -104,6 +107,24 @@ describe("executeWorkflowRun", () => {
 				const workflowRun = runningWorkflowRunRecordFactory.build();
 				const workflowVersion = fakeWorkflowVersion(async () => {
 					throw new ClientCodecMissingError(workflowRun.id as WorkflowRunId);
+				});
+
+				const result = await executeWorkflowRun({
+					client,
+					workflowRun,
+					workflowVersion,
+					logger: client.logger,
+					configProvider,
+				});
+
+				expect(result).toBe(false);
+			}));
+
+		test("returns false when the handler throws DefinitionCodecMissingError, so the run is redelivered", () =>
+			withFakeClient(async (client) => {
+				const workflowRun = runningWorkflowRunRecordFactory.build();
+				const workflowVersion = fakeWorkflowVersion(async () => {
+					throw new DefinitionCodecMissingError(workflowRun.id as WorkflowRunId, "input");
 				});
 
 				const result = await executeWorkflowRun({
@@ -558,12 +579,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							expectedRevision: workflowRun.revision,
 						},
 						{
 							revision: workflowRun.revision,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -604,12 +625,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							expectedRevision: workflowRun.revision,
 						},
 						{
 							revision: workflowRun.revision,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -650,12 +671,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							expectedRevision: workflowRun.revision,
 						},
 						{
 							revision: workflowRun.revision,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -698,12 +719,12 @@ describe("executeWorkflowRun", () => {
 						{
 							type: "optimistic",
 							id: workflowRun.id,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							expectedRevision: runningRevision,
 						},
 						{
 							revision: runningRevision + 1,
-							state: { status: "completed", output: asOpaquePayload("recorded") },
+							state: { status: "completed", output: asOpaquePayload("recorded"), definitionOutputCodecApplied: false },
 							attempts: workflowRun.attempts,
 						}
 					);
@@ -930,7 +951,11 @@ describe("executeWorkflowRun", () => {
 					return { def: { orderId: "o1" } };
 				},
 			};
-			const workflowRun = runningWorkflowRunRecordFactory.build({ input: encodedInput, clientCodecApplied: true });
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				input: encodedInput,
+				clientCodecApplied: true,
+				definitionInputCodecApplied: true,
+			});
 			let capturedInput: unknown;
 			const workflowVersion = fakeWorkflowVersion(
 				async (_run, input) => {
@@ -942,6 +967,47 @@ describe("executeWorkflowRun", () => {
 						decode: async (payload) => {
 							expect(payload).toEqual({ def: { orderId: "o1" } });
 							return { orderId: "o1" };
+						},
+					}),
+				}
+			);
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedInput).toEqual({ orderId: "o1" });
+		}));
+
+	test("decodes the run input through the client codec alone when the run was recorded without a definition input codec", () =>
+		withFakeClient(async (client) => {
+			const encodedInput = asOpaquePayload({ client: { orderId: "o1" } });
+			client[INTERNAL].codec = {
+				encode: async (payload) => payload,
+				decode: async (payload) => {
+					expect(payload).toEqual(encodedInput);
+					return { orderId: "o1" };
+				},
+			};
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				input: encodedInput,
+				clientCodecApplied: true,
+				definitionInputCodecApplied: false,
+			});
+			let capturedInput: unknown;
+			const workflowVersion = fakeWorkflowVersion(
+				async (_run, input) => {
+					capturedInput = input;
+				},
+				{
+					input: () => ({
+						encode: async (payload) => payload,
+						decode: async () => {
+							throw new Error("definition input codec must not run");
 						},
 					}),
 				}
@@ -998,12 +1064,12 @@ describe("executeWorkflowRun", () => {
 					{
 						type: "optimistic",
 						id: workflowRun.id,
-						state: { status: "completed", output: encodedOutput },
+						state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: true },
 						expectedRevision: workflowRun.revision,
 					},
 					{
 						revision: workflowRun.revision,
-						state: { status: "completed", output: encodedOutput },
+						state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: true },
 						attempts: workflowRun.attempts,
 					}
 				);
@@ -1037,6 +1103,58 @@ describe("executeWorkflowRun", () => {
 
 			expect(result).toBe(false);
 			expect(handlerCalled).toBe(false);
+		}));
+
+	test("returns false when the run was recorded with a definition input codec applied but the version has none", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({ definitionInputCodecApplied: true });
+			let handlerCalled = false;
+			const workflowVersion = fakeWorkflowVersion(async () => {
+				handlerCalled = true;
+			});
+
+			const result = await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(result).toBe(false);
+			expect(handlerCalled).toBe(false);
+		}));
+
+	test("ignores a definition input codec on the version when the run was recorded without one", () =>
+		withFakeClient(async (client) => {
+			const workflowRun = runningWorkflowRunRecordFactory.build({
+				input: asOpaquePayload({ orderId: "o1" }),
+				definitionInputCodecApplied: false,
+			});
+			let capturedInput: unknown;
+			const workflowVersion = fakeWorkflowVersion(
+				async (_run, input) => {
+					capturedInput = input;
+				},
+				{
+					input: () => ({
+						encode: async (payload) => payload,
+						decode: async () => {
+							throw new Error("definition input codec must not run");
+						},
+					}),
+				}
+			);
+
+			await executeWorkflowRun({
+				client,
+				workflowRun,
+				workflowVersion,
+				logger: client.logger,
+				configProvider,
+			});
+
+			expect(capturedInput).toEqual({ orderId: "o1" });
 		}));
 
 	test("returns false when the client's codec cannot decode the run's input", () =>
@@ -1126,6 +1244,7 @@ describe("executeWorkflowRun", () => {
 		withFakeClient(async (client) => {
 			const workflowRun = runningWorkflowRunRecordFactory.build({
 				input: asOpaquePayload({ def: "order-1" }),
+				definitionInputCodecApplied: true,
 			});
 			let handlerCalled = false;
 			const workflowVersion = fakeWorkflowVersion(

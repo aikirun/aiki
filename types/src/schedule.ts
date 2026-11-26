@@ -71,6 +71,11 @@ export interface Schedule {
 	workflowRunInput?: OpaquePayload;
 	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
+	/**
+	 * Whether this version's input definition codec was applied when the schedule input was written.
+	 * Copied onto runs the schedule creates.
+	 */
+	definitionInputCodecApplied: boolean;
 	referenceId?: string;
 	workflowRunOptions?: WorkflowRunOptions;
 	createdAt: number;

@@ -210,17 +210,22 @@ describe("convertDurationToTimestamp", () => {
 
 	test("completed with an output: keeps the output", () => {
 		expect(
-			convertDurationToTimestamp({ status: "completed", output: asOpaquePayload({ orderId: "order-7" }) }, now)
+			convertDurationToTimestamp(
+				{ status: "completed", output: asOpaquePayload({ orderId: "order-7" }), definitionOutputCodecApplied: false },
+				now
+			)
 		).toEqual({
 			status: "completed",
 			output: asOpaquePayload({ orderId: "order-7" }),
+			definitionOutputCodecApplied: false,
 		});
 	});
 
 	test("completed without an output: normalizes output to undefined", () => {
-		expect(convertDurationToTimestamp({ status: "completed" }, now)).toEqual({
+		expect(convertDurationToTimestamp({ status: "completed", definitionOutputCodecApplied: false }, now)).toEqual({
 			status: "completed",
 			output: undefined,
+			definitionOutputCodecApplied: false,
 		});
 	});
 

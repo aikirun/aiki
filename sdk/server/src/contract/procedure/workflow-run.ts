@@ -162,6 +162,7 @@ const createV1: ContractProcedure<WorkflowRunCreateRequestV1, WorkflowRunCreateR
 			inputHash: inputHashSchema,
 			clientHasherApplied: "boolean",
 			clientCodecApplied: "boolean",
+			definitionInputCodecApplied: "boolean = false",
 			"parent?": type({ workflowRunId: "string > 0", expectedRevision: "number.integer >= 0" }).or("undefined"),
 			"options?": workflowStartOptionsSchema,
 		})
@@ -192,7 +193,11 @@ const transitionStateV1: ContractProcedure<WorkflowRunTransitionStateRequestV1, 
 								workflowRunStateAwaitingRetrySchema.omit("nextAttemptAt").and({ nextAttemptInMs: "number.integer > 0" })
 							)
 							.or(workflowRunStateAwaitingTaskRetrySchema.omit("nextAttemptAt"))
-							.or(workflowRunStateCompletedSchema.omit("output").and({ "output?": opaquePayloadSchema }))
+							.or(
+								workflowRunStateCompletedSchema
+									.omit("output", "definitionOutputCodecApplied")
+									.and({ "output?": opaquePayloadSchema, definitionOutputCodecApplied: "boolean = false" })
+							)
 							.or(workflowRunStateFailedSchema),
 					}).or({
 						expectedSignalSequence: "number.integer >= 0",

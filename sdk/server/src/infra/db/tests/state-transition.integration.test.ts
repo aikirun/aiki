@@ -1,4 +1,5 @@
 import type { NamespaceId } from "@aikirun/types/namespace";
+import type { WorkflowRunState } from "@aikirun/types/workflow/run";
 import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
@@ -130,7 +131,30 @@ describe("state transition repository getById", () => {
 			const row = await repos.stateTransition.getById(transitionId);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
+		}));
+
+	test("defaults definitionOutputCodecApplied to false when a completed run's state was stored without it", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const transitionId = ulid();
+			// Pre-flag completed rows omitted definitionOutputCodecApplied; bypass the type to store one.
+			await repos.stateTransition.append({
+				id: transitionId,
+				type: "workflow_run",
+				workflowRunId: runId,
+				attempt: attemptsWhenClaimed,
+				revision: revisionWhenClaimed + 1,
+				state: { status: "completed" } as unknown as WorkflowRunState,
+			});
+
+			const row = await repos.stateTransition.getById(transitionId);
+
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
 	test("returns a completed task's state carrying the output key", () =>
@@ -213,7 +237,12 @@ describe("state transition repository getByIds", () => {
 
 			const rows = await repos.stateTransition.getByIds([transitionId]);
 
-			expect(rows).toEqual([expect.objectContaining({ id: transitionId, state: { status: "completed" } })]);
+			expect(rows).toEqual([
+				expect.objectContaining({
+					id: transitionId,
+					state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
+				}),
+			]);
 			expect(rows.find((row) => row.id === transitionId)?.state).toHaveProperty("output");
 		}));
 });

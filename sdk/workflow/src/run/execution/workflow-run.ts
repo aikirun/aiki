@@ -11,6 +11,7 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	type NonDeterminismError,
 	type WorkflowRunFailedError,
 	type WorkflowRunId,
@@ -95,7 +96,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		flushTaskExecutions = taskExecutionsFlusher;
 
 		const createContext = client[INTERNAL].context;
-		const codec = handle[INTERNAL].codec.workflowInput;
+		const codec = handle[INTERNAL].resolveInputCodec();
 
 		// Every hash inside the run must come from the hasher that made the run's own hash.
 		let hasher: BoundHasher;
@@ -154,7 +155,12 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 	} catch (err) {
 		if (isControlFlowError(err)) {
 			if (err instanceof ClientCodecMissingError) {
-				logger.error("The workflow run  expects a client codec, but none present", { err });
+				logger.error("The workflow run expects a client codec, but none present", { err });
+				return false;
+			}
+
+			if (err instanceof DefinitionCodecMissingError) {
+				logger.error("The workflow run expects a definition codec, but none present", { err });
 				return false;
 			}
 

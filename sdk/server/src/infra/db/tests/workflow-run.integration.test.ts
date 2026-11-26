@@ -136,7 +136,7 @@ describe("getByIdWithState", () => {
 			const row = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 });
 
@@ -156,7 +156,7 @@ describe("getByIdWithWorkflowAndState", () => {
 
 			expect(row?.workflow).toEqual({ name: workflowName, versionId: workflowVersionId, source: workflowSource });
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
 	test("finds the run only under its own workflow name and version", () =>
@@ -198,7 +198,7 @@ describe("getByReferenceWithWorkflowAndState", () => {
 			});
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
 	test("matches the reference under the requested workflow version only", () =>
@@ -217,6 +217,7 @@ describe("getByReferenceWithWorkflowAndState", () => {
 				inputHash: { value: await hashInput(input) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				options: { reference: { id: referenceId } },
 			});
 			const getReferencedRunUnderVersion = (versionId: string) =>

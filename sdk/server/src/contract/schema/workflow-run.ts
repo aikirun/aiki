@@ -114,6 +114,7 @@ export const workflowRunStateCancelledSchema = type({
 export const workflowRunStateCompletedSchema = type({
 	status: "'completed'",
 	output: opaquePayloadSchema,
+	definitionOutputCodecApplied: "boolean",
 });
 
 export const workflowRunStateFailedSchema = type({
@@ -180,6 +181,7 @@ export const workflowRunRecordSchema = type({
 	inputHash: "string > 0",
 	clientHasherApplied: "boolean",
 	clientCodecApplied: "boolean",
+	definitionInputCodecApplied: "boolean",
 	"referenceId?": "string > 0 | undefined",
 	"options?": workflowRunOptionsSchema.or("undefined"),
 	attempts: "number.integer >= 0",

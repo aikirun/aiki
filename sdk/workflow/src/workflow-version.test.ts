@@ -21,6 +21,7 @@ import {
 	CodecDecodeFailedError,
 	CodecEncodeFailedError,
 	CodecInitFailedError,
+	DefinitionCodecMissingError,
 	NonDeterminismError,
 	WORKFLOW_RUN_STATUSES,
 	WorkflowRunFailedError,
@@ -229,12 +230,12 @@ describe("workflow version execution", () => {
 							{
 								type: "optimistic",
 								id: runRecord.id,
-								state: { status: "completed", output: asOpaquePayload("done") },
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
 								expectedRevision: runRecord.revision,
 							},
 							{
 								revision: runRecord.revision,
-								state: { status: "completed", output: asOpaquePayload("done") },
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
 								attempts: runRecord.attempts,
 							}
 						);
@@ -278,12 +279,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: encodedOutput },
+							state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: false },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: encodedOutput },
+							state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: false },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -330,12 +331,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: encodedOutput },
+							state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: true },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: encodedOutput },
+							state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: true },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -389,12 +390,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: encodedOutput },
+							state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: true },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: encodedOutput },
+							state: { status: "completed", output: encodedOutput, definitionOutputCodecApplied: true },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -469,12 +470,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: asOpaquePayload("DONE") },
+							state: { status: "completed", output: asOpaquePayload("DONE"), definitionOutputCodecApplied: false },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: asOpaquePayload("DONE") },
+							state: { status: "completed", output: asOpaquePayload("DONE"), definitionOutputCodecApplied: false },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -562,12 +563,12 @@ describe("workflow version execution", () => {
 						{
 							type: "optimistic",
 							id: runRecord.id,
-							state: { status: "completed", output: storedOutput },
+							state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: false },
 							expectedRevision: runRecord.revision,
 						},
 						{
 							revision: runRecord.revision,
-							state: { status: "completed", output: storedOutput },
+							state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: false },
 							attempts: runRecord.attempts,
 						}
 					);
@@ -882,6 +883,7 @@ describe("workflow version execution", () => {
 			NonDeterminismError: (id, attempts) =>
 				new NonDeterminismError(id, attempts, { taskIds: [], childWorkflowRunIds: [] }),
 			ClientCodecMissingError: (id) => new ClientCodecMissingError(id),
+			DefinitionCodecMissingError: (id) => new DefinitionCodecMissingError(id, "input"),
 			CodecInitFailedError: () => new CodecInitFailedError(new Error("No keyring available")),
 			CodecEncodeFailedError: () => new CodecEncodeFailedError(new Error("Key 2025-06 not found")),
 			CodecDecodeFailedError: () => new CodecDecodeFailedError(new Error("No codec named aes-v1")),
@@ -1013,6 +1015,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: {},
 					},
@@ -1050,6 +1053,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: {},
 					},
@@ -1085,6 +1089,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: true,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: "client-hash" },
 						options: {},
 					},
@@ -1122,6 +1127,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("WORLD"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: {},
 					},
@@ -1171,6 +1177,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 } },
 					},
@@ -1213,6 +1220,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: {},
 					},
@@ -1228,7 +1236,7 @@ describe("creating a workflow run", () => {
 					{
 						run: {
 							...baseWorkflowRunRecordFactory.build({ id: newRunRecord.id }),
-							state: { status: "completed", output: storedOutput },
+							state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: true },
 						},
 					}
 				);
@@ -1259,6 +1267,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "never" } },
 					},
@@ -1289,6 +1298,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { retry: { type: "fixed", maxAttempts: 3, delayMs: 100 }, pool: "eu-west" },
 					},
@@ -1318,6 +1328,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { priority: 2 },
 					},
@@ -1359,6 +1370,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("world"),
 						clientHasherApplied: true,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: "client-hash" },
 						options: { clientCodecPolicy: "skip" },
 					},
@@ -1396,6 +1408,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						options: { clientCodecPolicy: "apply" },
 					},
@@ -1435,6 +1448,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: true,
 						inputHash: { value: inputHash },
 						options: {},
 					},
@@ -1541,6 +1555,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: true,
 						inputHash: { value: inputHash },
 						options: {},
 					},
@@ -1586,6 +1601,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: true,
 						inputHash: { value: inputHash },
 						options: { clientCodecPolicy: "skip" },
 					},
@@ -1619,6 +1635,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -1657,7 +1674,10 @@ describe("creating a workflow run", () => {
 					childWorkflowRunWaits: {
 						[childRunRecord.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+							terminal: {
+								state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: true },
+								completedAt: 1_000,
+							},
 						},
 					},
 				});
@@ -1671,6 +1691,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -1714,6 +1735,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -1763,6 +1785,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: true,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -1956,6 +1979,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { clientCodecPolicy: "skip" },
@@ -1996,6 +2020,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { clientCodecPolicy: "apply" },
@@ -2036,6 +2061,7 @@ describe("creating a workflow run", () => {
 						input: encodedInput,
 						clientHasherApplied: false,
 						clientCodecApplied: true,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2071,6 +2097,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2103,6 +2130,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: true,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: "run-bound-hash" },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2134,6 +2162,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2164,6 +2193,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2194,6 +2224,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2229,6 +2260,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2261,6 +2293,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2290,6 +2323,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "eu-west" },
@@ -2322,6 +2356,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { pool: "us-east" },
@@ -2354,6 +2389,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { priority: 2 },
@@ -2386,6 +2422,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("payload"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: { priority: 1 },
@@ -2468,7 +2505,10 @@ describe("creating a workflow run", () => {
 					childWorkflowRunWaits: {
 						[recordedChildRun.id]: {
 							timeouts: [],
-							terminal: { state: { status: "completed", output: storedOutput }, completedAt: 1_000 },
+							terminal: {
+								state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: true },
+								completedAt: 1_000,
+							},
 						},
 					},
 				});
@@ -2477,6 +2517,51 @@ describe("creating a workflow run", () => {
 				client.api.workflowRun.getByIdV1.once(
 					{ id: recordedChildRun.id },
 					{ run: runningWorkflowRunRecordFactory.build({ id: recordedChildRun.id }) }
+				);
+
+				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
+
+				expect(await childHandle.wait()).toEqual({
+					success: true,
+					state: { status: "completed", output: "done" },
+				});
+			}));
+
+		test("replays startAsChild and resolves wait when the child expects a definition input codec the version lacks", () =>
+			withFakeClient(async (client) => {
+				const childWorkflow = workflow({ name: "child-workflow" }).v("1.0.0", {
+					async handler(_run, payload: string) {
+						return payload;
+					},
+				});
+
+				const inputHash = await hashInput("payload");
+				const address = getCompositeId({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+					referenceId: inputHash,
+				});
+				const recordedChildRun = childWorkflowRunInfoFactory.build({
+					name: childWorkflow.name,
+					versionId: childWorkflow.versionId,
+				});
+				const parentRunRecord = runningWorkflowRunRecordFactory.build({
+					childWorkflowRuns: { [address]: [recordedChildRun] },
+					childWorkflowRunWaits: {
+						[recordedChildRun.id]: {
+							timeouts: [],
+							terminal: {
+								state: { status: "completed", output: asOpaquePayload("done"), definitionOutputCodecApplied: false },
+								completedAt: 1_000,
+							},
+						},
+					},
+				});
+				const parentRun = createTestWorkflowRun(client, parentRunRecord);
+
+				client.api.workflowRun.getByIdV1.once(
+					{ id: recordedChildRun.id },
+					{ run: runningWorkflowRunRecordFactory.build({ id: recordedChildRun.id, definitionInputCodecApplied: true }) }
 				);
 
 				const childHandle = await childWorkflow.startAsChild(parentRun, "payload");
@@ -2599,6 +2684,7 @@ describe("creating a workflow run", () => {
 						input: asOpaquePayload("PAYLOAD"),
 						clientHasherApplied: false,
 						clientCodecApplied: false,
+						definitionInputCodecApplied: false,
 						inputHash: { value: inputHash },
 						parent: { workflowRunId: parentRunRecord.id, expectedRevision: parentRunRecord.revision },
 						options: {},
@@ -2675,6 +2761,32 @@ describe("getting a run handle", () => {
 			expect(handle.run.id).toBe(runRecord.id);
 		}));
 
+	test("getHandleById returns a handle that can cancel a run whose definition input codec the version lacks", () =>
+		withFakeClient(async (client) => {
+			const workflowVersion = workflow({ name: "orders" }).v("1.0.0", {
+				async handler() {},
+			});
+			const runRecord = runningWorkflowRunRecordFactory.build({
+				name: "orders",
+				versionId: "1.0.0",
+				definitionInputCodecApplied: true,
+			});
+
+			client.api.workflowRun.getByIdV1.once(
+				{ id: runRecord.id, workflow: { name: "orders", versionId: "1.0.0" } },
+				{ run: runRecord }
+			);
+			client.api.workflowRun.transitionStateV1.once(
+				{ type: "pessimistic", id: runRecord.id, state: { status: "cancelled", explanation: undefined } },
+				{ revision: runRecord.revision + 1, state: { status: "cancelled" }, attempts: runRecord.attempts }
+			);
+
+			const handle = await workflowVersion.getHandleById(client, runRecord.id);
+			await handle.cancel();
+
+			expect(handle.run.state).toEqual({ status: "cancelled" });
+		}));
+
 	test("getHandleById returns a handle whose wait decodes the completed output with the definition codec", () =>
 		withFakeClient(async (client) => {
 			const storedOutput = asOpaquePayload({ def: "done" });
@@ -2710,7 +2822,7 @@ describe("getting a run handle", () => {
 				{
 					run: {
 						...baseWorkflowRunRecordFactory.build({ id: runRecord.id }),
-						state: { status: "completed", output: storedOutput },
+						state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: true },
 					},
 				}
 			);
@@ -2773,7 +2885,7 @@ describe("getting a run handle", () => {
 				{
 					run: {
 						...baseWorkflowRunRecordFactory.build({ id: runRecord.id }),
-						state: { status: "completed", output: storedOutput },
+						state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: true },
 					},
 				}
 			);

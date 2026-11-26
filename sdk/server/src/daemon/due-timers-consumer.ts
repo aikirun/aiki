@@ -169,6 +169,7 @@ export async function processDueTimers(
 				workflowRunInputHash: schedule.workflowRunInputHash,
 				clientHasherApplied: schedule.clientHasherApplied,
 				clientCodecApplied: schedule.clientCodecApplied,
+				definitionInputCodecApplied: schedule.definitionInputCodecApplied,
 			}));
 			if (!isNonEmptyArray(schedules)) {
 				continue;

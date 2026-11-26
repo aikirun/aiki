@@ -281,6 +281,7 @@ interface SchedulePayload {
 	workflowRunInputHash: string;
 	clientHasherApplied: boolean;
 	clientCodecApplied: boolean;
+	definitionInputCodecApplied: boolean;
 	definitionHash: string;
 }
 
@@ -301,6 +302,7 @@ async function activateScheduleInTx(
 		workflowRunInputHash: request.workflowRunInputHash.value,
 		clientHasherApplied: request.clientHasherApplied,
 		clientCodecApplied: request.clientCodecApplied,
+		definitionInputCodecApplied: request.definitionInputCodecApplied ?? false,
 		definitionHash: currentDefinitionHash,
 	};
 
@@ -417,7 +419,8 @@ async function activateExistingSchedule(
 			existing.workflowRunInputHash !== payload.workflowRunInputHash ||
 			existing.definitionHash !== payload.definitionHash ||
 			existing.clientHasherApplied !== payload.clientHasherApplied ||
-			existing.clientCodecApplied !== payload.clientCodecApplied);
+			existing.clientCodecApplied !== payload.clientCodecApplied ||
+			existing.definitionInputCodecApplied !== payload.definitionInputCodecApplied);
 
 	if (!needsReactivation && !shouldWritePayload && params.referenceIdToAttach === undefined) {
 		return existing;
@@ -433,6 +436,7 @@ async function activateExistingSchedule(
 		updates.workflowRunInputHash = payload.workflowRunInputHash;
 		updates.clientHasherApplied = payload.clientHasherApplied;
 		updates.clientCodecApplied = payload.clientCodecApplied;
+		updates.definitionInputCodecApplied = payload.definitionInputCodecApplied;
 		updates.definitionHash = payload.definitionHash;
 	}
 
@@ -486,6 +490,7 @@ async function createSchedule(
 		workflowRunInputHash: payload.workflowRunInputHash,
 		clientHasherApplied: payload.clientHasherApplied,
 		clientCodecApplied: payload.clientCodecApplied,
+		definitionInputCodecApplied: payload.definitionInputCodecApplied,
 		definitionHash: payload.definitionHash,
 		referenceId: params.referenceId,
 		workflowRunOptions: params.workflowRunOptions,
@@ -577,6 +582,7 @@ export function scheduleRowToDomain(
 		workflowRunInput: schedule.workflowRunInput ?? undefined,
 		clientHasherApplied: schedule.clientHasherApplied,
 		clientCodecApplied: schedule.clientCodecApplied,
+		definitionInputCodecApplied: schedule.definitionInputCodecApplied,
 		referenceId: schedule.referenceId ?? undefined,
 		workflowRunOptions: schedule.workflowRunOptions ?? undefined,
 		createdAt: schedule.createdAt,

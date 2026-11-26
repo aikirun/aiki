@@ -67,6 +67,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: inputHash },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				options: { pool: "eu-west" },
 			});
 
@@ -85,6 +86,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 					inputHash,
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: { pool: "eu-west" },
 					attempts: 1,
 					tasks: {},
@@ -100,7 +102,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 			);
 		}));
 
-	test("records that the client codec was applied", () =>
+	test("records that the client and definition input codecs were applied", () =>
 		withHarness(async ({ context, repos }) => {
 			const { service } = createService(repos);
 
@@ -112,10 +114,37 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: await hashInput(input) },
 				clientHasherApplied: false,
 				clientCodecApplied: true,
+				definitionInputCodecApplied: true,
 			});
 
 			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
-				expect.objectContaining({ id: runId, clientCodecApplied: true })
+				expect.objectContaining({
+					id: runId,
+					clientCodecApplied: true,
+					definitionInputCodecApplied: true,
+				})
+			);
+		}));
+
+	test("defaults definitionInputCodecApplied to false when omitted on create", () =>
+		withHarness(async ({ context, repos }) => {
+			const { service } = createService(repos);
+
+			const input = { orderId: "order-1" };
+			const runId = await service.createWorkflowRun(context, {
+				name: "checkout",
+				versionId: "v1",
+				input: asOpaquePayload(input),
+				inputHash: { value: await hashInput(input) },
+				clientHasherApplied: false,
+				clientCodecApplied: false,
+			});
+
+			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
+				expect.objectContaining({
+					id: runId,
+					definitionInputCodecApplied: false,
+				})
 			);
 		}));
 
@@ -131,6 +160,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: await hashInput(input) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 			});
 
 			expect(await service.getWorkflowRunById(context, runId, { name: "checkout", versionId: "v1" })).toEqual(
@@ -152,6 +182,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: "client-hash" },
 				clientHasherApplied: true,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 			});
 
 			expect(await service.getWorkflowRunById(context, runId, undefined)).toEqual(
@@ -171,6 +202,7 @@ describe("WorkflowRunService getWorkflowRunById", () => {
 				inputHash: { value: await hashInput(input) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				options: { clientCodecPolicy: "skip" },
 			});
 
@@ -249,7 +281,11 @@ describe("WorkflowRunService hasTerminated", () => {
 			stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: seed.runId,
-				state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-3" }) },
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receiptId: "rcp-3" }),
+					definitionOutputCodecApplied: false,
+				},
 				expectedRevision: seed.revisionWhenClaimed,
 			}),
 		failed: (context, stateMachine, seed) =>
@@ -563,7 +599,7 @@ describe("WorkflowRunService cancelByIds", () => {
 			stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: seed.runId,
-				state: { status: "completed", output: asOpaquePayload("receipt-9") },
+				state: { status: "completed", output: asOpaquePayload("receipt-9"), definitionOutputCodecApplied: false },
 				expectedRevision: seed.revisionWhenClaimed,
 			}),
 		failed: (context, stateMachine, seed) =>
@@ -698,6 +734,7 @@ describe("WorkflowRunService cancelByIds", () => {
 					inputHash: { value: await hashInput(childInput) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
 			).rejects.toThrow(WorkflowRunRevisionConflictError);
@@ -718,6 +755,7 @@ describe("WorkflowRunService cancelByIds", () => {
 				inputHash: { value: await hashInput(childInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
 
@@ -811,6 +849,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
 			};
@@ -834,6 +873,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: previousHash },
 				options,
 			});
@@ -844,6 +884,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: currentHash, deprecatedValues: [previousHash] },
 				options,
 			});
@@ -865,6 +906,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: announcedHash },
 				options,
 			});
@@ -876,6 +918,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: await hashInput(input), nextValues: [announcedHash] },
 				options,
 			});
@@ -896,6 +939,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: announcedHash },
 				options,
 			});
@@ -906,6 +950,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: await hashInput(input), nextValue: announcedHash },
 				options,
 			});
@@ -925,6 +970,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: "previous-hash" },
 				options,
 			});
@@ -936,6 +982,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 					input: asOpaquePayload(input),
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					inputHash: { value: await hashInput(input) },
 					options,
 				})
@@ -952,6 +999,7 @@ describe("WorkflowRunService createWorkflowRun reference matching", () => {
 					input: asOpaquePayload(input),
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					inputHash: { value: await hashInput(input) },
 					options: { reference: { id: "order-ref-1" } },
 				};
@@ -1003,6 +1051,7 @@ describe("WorkflowRunService createWorkflowRun delay", () => {
 					inputHash: { value: await hashInput(input) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: { delay: { milliseconds: MAX_TIMESTAMP_MS - now } },
 				})
 			);
@@ -1029,6 +1078,7 @@ describe("WorkflowRunService createWorkflowRun delay", () => {
 					inputHash: { value: await hashInput(input) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: { delay: { milliseconds: MAX_TIMESTAMP_MS - now + 1 } },
 				})
 			);
@@ -1054,6 +1104,7 @@ describe("WorkflowRunService createWorkflowRun retry delay", () => {
 					inputHash: { value: await hashInput(input) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: { retry },
 				})
 			);
@@ -1077,6 +1128,7 @@ describe("WorkflowRunService createWorkflowRun retry delay", () => {
 					inputHash: { value: await hashInput(input) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: { retry: { type: "fixed", maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now + 1 } },
 				})
 			);
@@ -1100,6 +1152,7 @@ describe("WorkflowRunService createWorkflowRun retry delay", () => {
 					inputHash: { value: await hashInput(input) },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: {
 						delay: { milliseconds: 1 },
 						retry: { type: "fixed", maxAttempts: 2, delayMs: MAX_TIMESTAMP_MS - now },
@@ -1132,6 +1185,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					inputHash: { value: inputHash },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 				})
 			);
 
@@ -1159,6 +1213,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					inputHash: { value: inputHash },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					options: { priority: 2 },
 				})
 			);
@@ -1184,6 +1239,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				inputHash: { value: await hashInput(input) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				options: { delay: { minutes: 1 } },
 			});
 
@@ -1206,6 +1262,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				input: asOpaquePayload(input),
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				inputHash: { value: inputHash },
 				options: { reference: { id: "order-ref-1" } },
 			};
@@ -1242,6 +1299,7 @@ describe("WorkflowRunService imminent run timers", () => {
 					inputHash: { value: childInputHash },
 					clientHasherApplied: false,
 					clientCodecApplied: false,
+					definitionInputCodecApplied: false,
 					parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 				})
 			);
@@ -1290,6 +1348,7 @@ describe("WorkflowRunService imminent run timers", () => {
 				inputHash: { value: await hashInput(childInput) },
 				clientHasherApplied: false,
 				clientCodecApplied: false,
+				definitionInputCodecApplied: false,
 				parent: { workflowRunId: parent.runId, expectedRevision: parent.revisionWhenClaimed },
 			});
 			await timerPriorityQueue.popDue({ maxRank: Number.MAX_SAFE_INTEGER, limit: 10 });

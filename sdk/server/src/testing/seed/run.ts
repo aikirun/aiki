@@ -61,6 +61,7 @@ export async function seedScheduledRun(
 		inputHash: { value: inputHash },
 		clientHasherApplied: false,
 		clientCodecApplied: false,
+		definitionInputCodecApplied: false,
 		options: overrides?.options,
 		parent: overrides?.parent,
 	});
@@ -153,7 +154,7 @@ export async function completeRun(deps: {
 	const completion = await services.workflowRunStateMachine.transitionState(context, {
 		type: "optimistic",
 		id: runId,
-		state: { status: "completed", output: asOpaquePayload(seededRunOutput) },
+		state: { status: "completed", output: asOpaquePayload(seededRunOutput), definitionOutputCodecApplied: false },
 		expectedRevision,
 	});
 
@@ -186,7 +187,7 @@ export async function seedCompletedRun(
 	await services.workflowRunStateMachine.transitionState(namespaceRequestContext, {
 		type: "optimistic",
 		id: seeded.runId,
-		state: { status: "completed", output: asOpaquePayload(output) },
+		state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 		expectedRevision: seeded.revisionWhenClaimed,
 	});
 

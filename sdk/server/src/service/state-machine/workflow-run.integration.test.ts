@@ -70,7 +70,11 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: runId,
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receipt: "r-1" }),
+						definitionOutputCodecApplied: false,
+					},
 					// The pre-claim revision: exactly what a fenced-out worker would still hold.
 					expectedRevision: revisionWhenClaimed - 1,
 				})
@@ -101,13 +105,21 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			const result = await stateMachine.transitionState(context, {
 				type: "optimistic",
 				id: runId,
-				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receipt: "r-1" }),
+					definitionOutputCodecApplied: false,
+				},
 				expectedRevision: revisionWhenClaimed,
 			});
 
 			expect(result).toEqual({
 				revision: revisionWhenClaimed + 1,
-				state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receipt: "r-1" }),
+					definitionOutputCodecApplied: false,
+				},
 				attempts: attemptsWhenClaimed,
 			});
 
@@ -120,9 +132,50 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 						revision: result.revision,
 						attempts: result.attempts,
 					}),
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receipt: "r-1" }),
+						definitionOutputCodecApplied: false,
+					},
 				})
 			);
+		}));
+
+	test("defaults definitionOutputCodecApplied to false when omitted on completed transition", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, attemptsWhenClaimed } = await seedClaimedRun({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const stateMachine = createStateMachine(repos);
+			const result = await stateMachine.transitionState(context, {
+				type: "optimistic",
+				id: runId,
+				expectedRevision: revisionWhenClaimed,
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receipt: "r-2" }),
+				},
+			});
+
+			expect(result).toEqual({
+				revision: revisionWhenClaimed + 1,
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ receipt: "r-2" }),
+					definitionOutputCodecApplied: false,
+				},
+				attempts: attemptsWhenClaimed,
+			});
+
+			const run = await repos.workflowRun.getByIdWithState({ namespaceId: context.namespaceId, id: runId });
+			expect(run?.state).toEqual({
+				status: "completed",
+				output: asOpaquePayload({ receipt: "r-2" }),
+				definitionOutputCodecApplied: false,
+			});
 		}));
 
 	test("a pessimistic transition succeeds without a revision", () =>
@@ -186,7 +239,7 @@ describe("WorkflowRunStateMachine transition preconditions", () => {
 			expect(run).toEqual(
 				expect.objectContaining({
 					run: expect.objectContaining({ id: runId, revision: revisionWhenClaimed + 1 }),
-					state: expect.objectContaining({ status: "completed" }),
+					state: expect.objectContaining({ status: "completed", definitionOutputCodecApplied: false }),
 				})
 			);
 		}));
@@ -897,10 +950,18 @@ describe("WorkflowRunStateMachine child terminal signals", () => {
 				({
 					type: "optimistic",
 					id,
-					state: { status: "completed", output: asOpaquePayload({ receiptId: "child-receipt-9" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receiptId: "child-receipt-9" }),
+						definitionOutputCodecApplied: false,
+					},
 					expectedRevision,
 				}) as const,
-			expectedChildState: { status: "completed", output: asOpaquePayload({ receiptId: "child-receipt-9" }) },
+			expectedChildState: {
+				status: "completed",
+				output: asOpaquePayload({ receiptId: "child-receipt-9" }),
+				definitionOutputCodecApplied: false,
+			},
 		},
 		failed: {
 			request: (id: string, expectedRevision: number) =>
@@ -1119,7 +1180,11 @@ describe("WorkflowRunStateMachine imminent run timers", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: child.runId,
-					state: { status: "completed", output: asOpaquePayload({ receiptId: "rcp-7" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receiptId: "rcp-7" }),
+						definitionOutputCodecApplied: false,
+					},
 					expectedRevision: child.revisionWhenClaimed,
 				})
 			);
@@ -1521,7 +1586,11 @@ describe("WorkflowRunStateMachine outbox row", () => {
 					createStateMachine(repos).transitionState(context, {
 						type: "optimistic",
 						id: runId,
-						state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+						state: {
+							status: "completed",
+							output: asOpaquePayload({ receipt: "r-1" }),
+							definitionOutputCodecApplied: false,
+						},
 						expectedRevision: revisionWhenClaimed,
 					}),
 			};
@@ -1954,7 +2023,11 @@ describe("WorkflowRunStateMachine failed transitions", () => {
 				stateMachine.transitionState(context, {
 					type: "optimistic",
 					id: parentRun.child.runId,
-					state: { status: "completed", output: asOpaquePayload({ receipt: "r-1" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ receipt: "r-1" }),
+						definitionOutputCodecApplied: false,
+					},
 					expectedRevision: parentRun.child.revisionWhenClaimed,
 				})
 			).rejects.toThrow("parent transition append failed");

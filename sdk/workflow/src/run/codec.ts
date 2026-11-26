@@ -94,45 +94,47 @@ export const toOpaquePayloadCodec = (codec: Codec<unknown>): OpaquePayloadCodec 
 });
 
 /**
- * Encodes through `inner` then `outer`. Decodes through `outer` then `inner`. Absent layers are
- * skipped; the result is wrapped once.
+ * Encodes through `definition` then `client`. Decodes through `client` then `definition`. Absent
+ * layers are skipped; the result is wrapped once.
  */
 export function composeCodecs(
-	inner: Codec<unknown> | undefined,
-	outer: Codec<unknown> | undefined
+	definition: Codec<unknown> | undefined,
+	client: Codec<unknown> | undefined
 ): OpaquePayloadCodec {
-	if (inner && outer) {
+	if (definition && client) {
 		return toOpaquePayloadCodec({
-			encode: async (payload) => outer.encode(await inner.encode(payload)),
-			decode: async (encoded) => inner.decode(await outer.decode(encoded)),
+			encode: async (payload) => client.encode(await definition.encode(payload)),
+			decode: async (encoded) => definition.decode(await client.decode(encoded)),
 		});
 	}
 
-	if (inner) {
-		return toOpaquePayloadCodec(inner);
+	if (definition) {
+		return toOpaquePayloadCodec(definition);
 	}
 
-	if (outer) {
-		return toOpaquePayloadCodec(outer);
+	if (client) {
+		return toOpaquePayloadCodec(client);
 	}
 
 	return noopCodec;
 }
 
 /**
- * Composes the definition input codec (inner) with the client codec (outer) chosen by policy.
- * `clientCodecApplied` reflects only the client layer.
+ * Composes the definition input codec with the client codec chosen by policy.
+ * `clientCodecApplied` reflects only the client layer; `definitionInputCodecApplied` only the definition.
  */
 export function resolveWorkflowInputCodec(params: {
 	definitionCodec: Codec<unknown> | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;
-}): { codec: OpaquePayloadCodec; clientCodecApplied: boolean } {
+}): { codec: OpaquePayloadCodec; clientCodecApplied: boolean; definitionInputCodecApplied: boolean } {
 	const clientCodecApplied = params.policy !== "skip" && params.clientCodec !== undefined;
+	const codec = composeCodecs(params.definitionCodec, clientCodecApplied ? params.clientCodec : undefined);
 
 	return {
-		codec: composeCodecs(params.definitionCodec, clientCodecApplied ? params.clientCodec : undefined),
+		codec,
 		clientCodecApplied,
+		definitionInputCodecApplied: params.definitionCodec !== undefined,
 	};
 }
 

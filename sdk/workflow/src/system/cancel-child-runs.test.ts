@@ -87,12 +87,12 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 						expectedRevision: runRecord.revision,
 					},
 					{
 						revision: runRecord.revision,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 						attempts: runRecord.attempts,
 					}
 				);
@@ -191,12 +191,12 @@ describe("createCancelChildRunsV1", () => {
 					{
 						type: "optimistic",
 						id: runRecord.id,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 						expectedRevision: runRecord.revision,
 					},
 					{
 						revision: runRecord.revision,
-						state: { status: "completed", output: undefined },
+						state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 						attempts: runRecord.attempts,
 					}
 				);

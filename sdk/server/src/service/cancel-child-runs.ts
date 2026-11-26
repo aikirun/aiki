@@ -94,6 +94,7 @@ export async function cancelChildRuns(
 			status: "scheduled",
 			clientHasherApplied: false,
 			clientCodecApplied: false,
+			definitionInputCodecApplied: false,
 			input: parentRun.id as unknown as OpaquePayload,
 			inputHash,
 			options: {
