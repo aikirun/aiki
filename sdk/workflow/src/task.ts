@@ -393,12 +393,12 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			clientCodecApplied: handle.run.clientCodecApplied,
 		});
 
-		const definitionOutput = instantiateCodec(this.params.codec?.output, logger);
-		if (state.definitionOutputCodecApplied && !definitionOutput) {
+		const definitionOutputCodec = instantiateCodec(this.params.codec?.output, logger);
+		if (state.definitionOutputCodecApplied && !definitionOutputCodec) {
 			throw new DefinitionCodecMissingError(runId, "output");
 		}
 
-		const codec = composeCodecs(state.definitionOutputCodecApplied ? definitionOutput : undefined, clientCodec);
+		const codec = composeCodecs(state.definitionOutputCodecApplied ? definitionOutputCodec : undefined, clientCodec);
 		const output = await codec.decode(state.output);
 
 		return output as Output;
