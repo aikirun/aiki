@@ -176,7 +176,7 @@ describe("childWorkflowRunHandle", () => {
 				});
 			}));
 
-		test("decodes the child's completed output through the client codec only when definitionCodecApplied is false even though a definition codec is present", () =>
+		test("decodes the child's completed output through the client codec only when definitionOutputCodecApplied is false even though a definition codec is present", () =>
 			withFakeClient(async (client) => {
 				const storedOutput = asOpaquePayload({ client: "done" });
 				client[INTERNAL].codec = {
@@ -204,7 +204,7 @@ describe("childWorkflowRunHandle", () => {
 						output: {
 							encode: async (payload) => payload,
 							decode: async () => {
-								throw new Error("definition output codec must not run when definitionCodecApplied is false");
+								throw new Error("definition output codec must not run when definitionOutputCodecApplied is false");
 							},
 						},
 					},

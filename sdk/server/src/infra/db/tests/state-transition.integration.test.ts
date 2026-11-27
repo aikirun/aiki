@@ -169,10 +169,10 @@ describe("state transition repository getById", () => {
 			const row = await repos.stateTransition.getById(transitionId);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
-	test("returns a completed task's state carrying definitionCodecApplied when the stored JSON omitted it", () =>
+	test("returns a completed task's state carrying definitionOutputCodecApplied when the stored JSON omitted it", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
@@ -180,7 +180,7 @@ describe("state transition repository getById", () => {
 				publisher,
 			});
 			const transitionId = ulid();
-			// Pre-flag completed JSON has neither output nor definitionCodecApplied.
+			// Pre-flag completed JSON has neither output nor definitionOutputCodecApplied.
 			await repos.stateTransition.append({
 				id: transitionId,
 				workflowRunId: runId,
@@ -194,7 +194,7 @@ describe("state transition repository getById", () => {
 
 			const row = await repos.stateTransition.getById(transitionId);
 
-			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 });
 
@@ -356,7 +356,7 @@ describe("state transition repository listByRunId", () => {
 				attempt: 1,
 				revision: revisionWhenClaimed,
 				taskSequence: latestTaskSequence + 1,
-				state: { status: "completed", definitionCodecApplied: false },
+				state: { status: "completed", definitionOutputCodecApplied: false },
 			});
 
 			const { rows } = await repos.stateTransition.listByRunId(runId, 50, 0, { order: "asc" });

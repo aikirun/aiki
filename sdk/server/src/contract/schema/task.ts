@@ -21,8 +21,12 @@ export const taskStateAwaitingRetrySchema = type({
 export const taskStateCompletedSchema = type({
 	status: "'completed'",
 	output: opaquePayloadSchema,
-	definitionCodecApplied: "boolean",
+	definitionOutputCodecApplied: "boolean",
 });
+
+export const taskStateCompletedRequestSchema = taskStateCompletedSchema
+	.omit("output", "definitionOutputCodecApplied")
+	.and({ "output?": opaquePayloadSchema, "definitionOutputCodecApplied?": "boolean | undefined" });
 
 export const taskStateFailedSchema = type({
 	status: "'failed'",
@@ -63,5 +67,5 @@ export const taskRecordSchema = type({
 export const taskSetStateRequestSchema = type({
 	id: "string > 0",
 	workflowRunId: "string > 0",
-	state: taskStateCompletedSchema.or(taskStateFailedSchema),
+	state: taskStateCompletedRequestSchema.or(taskStateFailedSchema),
 });

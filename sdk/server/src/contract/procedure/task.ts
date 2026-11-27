@@ -18,7 +18,7 @@ import {
 	taskRecordSchema,
 	taskSetStateRequestSchema,
 	taskStateAwaitingRetrySchema,
-	taskStateCompletedSchema,
+	taskStateCompletedRequestSchema,
 	taskStateFailedSchema,
 } from "../schema/task";
 
@@ -58,7 +58,7 @@ const transitionStateV1: ContractProcedure<TaskTransitionStateRequestV1, TaskTra
 				id: "string > 0",
 				workflowRunId: "string > 0",
 				attempts: "number.integer > 0",
-				state: taskStateCompletedSchema.omit("output").and({ "output?": opaquePayloadSchema }),
+				state: taskStateCompletedRequestSchema,
 				expectedWorkflowRunRevision: "number.integer >= 0",
 				sequence: "number.integer > 0",
 			})

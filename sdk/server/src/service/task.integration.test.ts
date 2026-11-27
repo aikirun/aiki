@@ -87,19 +87,19 @@ describe("TaskService setTaskState", () => {
 			await taskService.setTaskState(context, {
 				id: taskInfo.id,
 				workflowRunId: runId,
-				state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: false },
+				state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 			});
 
 			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
 				expect.objectContaining({
 					id: taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: false },
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 				}),
 			]);
 		}));
 
-	test("completes a running task with definitionCodecApplied true", () =>
+	test("completes a running task with definitionOutputCodecApplied true", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, taskInfo } = await seedRunningTask({
 				namespaceRequestContext: context,
@@ -112,22 +112,47 @@ describe("TaskService setTaskState", () => {
 			await taskService.setTaskState(context, {
 				id: taskInfo.id,
 				workflowRunId: runId,
-				state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: true },
+				state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
 			});
 
 			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
 				expect.objectContaining({
 					id: taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: true },
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
 				}),
 			]);
 			expect(await taskService.getTaskById(context, taskInfo.id)).toEqual(
 				expect.objectContaining({
 					id: taskInfo.id,
-					state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: true },
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
 				})
 			);
+		}));
+
+	test("defaults definitionOutputCodecApplied to false when omitted on completed state", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const output = { reservationId: "rsv-2" };
+			const taskService = createTaskService({ repos });
+			await taskService.setTaskState(context, {
+				id: taskInfo.id,
+				workflowRunId: runId,
+				state: { status: "completed", output: asOpaquePayload(output) },
+			});
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					attempts: 2,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
+				}),
+			]);
 		}));
 
 	test("puts the result after the task transitions already at the run's revision", () =>
@@ -149,7 +174,7 @@ describe("TaskService setTaskState", () => {
 				state: {
 					status: "completed",
 					output: asOpaquePayload({ reservationId: "rsv-1" }),
-					definitionCodecApplied: false,
+					definitionOutputCodecApplied: false,
 				},
 			});
 
@@ -211,7 +236,7 @@ describe("TaskService setTaskState", () => {
 				taskService.setTaskState(context, {
 					id: victimTaskSeed.taskInfo.id,
 					workflowRunId: attackerRunSeed.runId,
-					state: { status: "completed", output: asOpaquePayload("hijacked"), definitionCodecApplied: false },
+					state: { status: "completed", output: asOpaquePayload("hijacked"), definitionOutputCodecApplied: false },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 
@@ -239,7 +264,7 @@ describe("TaskService setTaskState", () => {
 					state: {
 						status: "completed",
 						output: asOpaquePayload({ reservationId: "rsv-1" }),
-						definitionCodecApplied: false,
+						definitionOutputCodecApplied: false,
 					},
 				})
 			).rejects.toBeInstanceOf(WorkflowRunTerminatedError);

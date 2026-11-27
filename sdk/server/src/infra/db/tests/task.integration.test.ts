@@ -37,10 +37,10 @@ describe("task repository getByIdWithState", () => {
 			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
-	test("returns a completed state carrying definitionCodecApplied when the stored JSON omitted it", () =>
+	test("returns a completed state carrying definitionOutputCodecApplied when the stored JSON omitted it", () =>
 		withHarness(async ({ context, repos, publisher }) => {
 			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
 				namespaceRequestContext: context,
@@ -48,7 +48,7 @@ describe("task repository getByIdWithState", () => {
 				publisher,
 			});
 			const transitionId = ulid();
-			// Pre-flag completed JSON has neither output nor definitionCodecApplied.
+			// Pre-flag completed JSON has neither output nor definitionOutputCodecApplied.
 			await repos.stateTransition.append({
 				id: transitionId,
 				workflowRunId: runId,
@@ -66,7 +66,7 @@ describe("task repository getByIdWithState", () => {
 
 			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
 
-			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionCodecApplied: false });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
 	test("finds a task only through its own namespace", () =>

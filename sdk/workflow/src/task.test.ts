@@ -237,7 +237,7 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
-					state: { output: storedOutput, definitionCodecApplied: true },
+					state: { output: storedOutput, definitionOutputCodecApplied: true },
 				});
 
 				client.api.task.transitionStateV1
@@ -261,7 +261,7 @@ describe("task", () => {
 							state: {
 								status: "completed",
 								output: storedOutput,
-								definitionCodecApplied: true,
+								definitionOutputCodecApplied: true,
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
@@ -317,7 +317,7 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
-					state: { output: storedOutput, definitionCodecApplied: true },
+					state: { output: storedOutput, definitionOutputCodecApplied: true },
 				});
 
 				client.api.task.transitionStateV1
@@ -341,7 +341,7 @@ describe("task", () => {
 							state: {
 								status: "completed",
 								output: storedOutput,
-								definitionCodecApplied: true,
+								definitionOutputCodecApplied: true,
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
@@ -362,7 +362,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: "send-email",
-					state: { output: storedOutput, definitionCodecApplied: true },
+					state: { output: storedOutput, definitionOutputCodecApplied: true },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					clientCodecApplied: true,
@@ -406,7 +406,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: "send-email",
-					state: { output: asOpaquePayload("previously-sent"), definitionCodecApplied: true },
+					state: { output: asOpaquePayload("previously-sent"), definitionOutputCodecApplied: true },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -515,7 +515,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: "send-email",
-					state: { output: asOpaquePayload({ def: "previously-sent" }), definitionCodecApplied: true },
+					state: { output: asOpaquePayload({ def: "previously-sent" }), definitionOutputCodecApplied: true },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -540,7 +540,7 @@ describe("task", () => {
 				await expect(starting).rejects.toMatchObject({ cause: decodeError });
 			}));
 
-		test("encodes input through the definition codec and records definitionCodecApplied false on output when only the input codec is configured", () =>
+		test("encodes input through the definition codec and records definitionOutputCodecApplied false on output when only the input codec is configured", () =>
 			withFakeClient(async (client) => {
 				const input = "info@aiki.run";
 				const output = "Sent to info@aiki.run";
@@ -564,7 +564,7 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
-					state: { output: asOpaquePayload(output), definitionCodecApplied: false },
+					state: { output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 				});
 
 				client.api.task.transitionStateV1
@@ -588,7 +588,7 @@ describe("task", () => {
 							state: {
 								status: "completed",
 								output: asOpaquePayload(output),
-								definitionCodecApplied: false,
+								definitionOutputCodecApplied: false,
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
@@ -600,7 +600,7 @@ describe("task", () => {
 				expect(await sendEmail.start(run, input)).toBe(output);
 			}));
 
-		test("records definitionCodecApplied true on output when only the output codec is configured", () =>
+		test("records definitionOutputCodecApplied true on output when only the output codec is configured", () =>
 			withFakeClient(async (client) => {
 				const input = "info@aiki.run";
 				const output = "Sent to info@aiki.run";
@@ -624,7 +624,7 @@ describe("task", () => {
 				const completedTaskInfo = completedTaskInfoFactory.build({
 					id: runningTaskInfo.id,
 					name: sendEmail.name,
-					state: { output: storedOutput, definitionCodecApplied: true },
+					state: { output: storedOutput, definitionOutputCodecApplied: true },
 				});
 
 				client.api.task.transitionStateV1
@@ -648,7 +648,7 @@ describe("task", () => {
 							state: {
 								status: "completed",
 								output: storedOutput,
-								definitionCodecApplied: true,
+								definitionOutputCodecApplied: true,
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
@@ -660,7 +660,7 @@ describe("task", () => {
 				expect(await sendEmail.start(run, input)).toBe(output);
 			}));
 
-		test("does not decode through the task definition codec when replaying a completed task that recorded definitionCodecApplied false", () =>
+		test("does not decode through the task definition codec when replaying a completed task that recorded definitionOutputCodecApplied false", () =>
 			withFakeClient(async (client) => {
 				const input = { to: "info@aiki.run" };
 				const output = "previously-sent";
@@ -668,7 +668,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: "send-email",
-					state: { output: asOpaquePayload(output), definitionCodecApplied: false },
+					state: { output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -686,7 +686,7 @@ describe("task", () => {
 						output: () => ({
 							encode: async (payload) => ({ def: payload as string }),
 							decode: async () => {
-								throw new Error("definition output codec must not run when definitionCodecApplied is false");
+								throw new Error("definition output codec must not run when definitionOutputCodecApplied is false");
 							},
 						}),
 					},
@@ -696,7 +696,7 @@ describe("task", () => {
 				expect(handlerCalls).toBe(0);
 			}));
 
-		test("decodes through the client codec only when replaying a completed task that recorded definitionCodecApplied false even though a definition codec is present", () =>
+		test("decodes through the client codec only when replaying a completed task that recorded definitionOutputCodecApplied false even though a definition codec is present", () =>
 			withFakeClient(async (client) => {
 				const input = { to: "info@aiki.run" };
 				const output = "previously-sent";
@@ -705,7 +705,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: "send-email",
-					state: { output: storedOutput, definitionCodecApplied: false },
+					state: { output: storedOutput, definitionOutputCodecApplied: false },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					clientCodecApplied: true,
@@ -731,7 +731,7 @@ describe("task", () => {
 						output: () => ({
 							encode: async (payload) => ({ def: payload as string }),
 							decode: async () => {
-								throw new Error("definition output codec must not run when definitionCodecApplied is false");
+								throw new Error("definition output codec must not run when definitionOutputCodecApplied is false");
 							},
 						}),
 					},
@@ -750,7 +750,7 @@ describe("task", () => {
 				const address = getCompositeId({ name: "send-email", referenceId: inputHash });
 				const recordedTask = completedTaskInfoFactory.build({
 					name: "send-email",
-					state: { output: storedOutput, definitionCodecApplied: true },
+					state: { output: storedOutput, definitionOutputCodecApplied: true },
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({
 					tasks: { [address]: [recordedTask] },
@@ -956,7 +956,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload(output), definitionCodecApplied: false },
+							state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -1038,7 +1038,7 @@ describe("task", () => {
 							state: {
 								status: "completed",
 								output: storedOutput,
-								definitionCodecApplied: true,
+								definitionOutputCodecApplied: true,
 							},
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
@@ -1049,7 +1049,7 @@ describe("task", () => {
 								id: awaitingRetryTaskInfo.id,
 								name: chargeCard.name,
 								attempts: 2,
-								state: { output: storedOutput, definitionCodecApplied: true },
+								state: { output: storedOutput, definitionOutputCodecApplied: true },
 							}),
 						}
 					);
@@ -1269,7 +1269,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionOutputCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -1370,7 +1370,7 @@ describe("task", () => {
 						{
 							id: awaitingRetryTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionOutputCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -1425,7 +1425,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionOutputCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -1486,7 +1486,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 2,
-							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionOutputCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -1770,7 +1770,7 @@ describe("task", () => {
 						{
 							id: runningTaskInfo.id,
 							attempts: 1,
-							state: { status: "completed", output: asOpaquePayload("charged"), definitionCodecApplied: false },
+							state: { status: "completed", output: asOpaquePayload("charged"), definitionOutputCodecApplied: false },
 							workflowRunId: runRecord.id,
 							expectedWorkflowRunRevision: runRecord.revision,
 							sequence: 2,
@@ -2789,12 +2789,12 @@ describe("task output on the first run", () => {
 					{
 						id: runningTaskInfo.id,
 						attempts: 1,
-						state: { status: "completed", output: undefined, definitionCodecApplied: false },
+						state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 						workflowRunId: runRecord.id,
 						expectedWorkflowRunRevision: runRecord.revision,
 						sequence: 2,
 					},
-					{ taskInfo: { ...runningTaskInfo, state: { status: "completed", definitionCodecApplied: false } } }
+					{ taskInfo: { ...runningTaskInfo, state: { status: "completed", definitionOutputCodecApplied: false } } }
 				);
 
 			expect(await ping.start(run)).toBeUndefined();

@@ -48,10 +48,14 @@ export interface TransitionTaskStateToRunningRetry extends TransitionTaskStateBa
 
 export type TransitionTaskStateToRunning = TransitionTaskStateToRunningCreate | TransitionTaskStateToRunningRetry;
 
+export type TaskStateCompletedRequest = Omit<TaskStateCompleted, "definitionOutputCodecApplied"> & {
+	definitionOutputCodecApplied?: boolean;
+};
+
 export interface TransitionTaskStateToCompleted extends TransitionTaskStateBase {
 	id: string;
 	attempts: number;
-	state: TaskStateCompleted;
+	state: TaskStateCompletedRequest;
 }
 
 export interface TransitionTaskStateToFailed extends TransitionTaskStateBase {
@@ -83,5 +87,5 @@ export interface TaskTransitionStateResponseV1 {
 export interface TaskSetStateRequestV1 {
 	id: string;
 	workflowRunId: string;
-	state: TaskStateCompleted | TaskStateFailed;
+	state: TaskStateCompletedRequest | TaskStateFailed;
 }

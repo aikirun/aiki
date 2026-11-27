@@ -78,7 +78,7 @@ async function setTaskStateInTx(
 			? {
 					status: "completed",
 					output: request.state.output,
-					definitionCodecApplied: request.state.definitionCodecApplied,
+					definitionOutputCodecApplied: request.state.definitionOutputCodecApplied ?? false,
 				}
 			: { status: request.state.status satisfies "failed", error: request.state.error };
 

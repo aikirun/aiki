@@ -42,5 +42,5 @@ export const completedTaskInfoFactory = Factory.define<TaskInfo & { state: TaskS
 	name: "task",
 	inputHash: "hash",
 	attempts: 1,
-	state: { status: "completed", output: undefined, definitionCodecApplied: false },
+	state: { status: "completed", output: undefined, definitionOutputCodecApplied: false },
 }));

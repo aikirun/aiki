@@ -129,7 +129,7 @@ export interface TaskParams<Input, Output, EncodedInput = never, EncodedOutput =
 	 * Each start and each replay builds its own codec from these factories, so keep any state that
 	 * should outlive a start or a replay outside the factory.
 	 *
-	 * Completed outputs a definition codec writes record whether it did (`definitionCodecApplied`).
+	 * Completed outputs a definition codec writes record whether it did (`definitionOutputCodecApplied`).
 	 * Stored task inputs are never decoded, so they carry no such flag. Adding or removing an output
 	 * codec on a task that has stored results is safe: readers honour the stored declaration, and
 	 * refuse with `DefinitionCodecMissingError` when a payload was written with a definition codec
@@ -245,7 +245,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			state: {
 				status: "completed",
 				output: await outputCodec.encode(output),
-				definitionCodecApplied: definitionOutputCodecApplied,
+				definitionOutputCodecApplied,
 			},
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
@@ -358,7 +358,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			state: {
 				status: "completed",
 				output: await outputCodec.encode(output),
-				definitionCodecApplied: definitionOutputCodecApplied,
+				definitionOutputCodecApplied,
 			},
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
@@ -394,11 +394,11 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		});
 
 		const definitionOutput = instantiateCodec(this.params.codec?.output, logger);
-		if (state.definitionCodecApplied && !definitionOutput) {
+		if (state.definitionOutputCodecApplied && !definitionOutput) {
 			throw new DefinitionCodecMissingError(runId, "output");
 		}
 
-		const codec = composeCodecs(state.definitionCodecApplied ? definitionOutput : undefined, clientCodec);
+		const codec = composeCodecs(state.definitionOutputCodecApplied ? definitionOutput : undefined, clientCodec);
 		const output = await codec.decode(state.output);
 
 		return output as Output;

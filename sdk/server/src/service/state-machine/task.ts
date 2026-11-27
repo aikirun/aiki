@@ -159,7 +159,7 @@ async function transitionStateInTx(
 				? {
 						status: requestTaskState.status,
 						output: requestTaskState.output,
-						definitionCodecApplied: requestTaskState.definitionCodecApplied,
+						definitionOutputCodecApplied: requestTaskState.definitionOutputCodecApplied ?? false,
 					}
 				: requestTaskState.status === "awaiting_retry"
 					? {
