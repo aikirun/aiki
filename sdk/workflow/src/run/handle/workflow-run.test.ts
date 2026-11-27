@@ -173,8 +173,18 @@ describe("workflowRunHandle", () => {
 				const record = runningWorkflowRunRecordFactory.build({ revision: 5 });
 				const handle = workflowRunHandle(client, record);
 
-				const reserveSeat = { type: "create", taskName: "reserve-seat", options: {}, inputHash: "seat-hash" } as const;
-				const chargeCard = { type: "create", taskName: "charge-card", options: {}, inputHash: "card-hash" } as const;
+				const reserveSeat = {
+					type: "create",
+					taskName: "reserve-seat",
+					options: {},
+					inputHash: "seat-hash",
+				} as const;
+				const chargeCard = {
+					type: "create",
+					taskName: "charge-card",
+					options: {},
+					inputHash: "card-hash",
+				} as const;
 				const sendReceipt = {
 					type: "create",
 					taskName: "send-receipt",
@@ -526,7 +536,7 @@ describe("workflowRunHandle", () => {
 				};
 				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const handle = workflowRunHandle(client, record, {
-					workflowCodec: {
+					definitionCodec: {
 						output: {
 							encode: async (payload) => payload,
 							decode: async (payload) => {
@@ -571,6 +581,40 @@ describe("workflowRunHandle", () => {
 					slot: "output",
 					message: expect.stringContaining("output"),
 				});
+			}));
+
+		test("decodes the completed output through the client codec only when definitionOutputCodecApplied is false even though a definition codec is present", () =>
+			withFakeClient(async (client) => {
+				const storedOutput = asOpaquePayload({ client: "done" });
+				client[INTERNAL].codec = {
+					encode: async (payload) => payload,
+					decode: async (payload) => {
+						expect(payload).toEqual(storedOutput);
+						return (payload as { client: string }).client;
+					},
+				};
+				const record = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
+				const handle = workflowRunHandle(client, record, {
+					definitionCodec: {
+						output: {
+							encode: async (payload) => payload,
+							decode: async () => {
+								throw new Error("definition output codec must not run when definitionOutputCodecApplied is false");
+							},
+						},
+					},
+				});
+
+				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
+				const completed: WorkflowRunRecord = {
+					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
+					state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: false },
+				};
+				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
+
+				const result = await handle.wait();
+
+				expect(result).toEqual({ success: true, state: { status: "completed", output: "done" } });
 			}));
 
 		test("resolves with whatever terminal state the run reached", () =>

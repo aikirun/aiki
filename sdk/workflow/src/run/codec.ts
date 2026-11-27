@@ -18,12 +18,12 @@ export interface OpaquePayloadCodec {
 	decode(payload: OpaquePayload | undefined): Promise<unknown>;
 }
 
-export type WorkflowDefinitionCodec = {
+export type DefinitionCodec = {
 	input?: Codec<unknown>;
 	output?: Codec<unknown>;
 };
 
-export type CreateWorkflowDefinitionCodec<EncodedInput = never, EncodedOutput = never> = RequireAtLeastOneProp<{
+export type CreateDefinitionCodec<EncodedInput = never, EncodedOutput = never> = RequireAtLeastOneProp<{
 	input?: CreateCodec<EncodedInput>;
 	output?: CreateCodec<EncodedOutput>;
 }>;
@@ -49,21 +49,24 @@ export function instantiateCodec(create: CreateCodec<unknown> | undefined, logge
  * errors are wrapped in `CodecInitFailedError` for the SDK to recognise, with the factory's
  * error as the cause.
  */
-export function instantiateWorkflowDefinitionCodec(
-	create: CreateWorkflowDefinitionCodec<unknown, unknown> | undefined,
+export function instantiateDefinitionCodec(
+	create: CreateDefinitionCodec<unknown, unknown> | undefined,
 	logger: Logger
-): WorkflowDefinitionCodec | undefined {
+): DefinitionCodec | undefined {
 	if (!create) {
 		return undefined;
 	}
 
-	const codec: WorkflowDefinitionCodec = {};
+	const codec: DefinitionCodec = {};
+
 	if (create.input) {
 		codec.input = instantiateCodec(create.input, logger);
 	}
+
 	if (create.output) {
 		codec.output = instantiateCodec(create.output, logger);
 	}
+
 	return codec;
 }
 
@@ -123,7 +126,7 @@ export function composeCodecs(
  * Composes the definition input codec with the client codec chosen by policy.
  * `clientCodecApplied` reflects only the client layer; `definitionInputCodecApplied` only the definition.
  */
-export function resolveWorkflowInputCodec(params: {
+export function resolveInputCodec(params: {
 	definitionCodec: Codec<unknown> | undefined;
 	clientCodec: Codec<unknown> | undefined;
 	policy: ClientCodecPolicy | undefined;

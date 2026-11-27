@@ -37,11 +37,7 @@ import { TaskFailedError } from "@aikirun/types/workflow/task";
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
-import {
-	type CreateWorkflowDefinitionCodec,
-	instantiateWorkflowDefinitionCodec,
-	resolveWorkflowInputCodec,
-} from "./run/codec";
+import { type CreateDefinitionCodec, instantiateDefinitionCodec, resolveInputCodec } from "./run/codec";
 import type { EventsDefinition } from "./run/event/definition";
 import { createEventMulticasters, type EventMulticasters } from "./run/event/multicaster";
 import { isControlFlowError } from "./run/execution/control-flow-error";
@@ -73,8 +69,8 @@ export interface WorkflowVersionParams<
 	/**
 	 * Optional codecs for this version's workflow input and output. Composed with the client's
 	 * codec at the call site and again at consumption: definition encodes first, client wraps;
-	 * decode reverses that order. Does not replace the client codec, and does not apply to tasks
-	 * or events.
+	 * decode reverses that order. Does not replace the client codec, and does not apply to task
+	 * payloads or events — tasks declare their own definition codecs.
 	 *
 	 * Each handle and each execution builds its own codec from these factories, so keep any state
 	 * that should outlive a handle or an execution outside the factory.
@@ -85,7 +81,7 @@ export interface WorkflowVersionParams<
 	 * honour the stored declaration, and refuse with `DefinitionCodecMissingError` when a payload
 	 * was written with a definition codec that is no longer present.
 	 */
-	codec?: CreateWorkflowDefinitionCodec<EncodedInput, EncodedOutput>;
+	codec?: CreateDefinitionCodec<EncodedInput, EncodedOutput>;
 }
 
 export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsDefinition = EventsDefinition> {
@@ -133,7 +129,7 @@ export interface WorkflowVersion<Input, Output, Context, TEvents extends EventsD
 		eventsDefinition: TEvents;
 		handler: (run: Omit<WorkflowRun<Context, TEvents>, "context">, input: Input) => Promise<void>;
 		runOptions: () => WorkflowRunOptions;
-		codec: CreateWorkflowDefinitionCodec<unknown, unknown> | undefined;
+		codec: CreateDefinitionCodec<unknown, unknown> | undefined;
 	};
 }
 
@@ -219,9 +215,9 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 	): Promise<WorkflowRunHandle<Output, Context, TEvents>> {
 		let input = args[0];
 		const { hasher: clientHasher, codec: clientCodec } = client[INTERNAL];
-		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger);
-		const { codec, clientCodecApplied, definitionInputCodecApplied } = resolveWorkflowInputCodec({
-			definitionCodec: workflowCodec?.input,
+		const definitionCodec = instantiateDefinitionCodec(this[INTERNAL].codec, client.logger);
+		const { codec, clientCodecApplied, definitionInputCodecApplied } = resolveInputCodec({
+			definitionCodec: definitionCodec?.input,
 			clientCodec,
 			policy: startOptions.clientCodecPolicy,
 		});
@@ -256,7 +252,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return workflowRunHandle(client, id as WorkflowRunId, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec,
+			definitionCodec,
 		});
 	}
 
@@ -289,7 +285,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			inputSchemaValidationResult instanceof Promise ? await inputSchemaValidationResult : inputSchemaValidationResult;
 		// we should use a parent hasher instead of the client to enforce consistency
 		const inputHash = { value: await parentRunHasher(input) };
-		const workflowCodec = instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, parentRunLogger);
+		const definitionCodec = instantiateDefinitionCodec(this[INTERNAL].codec, parentRunLogger);
 
 		const referenceId = startOptions.reference?.id;
 		const address = getCompositeId<WorkflowRunAddress>({
@@ -319,7 +315,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 				return childWorkflowRunHandle(client, existingRun, parentRunHandle, logger, {
 					eventsDefinition: this[INTERNAL].eventsDefinition,
-					workflowCodec,
+					definitionCodec,
 				});
 			}
 
@@ -339,8 +335,8 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 			return this.failRun(parentRunHandle, { attempts: parentRunHandle.run.attempts, err }, parentRunLogger);
 		}
 
-		const { codec, clientCodecApplied, definitionInputCodecApplied } = resolveWorkflowInputCodec({
-			definitionCodec: workflowCodec?.input,
+		const { codec, clientCodecApplied, definitionInputCodecApplied } = resolveInputCodec({
+			definitionCodec: definitionCodec?.input,
 			clientCodec: client[INTERNAL].codec,
 			policy: startOptions.clientCodecPolicy,
 		});
@@ -384,7 +380,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return childWorkflowRunHandle(client, newRun, parentRunHandle, logger, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec,
+			definitionCodec,
 		});
 	}
 
@@ -430,7 +426,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 		});
 		return workflowRunHandle(client, run as WorkflowRunRecord, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec: instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger),
+			definitionCodec: instantiateDefinitionCodec(this[INTERNAL].codec, client.logger),
 		});
 	}
 
@@ -446,7 +442,7 @@ export class WorkflowVersionImpl<Input, Output, Context, TEvents extends EventsD
 
 		return workflowRunHandle(client, run as WorkflowRunRecord, {
 			eventsDefinition: this[INTERNAL].eventsDefinition,
-			workflowCodec: instantiateWorkflowDefinitionCodec(this[INTERNAL].codec, client.logger),
+			definitionCodec: instantiateDefinitionCodec(this[INTERNAL].codec, client.logger),
 		});
 	}
 

@@ -1,4 +1,5 @@
 import type { TimestampMs } from "@aikirun/lib/timestamp";
+import type { TaskState } from "@aikirun/types/workflow/task";
 import { ulid } from "ulidx";
 import { describe, expect, test } from "vitest";
 
@@ -36,7 +37,36 @@ describe("task repository getByIdWithState", () => {
 			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
 
 			expect(row?.state).toHaveProperty("output");
-			expect(row?.state).toEqual({ status: "completed", output: undefined });
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
+		}));
+
+	test("returns a completed state carrying definitionOutputCodecApplied when the stored JSON omitted it", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+			const transitionId = ulid();
+			// Pre-flag completed JSON has neither output nor definitionOutputCodecApplied.
+			await repos.stateTransition.append({
+				id: transitionId,
+				workflowRunId: runId,
+				type: "task",
+				taskId: taskInfo.id,
+				attempt: 1,
+				revision: revisionWhenClaimed,
+				taskSequence: latestTaskSequence + 1,
+				state: { status: "completed" } as TaskState,
+			});
+			await repos.task.update(
+				{ id: taskInfo.id, workflowRunId: runId, status: "running", attempts: 1 },
+				{ status: "completed", attempts: 1, latestStateTransitionId: transitionId, nextAttemptAt: null }
+			);
+
+			const row = await repos.task.getByIdWithState(context.namespaceId, taskInfo.id);
+
+			expect(row?.state).toEqual({ status: "completed", output: undefined, definitionOutputCodecApplied: false });
 		}));
 
 	test("finds a task only through its own namespace", () =>

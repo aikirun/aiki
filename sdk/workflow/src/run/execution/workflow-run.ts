@@ -27,7 +27,7 @@ import { isControlFlowError } from "./control-flow-error";
 import { createReplayManifest } from "./replay-manifest";
 import { taskExecutionTracker } from "./task-execution-tracker";
 import type { AnyWorkflowVersion } from "../../workflow-version";
-import { instantiateWorkflowDefinitionCodec } from "../codec";
+import { instantiateDefinitionCodec } from "../codec";
 import { createEventWaiters } from "../event/waiter";
 import { workflowRunHandle } from "../handle/workflow-run";
 import { createSleeper } from "../sleeper";
@@ -90,7 +90,7 @@ export async function executeWorkflowRun<Context>(params: ExecuteWorkflowParams<
 		const handle = workflowRunHandle(client, workflowRun, {
 			eventsDefinition,
 			logger,
-			workflowCodec: instantiateWorkflowDefinitionCodec(workflowVersion[INTERNAL].codec, logger),
+			definitionCodec: instantiateDefinitionCodec(workflowVersion[INTERNAL].codec, logger),
 		});
 		const { create: createTaskExecutionTracker, flush: taskExecutionsFlusher } = taskExecutionTracker(handle, logger);
 		flushTaskExecutions = taskExecutionsFlusher;

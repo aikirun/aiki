@@ -94,7 +94,11 @@ export async function seedTaskInEachStatusOnRun(
 		expectedWorkflowRunRevision: run.revisionWhenClaimed,
 		sequence: taskToFail.latestTaskSequence + 2,
 		attempts: 1,
-		state: { status: "completed", output: asOpaquePayload({ trackingId: "trk-8" }) },
+		state: {
+			status: "completed",
+			output: asOpaquePayload({ trackingId: "trk-8" }),
+			definitionOutputCodecApplied: false,
+		},
 	});
 	await taskStateMachine.transitionState(namespaceRequestContext, {
 		id: taskToFail.taskInfo.id,
@@ -339,7 +343,7 @@ export async function seedCompletedTask(
 		expectedWorkflowRunRevision: seeded.revisionWhenClaimed,
 		sequence: taskSequence,
 		attempts: 1,
-		state: { status: "completed", output: asOpaquePayload(output) },
+		state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 	});
 
 	return { ...seeded, taskInfo, latestTaskSequence: taskSequence, taskOutput: output };

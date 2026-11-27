@@ -34,7 +34,7 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { describe, expect, test } from "vitest";
 
 import type { WorkflowRun } from "./run";
-import type { WorkflowDefinitionCodec } from "./run/codec";
+import type { DefinitionCodec } from "./run/codec";
 import type { ControlFlowError } from "./run/execution/control-flow-error";
 import { createReplayManifest } from "./run/execution/replay-manifest";
 import { taskExecutionTracker } from "./run/execution/task-execution-tracker";
@@ -45,7 +45,7 @@ import { workflow } from "./workflow";
 function createTestWorkflowRun(
 	client: Client,
 	record: WorkflowRunRecord,
-	options: { workflowCodec?: WorkflowDefinitionCodec } = {}
+	options: { definitionCodec?: DefinitionCodec } = {}
 ): WorkflowRun<null, Record<string, never>> {
 	const handle = workflowRunHandle(client, record, options);
 	return {
@@ -302,7 +302,7 @@ describe("workflow version execution", () => {
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async (payload) => ({ input: payload }),
 							decode: async (payload) => payload,
@@ -361,7 +361,7 @@ describe("workflow version execution", () => {
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build({ clientCodecApplied: true });
 				const run = createTestWorkflowRun(client, runRecord, {
-					workflowCodec: {
+					definitionCodec: {
 						input: {
 							encode: async (payload) => ({ input: payload }),
 							decode: async (payload) => payload,
@@ -413,7 +413,7 @@ describe("workflow version execution", () => {
 				});
 				const runRecord = runningWorkflowRunRecordFactory.build();
 				const run = createTestWorkflowRun(client, runRecord, {
-					workflowCodec: {
+					definitionCodec: {
 						output: {
 							encode: async () => {
 								throw encodeError;

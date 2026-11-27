@@ -28,11 +28,11 @@ import type { TaskInfo } from "@aikirun/types/workflow/task";
 
 import {
 	composeCodecs,
+	type DefinitionCodec,
 	noopCodec,
 	type OpaquePayloadCodec,
 	resolveAppliedClientCodec,
 	toOpaquePayloadCodec,
-	type WorkflowDefinitionCodec,
 } from "../codec";
 import type { EventsDefinition } from "../event/definition";
 import { createEventSenders, type EventSenders } from "../event/sender";
@@ -42,7 +42,7 @@ import { taskHandlerScopeStorage } from "../execution/task-handler-scope";
 export interface WorkflowRunHandleOptions<TEvents extends EventsDefinition> {
 	eventsDefinition?: TEvents;
 	logger?: Logger;
-	workflowCodec?: WorkflowDefinitionCodec;
+	definitionCodec?: DefinitionCodec;
 }
 
 export function workflowRunHandle<Output, Context, TEvents extends EventsDefinition>(
@@ -76,7 +76,7 @@ export function workflowRunHandle<Output, Context, TEvents extends EventsDefinit
 						"aiki.workflowVersionId": run.versionId,
 						"aiki.workflowRunId": run.id,
 					}),
-				options?.workflowCodec
+				options?.definitionCodec
 			);
 		})();
 	}
@@ -92,7 +92,7 @@ export function workflowRunHandle<Output, Context, TEvents extends EventsDefinit
 				"aiki.workflowVersionId": run.versionId,
 				"aiki.workflowRunId": run.id,
 			}),
-		options?.workflowCodec
+		options?.definitionCodec
 	);
 }
 
@@ -235,7 +235,7 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 		private _run: WorkflowRunRecord,
 		eventsDefinition: TEvents,
 		private readonly logger: Logger,
-		workflowCodec?: WorkflowDefinitionCodec
+		definitionCodec?: DefinitionCodec
 	) {
 		this.api = client.api;
 		this.events = createEventSenders(client, this._run.id, eventsDefinition, this.logger);
@@ -250,10 +250,10 @@ class WorkflowRunHandleImpl<Output, Context, TEvents extends EventsDefinition>
 			client,
 			codec: {
 				client: clientCodec ? toOpaquePayloadCodec(clientCodec) : noopCodec,
-				workflowInputCodec: composeCodecs(workflowCodec?.input, clientCodec),
-				workflowOutputCodec: composeCodecs(workflowCodec?.output, clientCodec),
-				definitionInputCodecApplied: workflowCodec?.input !== undefined,
-				definitionOutputCodecApplied: workflowCodec?.output !== undefined,
+				workflowInputCodec: composeCodecs(definitionCodec?.input, clientCodec),
+				workflowOutputCodec: composeCodecs(definitionCodec?.output, clientCodec),
+				definitionInputCodecApplied: definitionCodec?.input !== undefined,
+				definitionOutputCodecApplied: definitionCodec?.output !== undefined,
 			},
 			transitionStateOptimistic: this.transitionStateOptimistic.bind(this),
 			transitionTaskState: this.transitionTaskState.bind(this),

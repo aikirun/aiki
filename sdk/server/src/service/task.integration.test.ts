@@ -87,6 +87,62 @@ describe("TaskService setTaskState", () => {
 			await taskService.setTaskState(context, {
 				id: taskInfo.id,
 				workflowRunId: runId,
+				state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
+			});
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					attempts: 2,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
+				}),
+			]);
+		}));
+
+	test("completes a running task with definitionOutputCodecApplied true", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const output = { reservationId: "rsv-1" };
+			const taskService = createTaskService({ repos });
+			await taskService.setTaskState(context, {
+				id: taskInfo.id,
+				workflowRunId: runId,
+				state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+			});
+
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					attempts: 2,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+				}),
+			]);
+			expect(await taskService.getTaskById(context, taskInfo.id)).toEqual(
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+				})
+			);
+		}));
+
+	test("defaults definitionOutputCodecApplied to false when omitted on completed state", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, taskInfo } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const output = { reservationId: "rsv-2" };
+			const taskService = createTaskService({ repos });
+			await taskService.setTaskState(context, {
+				id: taskInfo.id,
+				workflowRunId: runId,
 				state: { status: "completed", output: asOpaquePayload(output) },
 			});
 
@@ -94,7 +150,7 @@ describe("TaskService setTaskState", () => {
 				expect.objectContaining({
 					id: taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output: asOpaquePayload(output) },
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
 				}),
 			]);
 		}));
@@ -115,7 +171,11 @@ describe("TaskService setTaskState", () => {
 			await taskService.setTaskState(context, {
 				id: seeded.taskInfo.id,
 				workflowRunId: seeded.runId,
-				state: { status: "completed", output: asOpaquePayload({ reservationId: "rsv-1" }) },
+				state: {
+					status: "completed",
+					output: asOpaquePayload({ reservationId: "rsv-1" }),
+					definitionOutputCodecApplied: false,
+				},
 			});
 
 			const { rows } = await repos.stateTransition.listByRunId(seeded.runId, 50, 0, { order: "asc" });
@@ -176,7 +236,7 @@ describe("TaskService setTaskState", () => {
 				taskService.setTaskState(context, {
 					id: victimTaskSeed.taskInfo.id,
 					workflowRunId: attackerRunSeed.runId,
-					state: { status: "completed", output: asOpaquePayload("hijacked") },
+					state: { status: "completed", output: asOpaquePayload("hijacked"), definitionOutputCodecApplied: false },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 
@@ -201,7 +261,11 @@ describe("TaskService setTaskState", () => {
 				taskService.setTaskState(context, {
 					id: taskInfo.id,
 					workflowRunId: runId,
-					state: { status: "completed", output: asOpaquePayload({ reservationId: "rsv-1" }) },
+					state: {
+						status: "completed",
+						output: asOpaquePayload({ reservationId: "rsv-1" }),
+						definitionOutputCodecApplied: false,
+					},
 				})
 			).rejects.toBeInstanceOf(WorkflowRunTerminatedError);
 

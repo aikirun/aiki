@@ -31,6 +31,7 @@ export interface TaskStateAwaitingRetry {
 export interface TaskStateCompleted {
 	status: "completed";
 	output?: OpaquePayload;
+	definitionOutputCodecApplied: boolean;
 }
 
 export interface TaskStateFailed {

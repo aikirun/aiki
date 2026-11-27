@@ -205,12 +205,78 @@ describe("TaskStateMachine transitionState", () => {
 					sequence: 1,
 					id: victimTaskSeed.taskInfo.id,
 					attempts: 2,
-					state: { status: "completed", output: asOpaquePayload("hijacked") },
+					state: { status: "completed", output: asOpaquePayload("hijacked"), definitionOutputCodecApplied: false },
 				})
 			).rejects.toBeInstanceOf(NotFoundError);
 
 			expect(await repos.task.getById({ id: victimTaskSeed.taskInfo.id, workflowRunId: victimTaskSeed.runId })).toEqual(
 				victimRowBefore
 			);
+		}));
+
+	test("defaults definitionOutputCodecApplied to false when omitted on completed transition", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const output = { reservationId: "rsv-2" };
+			const taskStateMachine = createTaskStateMachine({ repos });
+			const result = await taskStateMachine.transitionState(context, {
+				workflowRunId: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
+				id: taskInfo.id,
+				attempts: taskInfo.attempts,
+				state: { status: "completed", output: asOpaquePayload(output) },
+			});
+
+			expect(result).toEqual(
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
+				})
+			);
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: false },
+				}),
+			]);
+		}));
+
+	test("preserves definitionOutputCodecApplied true on completed transition", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const output = { reservationId: "rsv-3" };
+			const taskStateMachine = createTaskStateMachine({ repos });
+			const result = await taskStateMachine.transitionState(context, {
+				workflowRunId: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
+				id: taskInfo.id,
+				attempts: taskInfo.attempts,
+				state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+			});
+
+			expect(result).toEqual(
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+				})
+			);
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+				}),
+			]);
 		}));
 });
