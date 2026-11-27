@@ -608,7 +608,7 @@ describe("workflowRunHandle", () => {
 				client.api.workflowRun.hasTerminatedV1.once({ id: record.id }, { terminated: true });
 				const completed: WorkflowRunRecord = {
 					...baseWorkflowRunRecordFactory.build({ id: record.id, clientCodecApplied: true }),
-					state: { status: "completed", output: storedOutput, definitionCodecApplied: false },
+					state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: false },
 				};
 				client.api.workflowRun.getByIdV1.once({ id: record.id }, { run: completed });
 

@@ -16,6 +16,7 @@ import { createSerializableError } from "@aikirun/lib/serializable";
 import { INTERNAL } from "@aikirun/types/symbols";
 import type { UnconsumedManifestEntries, WorkflowRunId } from "@aikirun/types/workflow/run";
 import {
+	DefinitionCodecMissingError,
 	NonDeterminismError,
 	WorkflowRunFailedError,
 	WorkflowRunSuspendedError,
@@ -34,14 +35,13 @@ import type { StandardSchemaV1 } from "@standard-schema/spec";
 
 import type { WorkflowRun } from "./run";
 import {
-	type ComposedCodec,
 	type CreateDefinitionCodec,
 	composeCodecs,
 	type DefinitionCodec,
 	instantiateCodec,
 	instantiateDefinitionCodec,
+	type OpaquePayloadCodec,
 	resolveAppliedClientCodec,
-	resolveDeclaredDefinitionCodec,
 } from "./run/codec";
 import type { WorkflowExecutionConfig } from "./run/execution/config";
 import type { TaskExecutionTracker } from "./run/execution/task-execution-tracker";
@@ -211,7 +211,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		const attempts = 1;
 		const retryStrategy = startOptions.retry ?? { type: "never" };
 		const taskCodec = instantiateDefinitionCodec(this.params.codec, logger);
-		const { inputCodec, outputCodec } = this.bindTaskCodecs(handle, taskCodec);
+		const { inputCodec, outputCodec, definitionOutputCodecApplied } = this.bindTaskCodecs(handle, taskCodec);
 
 		const taskInfo = await handle[INTERNAL].transitionTaskState({
 			type: "create",
@@ -245,7 +245,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			state: {
 				status: "completed",
 				output: await outputCodec.encode(output),
-				definitionCodecApplied: outputCodec.definitionCodecSupplied,
+				definitionCodecApplied: definitionOutputCodecApplied,
 			},
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
@@ -348,7 +348,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			taskLogger
 		);
 
-		const { outputCodec } = this.bindTaskCodecs(handle, {
+		const { outputCodec, definitionOutputCodecApplied } = this.bindTaskCodecs(handle, {
 			output: instantiateCodec(this.params.codec?.output, logger),
 		});
 
@@ -358,7 +358,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			state: {
 				status: "completed",
 				output: await outputCodec.encode(output),
-				definitionCodecApplied: outputCodec.definitionCodecSupplied,
+				definitionCodecApplied: definitionOutputCodecApplied,
 			},
 		});
 		taskLogger.debug("Task complete", { "aiki.attempts": lastAttempt });
@@ -369,7 +369,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 	private bindTaskCodecs(
 		handle: UnknownWorkflowRunHandle,
 		taskCodec: DefinitionCodec | undefined
-	): { inputCodec: ComposedCodec; outputCodec: ComposedCodec } {
+	): { inputCodec: OpaquePayloadCodec; outputCodec: OpaquePayloadCodec; definitionOutputCodecApplied: boolean } {
 		const runId = handle.run.id as WorkflowRunId;
 		const clientCodec = resolveAppliedClientCodec(handle[INTERNAL].client, {
 			runId,
@@ -378,6 +378,7 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 		return {
 			inputCodec: composeCodecs(taskCodec?.input, clientCodec),
 			outputCodec: composeCodecs(taskCodec?.output, clientCodec),
+			definitionOutputCodecApplied: taskCodec?.output !== undefined,
 		};
 	}
 
@@ -392,12 +393,13 @@ class TaskImpl<Input, Output> implements Task<Input, Output> {
 			clientCodecApplied: handle.run.clientCodecApplied,
 		});
 
-		const definitionOutput = resolveDeclaredDefinitionCodec(instantiateCodec(this.params.codec?.output, logger), {
-			runId,
-			definitionCodecApplied: state.definitionCodecApplied,
-		});
+		const definitionOutput = instantiateCodec(this.params.codec?.output, logger);
+		if (state.definitionCodecApplied && !definitionOutput) {
+			throw new DefinitionCodecMissingError(runId, "output");
+		}
 
-		const output = await composeCodecs(definitionOutput, clientCodec).decode(state.output);
+		const codec = composeCodecs(state.definitionCodecApplied ? definitionOutput : undefined, clientCodec);
+		const output = await codec.decode(state.output);
 
 		return output as Output;
 	}

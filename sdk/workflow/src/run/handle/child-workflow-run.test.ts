@@ -192,7 +192,7 @@ describe("childWorkflowRunHandle", () => {
 						[childRecord.id]: {
 							timeouts: [],
 							terminal: {
-								state: { status: "completed", output: storedOutput, definitionCodecApplied: false },
+								state: { status: "completed", output: storedOutput, definitionOutputCodecApplied: false },
 								completedAt: 1_000,
 							},
 						},
