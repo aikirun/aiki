@@ -246,4 +246,37 @@ describe("TaskStateMachine transitionState", () => {
 				}),
 			]);
 		}));
+
+	test("preserves definitionOutputCodecApplied true on completed transition", () =>
+		withHarness(async ({ context, repos, publisher }) => {
+			const { runId, revisionWhenClaimed, taskInfo, latestTaskSequence } = await seedRunningTask({
+				namespaceRequestContext: context,
+				repos,
+				publisher,
+			});
+
+			const output = { reservationId: "rsv-3" };
+			const taskStateMachine = createTaskStateMachine({ repos });
+			const result = await taskStateMachine.transitionState(context, {
+				workflowRunId: runId,
+				expectedWorkflowRunRevision: revisionWhenClaimed,
+				sequence: latestTaskSequence + 1,
+				id: taskInfo.id,
+				attempts: taskInfo.attempts,
+				state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+			});
+
+			expect(result).toEqual(
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+				})
+			);
+			expect(await repos.task.listByWorkflowRunIdWithState(runId)).toEqual([
+				expect.objectContaining({
+					id: taskInfo.id,
+					state: { status: "completed", output: asOpaquePayload(output), definitionOutputCodecApplied: true },
+				}),
+			]);
+		}));
 });
